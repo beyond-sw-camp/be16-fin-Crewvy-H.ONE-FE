@@ -8,12 +8,18 @@ import PayrollInsuranceDeduction from '../../views/payroll/PayrollInsuranceDeduc
 import PayrollStatusOutput from '../../views/payroll/PayrollStatusOutput.vue'
 import PayrollWithholdingReport from '../../views/payroll/PayrollWithholdingReport.vue'
 import PayrollElderlyIncentive from '../../views/payroll/PayrollElderlyIncentive.vue'
+import PayrollItemManagement from '../../views/payroll/PayrollItemManagement.vue'
 
 const routes = [
   {
     path: '/payroll',
     name: 'Payroll',
     component: Payroll
+  },
+  {
+    path: '/payroll/item-management',
+    name: 'PayrollItemManagement',
+    component: PayrollItemManagement
   },
   {
     path: '/payroll/basic-info',

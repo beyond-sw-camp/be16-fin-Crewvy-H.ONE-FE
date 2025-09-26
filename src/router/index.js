@@ -9,6 +9,8 @@ import approvalRoutes from './routes/approval';
 import Dashboard from '@/views/dashboard/Dashboard.vue';
 import LandingPage3 from '@/views/LandingPage3.vue';
 import PerformanceRoutes from './routes/performance';
+import meetingRoutes from './routes/meeting';
+import reservationRoutes from './routes/reservation';
 
 const routes = [
   {
@@ -29,6 +31,8 @@ const routes = [
   ...appsRoutes,
   ...approvalRoutes,
   ...PerformanceRoutes,
+  ...meetingRoutes,
+  ...reservationRoutes,
 ];
 
 const router = createRouter({
