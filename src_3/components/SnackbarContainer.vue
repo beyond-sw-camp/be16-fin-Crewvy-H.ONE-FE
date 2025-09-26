@@ -9,7 +9,6 @@
       :message="snackbar.message"
       :duration="snackbar.duration"
       :position="snackbar.position"
-      :pushing="snackbar.pushing"
       @close="removeSnackbar(snackbar.id)"
     />
   </div>

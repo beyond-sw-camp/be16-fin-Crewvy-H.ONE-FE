@@ -1,7 +1,13 @@
 <template>
   <div id="app">
-    <MainLayout v-if="!isLandingPage" />
-    <router-view v-if="isLandingPage" />
+    <template v-if="$route.meta.hideLayout">
+      <router-view />
+    </template>
+    <template v-else>
+      <MainLayout>
+        <router-view />
+      </MainLayout>
+    </template>
     <SnackbarContainer />
   </div>
 </template>
@@ -15,11 +21,6 @@ export default {
   components: {
     MainLayout,
     SnackbarContainer
-  },
-  computed: {
-    isLandingPage() {
-      return this.$route.path === '/landing'
-    }
   }
 }
 </script>

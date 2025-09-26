@@ -63,8 +63,8 @@
                 <div class="setting-item">
                   <label class="setting-label">연차적용</label>
                   <el-radio-group v-model="calculationSettings.annualLeave">
-                    <el-radio label="기본(10)">기본(10)</el-radio>
-                    <el-radio label="연봉제(15)">연봉제(15)</el-radio>
+                    <el-radio label="기본">기본</el-radio>
+                    <el-radio label="연봉제">연봉제</el-radio>
                   </el-radio-group>
                 </div>
 
@@ -100,7 +100,7 @@
                 <!-- 국민연금 비공제연령 -->
                 <div class="setting-item">
                   <label class="setting-label">국민연금 비공제연령</label>
-                  <el-input v-model="calculationSettings.nationalPensionAge" prefix="만" suffix="세" readonly class="is-readonly" />
+                  <el-input v-model="calculationSettings.nationalPensionAge" prefix="만" suffix="세" />
                 </div>
 
                 <!-- 건강보험 자동계산 -->
@@ -490,43 +490,6 @@ export default {
 .result-item.final .result-value {
   color: #1976d2;
   font-size: 18px;
-}
-
-/* 읽기 전용 input 스타일 - is-readonly 클래스 직접 대상 */
-.is-readonly {
-  background-color: #f5f7fa !important;
-  opacity: 0.7 !important;
-}
-
-.is-readonly input {
-  background-color: #f5f7fa !important;
-  color: #909399 !important;
-  cursor: not-allowed !important;
-}
-
-.is-readonly .el-input__wrapper {
-  background-color: #f5f7fa !important;
-  border-color: #e4e7ed !important;
-  cursor: not-allowed !important;
-}
-
-.is-readonly .el-input__inner {
-  background-color: #f5f7fa !important;
-  color: #909399 !important;
-  cursor: not-allowed !important;
-}
-
-.is-readonly .el-input__control {
-  background-color: #f5f7fa !important;
-  color: #909399 !important;
-  cursor: not-allowed !important;
-}
-
-/* 모든 하위 요소에 스타일 적용 */
-.is-readonly * {
-  background-color: #f5f7fa !important;
-  color: #909399 !important;
-  cursor: not-allowed !important;
 }
 
 /* 반응형 디자인 */

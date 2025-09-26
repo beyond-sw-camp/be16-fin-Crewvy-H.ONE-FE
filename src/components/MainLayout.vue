@@ -43,23 +43,37 @@
           <span>직원 관리</span>
         </el-menu-item>
         
-        <el-menu-item index="/attendance">
-          <el-icon><Clock /></el-icon>
-          <span>근태 관리</span>
-        </el-menu-item>
+        <el-sub-menu index="attendance">
+          <template #title>
+            <el-icon><Clock /></el-icon>
+            <span>근태 관리</span>
+          </template>
+          <el-menu-item index="/attendance">
+            <span>내 근태 현황</span>
+          </el-menu-item>
+          <el-menu-item index="/leave-request">
+            <span>휴가/출장 신청</span>
+          </el-menu-item>
+          <el-menu-item index="/shared-calendar">
+            <span>공유 캘린더</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/attendance">
+            <span>관리자 근태 현황</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/leave-management">
+            <span>관리자 연차 현황</span>
+          </el-menu-item>
+        </el-sub-menu>
         
         <el-sub-menu index="payroll">
           <template #title>
             <el-icon><Money /></el-icon>
-            <span>급여</span>
+            <span>급여 관리</span>
           </template>
           <el-sub-menu index="payroll-management">
             <template #title>
               <span>급여 관리</span>
             </template>
-            <el-menu-item index="/payroll/item-management">
-              <span>급여 기초 정보</span>
-            </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
               <span>급여 기본 정보</span>
             </el-menu-item>
@@ -89,6 +103,11 @@
           </el-sub-menu>
         </el-sub-menu>
         
+        <el-menu-item index="/chat">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>채팅</span>
+        </el-menu-item>
+        
         <el-menu-item index="/meeting">
           <el-icon><VideoCamera /></el-icon>
           <span>화상회의</span>
@@ -104,16 +123,24 @@
           <span>게시판</span>
         </el-menu-item>
         
-        <el-sub-menu index="resource">
+        <el-menu-item index="/resource">
+          <el-icon><Calendar /></el-icon>
+          <span>예약</span>
+        </el-menu-item>
+
+        <el-sub-menu index="settings">
           <template #title>
-            <el-icon><Calendar /></el-icon>
-            <span>예약</span>
+            <el-icon><Setting /></el-icon>
+            <span>환경설정</span>
           </template>
-          <el-menu-item index="/resource/reservation">
-            <span>예약하기</span>
+          <el-menu-item index="/admin/policy-management">
+            <span>근태 정책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/resource/management">
-            <span>자원 관리</span>
+          <el-menu-item index="/admin/work-location-management">
+            <span>근무지 관리</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/audit-log">
+            <span>감사 로그</span>
           </el-menu-item>
         </el-sub-menu>
         
@@ -404,18 +431,18 @@
       <div class="calendar-modal">
         <div class="calendar-header">
           <div class="calendar-controls">
-            <el-button @click="prevMonth" circle>
-              <el-icon><ArrowLeft /></el-icon>
-            </el-button>
+            <el-button @click="prevMonth" :icon="ArrowLeft" circle />
             <h3>{{ currentMonthYear }}</h3>
-            <el-button @click="nextMonth" circle>
-              <el-icon><ArrowRight /></el-icon>
-            </el-button>
+            <el-button @click="nextMonth" :icon="ArrowRight" circle />
           </div>
           <div class="calendar-actions">
             <el-button type="primary" @click="addEvent">
               <el-icon><Plus /></el-icon>
               일정 추가
+            </el-button>
+            <el-button @click="goToSharedCalendar">
+              <el-icon><Calendar /></el-icon>
+              전체 캘린더 보기
             </el-button>
           </div>
         </div>
@@ -556,7 +583,6 @@ export default {
       sessionExpiryTime: null,
       sessionTimer: null,
       currentTime: new Date(),
-      sessionWarningShown: false, // 세션 경고 표시 여부 추적
       expandedDepartments: {
         management: false,
         sales: true
@@ -565,63 +591,63 @@ export default {
         {
           id: 1,
           title: '주간 팀 미팅',
-          date: this.formatDateForEvent(new Date()),
+          date: '2024-09-20',
           type: 'meeting',
           time: '14:00'
         },
         {
           id: 2,
           title: '회의실 예약',
-          date: this.formatDateForEvent(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+          date: '2024-09-22',
           type: 'reservation',
           time: '10:00'
         },
         {
           id: 3,
           title: '연차 휴가',
-          date: this.formatDateForEvent(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-25',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 4,
           title: '프로젝트 마감',
-          date: this.formatDateForEvent(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-30',
           type: 'deadline',
           time: '18:00'
         },
         {
           id: 5,
           title: '월간 보고서 회의',
-          date: this.formatDateForEvent(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-15',
           type: 'meeting',
           time: '15:00'
         },
         {
           id: 6,
           title: '고객사 미팅',
-          date: this.formatDateForEvent(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-18',
           type: 'meeting',
           time: '11:00'
         },
         {
           id: 7,
           title: '법인 차량 예약',
-          date: this.formatDateForEvent(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-19',
           type: 'reservation',
           time: '09:00'
         },
         {
           id: 8,
           title: '반차 휴가',
-          date: this.formatDateForEvent(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-23',
           type: 'vacation',
           time: '14:00'
         },
         {
           id: 9,
           title: '신규 프로젝트 킥오프',
-          date: this.formatDateForEvent(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000)),
+          date: '2024-09-24',
           type: 'meeting',
           time: '10:00'
         },
@@ -728,11 +754,6 @@ export default {
         return path
       }
       
-      // 예약 관련 경로인 경우 해당 경로를 반환 (하위 메뉴 활성화)
-      if (path.startsWith('/resource')) {
-        return path
-      }
-      
       return path
     },
     openedMenus() {
@@ -742,10 +763,13 @@ export default {
       if (path.startsWith('/payroll')) {
         return ['payroll', 'payroll-management', 'payroll-inquiry']
       }
+
+      if (path.startsWith('/attendance') || path.startsWith('/admin/attendance') || path.startsWith('/admin/leave-management') || path.startsWith('/leave-request') || path.startsWith('/shared-calendar')) {
+        return ['attendance']
+      }
       
-      // 예약 관련 경로인 경우 예약 메뉴를 열어둠
-      if (path.startsWith('/resource')) {
-        return ['resource']
+      if (path.startsWith('/admin/policy-management') || path.startsWith('/admin/work-location-management') || path.startsWith('/admin/audit-log')) {
+        return ['settings']
       }
       
       return []
@@ -817,9 +841,12 @@ export default {
         '/': '대시보드',
         '/organization': '조직도',
         '/employee': '직원 관리',
-        '/attendance': '근태 관리',
+        '/attendance': '내 근태 현황',
+        '/leave-request': '휴가/출장 신청',
+        '/shared-calendar': '공유 캘린더',
+        '/admin/attendance': '관리자 근태 현황',
+        '/admin/leave-management': '관리자 연차 현황',
         '/payroll': '급여 관리',
-        '/payroll/item-management': '급여기초정보',
         '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
         '/payroll/transfer-output': '급여 이체 출력',
@@ -833,8 +860,10 @@ export default {
         '/meeting': '화상회의',
         '/approval': '전자결재',
         '/board': '게시판',
-        '/resource/reservation': '예약하기',
-        '/resource/management': '자원 관리'
+        '/resource': '예약',
+        '/admin/policy-management': '근태 정책 관리',
+        '/admin/work-location-management': '근무지 관리',
+        '/admin/audit-log': '감사 로그'
       }
       return titles[this.$route.path] || 'H.ONE'
     },
@@ -858,20 +887,16 @@ export default {
       this.showOrgModal = false
       done()
     },
-    formatDateForEvent(date) {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    },
     openCalendarModal() {
-      // 캘린더를 열 때마다 현재 달로 리셋
-      this.currentDate = new Date()
       this.showCalendarModal = true
     },
     handleCalendarClose(done) {
       this.showCalendarModal = false
       done()
+    },
+    goToSharedCalendar() {
+      this.showCalendarModal = false;
+      this.$router.push('/shared-calendar');
     },
     prevMonth() {
       this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1)
@@ -932,7 +957,7 @@ export default {
         
         if (diff <= 0) {
           this.handleSessionExpiry()
-        } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000 && !this.sessionWarningShown) { // 5분 남았을 때 한 번만 경고
+        } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
           this.showSessionWarning()
         }
       }, 1000)
@@ -944,13 +969,11 @@ export default {
       this.info('로그인 페이지로 이동합니다.')
     },
     showSessionWarning() {
-      this.sessionWarningShown = true // 경고 표시 플래그 설정
       this.warning('세션이 곧 만료됩니다. (5분 남음)')
     },
     extendSession() {
       // 세션 연장 (30분 추가)
       this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
-      this.sessionWarningShown = false // 경고 상태 리셋
       this.success('세션이 연장되었습니다.')
     },
     updatePayrollMenuState() {
@@ -1554,7 +1577,7 @@ export default {
 
 .calendar-day.today {
   background: #f0f9ff;
-  border: 2px solid #93c5fd;
+  border: 2px solid #4f46e5;
 }
 
 .calendar-day.has-events {
@@ -1848,18 +1871,6 @@ export default {
 }
 
 .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active) > .el-sub-menu__title .el-icon {
-  color: #4f46e5 !important;
-}
-
-/* 예약 하위 메뉴가 활성화된 경우 최상위 예약 메뉴만 활성화 */
-.el-sub-menu[index="resource"]:has(.el-menu-item.is-active) > .el-sub-menu__title {
-  background: #f0f9ff !important;
-  color: #4f46e5 !important;
-  border-right: 3px solid #4f46e5 !important;
-  font-weight: 600 !important;
-}
-
-.el-sub-menu[index="resource"]:has(.el-menu-item.is-active) > .el-sub-menu__title .el-icon {
   color: #4f46e5 !important;
 }
 </style>

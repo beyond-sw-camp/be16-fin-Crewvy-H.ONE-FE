@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="snackbar" :class="[`snackbar--${type}`, `snackbar--${position}`, { 'snackbar--visible': visible, 'snackbar--pushing': pushing }]">
+  <div v-if="visible" class="snackbar" :class="[`snackbar--${type}`, `snackbar--${position}`, { 'snackbar--visible': visible }]">
     <div class="snackbar__content">
       <div class="snackbar__icon">
         <el-icon v-if="type === 'success'"><Check /></el-icon>
@@ -21,7 +21,6 @@
 <script>
 export default {
   name: 'SnackbarComponent',
-  emits: ['close'],
   props: {
     visible: {
       type: Boolean,
@@ -48,10 +47,6 @@ export default {
       type: String,
       default: 'top-center',
       validator: (value) => ['top-left', 'top-right', 'top-center', 'bottom-left', 'bottom-right'].includes(value)
-    },
-    pushing: {
-      type: Boolean,
-      default: false
     }
   },
   watch: {
@@ -100,16 +95,6 @@ export default {
 
 .snackbar--top-center.snackbar--visible {
   transform: translateX(-50%) translateY(0);
-}
-
-/* 위로 밀어내는 애니메이션 */
-.snackbar--pushing {
-  transform: translateX(0) translateY(-50%);
-  opacity: 0;
-}
-
-.snackbar--top-center.snackbar--pushing {
-  transform: translateX(-50%) translateY(-50%);
 }
 
 .snackbar--top-left {

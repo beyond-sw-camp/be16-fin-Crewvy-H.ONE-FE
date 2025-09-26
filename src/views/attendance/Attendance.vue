@@ -10,10 +10,6 @@
           <el-icon><Clock /></el-icon>
           <span style="margin-left: 8px;">{{ isCheckedIn ? '퇴근 체크' : '출근 체크' }}</span>
         </el-button>
-        <el-button @click="showVacationRequest = true">
-          <el-icon><Calendar /></el-icon>
-          <span style="margin-left: 8px;">휴가 신청</span>
-        </el-button>
       </div>
     </div>
 
@@ -105,10 +101,10 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="수정" width="100" align="center">
+                <el-table-column label="수정 요청" width="120" align="center">
                   <template #default="scope">
-                    <el-button type="text" size="small" @click="editRecord(scope.row)">
-                      <el-icon><Edit /></el-icon>
+                    <el-button size="small" @click="editRecord(scope.row)">
+                      요청
                     </el-button>
                   </template>
                 </el-table-column>
@@ -128,7 +124,7 @@
           <div class="vacation-section">
             <div class="section-header">
               <h3>휴가 신청 현황</h3>
-              <el-button type="primary" @click="showVacationRequest = true">
+              <el-button type="primary" @click="openEssentialRequestModal">
                 <el-icon><Plus /></el-icon>
                 휴가 신청
               </el-button>
@@ -191,9 +187,8 @@
             
             <div class="chart-section">
               <h4>근무 시간 추이</h4>
-              <div class="chart-placeholder">
-                <el-icon><TrendCharts /></el-icon>
-                <p>근무 시간 차트</p>
+              <div style="height: 300px;">
+                <Line :data="chartData" :options="chartOptions" />
               </div>
             </div>
           </div>
@@ -201,61 +196,37 @@
       </el-tabs>
     </div>
 
-    <!-- 휴가 신청 모달 -->
-    <el-dialog
-      v-model="showVacationRequest"
-      title="휴가 신청"
-      width="500px"
-    >
-      <el-form :model="vacationForm" label-width="80px">
-        <el-form-item label="휴가 유형">
-          <el-select v-model="vacationForm.type" placeholder="휴가 유형을 선택하세요">
-            <el-option label="연차" value="annual" />
-            <el-option label="병가" value="sick" />
-            <el-option label="경조사" value="family" />
-            <el-option label="기타" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="시작일">
-          <el-date-picker
-            v-model="vacationForm.startDate"
-            type="date"
-            placeholder="시작일 선택"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-        <el-form-item label="종료일">
-          <el-date-picker
-            v-model="vacationForm.endDate"
-            type="date"
-            placeholder="종료일 선택"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-        <el-form-item label="사유">
-          <el-input
-            v-model="vacationForm.reason"
-            type="textarea"
-            placeholder="휴가 사유를 입력하세요"
-            :rows="3"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showVacationRequest = false">취소</el-button>
-        <el-button type="primary" @click="submitVacationRequest">신청</el-button>
-      </template>
-    </el-dialog>
+    <!-- 근태 기록 수정 요청 모달 -->
+    <correction-request-modal
+      v-model:visible="showCorrectionModal"
+      :record="recordToCorrect"
+      @submit="handleCorrectionSubmit"
+    />
+
+    <!-- 필수 정보 입력 모달 -->
+    <essential-request-input-modal
+      v-model:visible="showEssentialRequestModal"
+      @submit="handleEssentialRequestSubmit"
+    />
   </div>
 </template>
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import CorrectionRequestModal from '@/components/attendance/CorrectionRequestModal.vue'
+import EssentialRequestInputModal from '@/components/attendance/EssentialRequestInputModal.vue'
+import { Line } from 'vue-chartjs'
+import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement } from 'chart.js'
+
+ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement)
 
 export default {
   name: 'AttendancePage',
+  components: {
+    CorrectionRequestModal,
+    EssentialRequestInputModal,
+    Line
+  },
   setup() {
     const { success, error, warning, info } = useSnackbar()
     return { success, error, warning, info }
@@ -266,15 +237,11 @@ export default {
       isCheckedIn: false,
       checkInTime: null,
       checkOutTime: null,
-      showVacationRequest: false,
+      showEssentialRequestModal: false,
+      showCorrectionModal: false,
+      recordToCorrect: null,
       dateRange: [],
       selectedEmployee: '',
-      vacationForm: {
-        type: '',
-        startDate: '',
-        endDate: '',
-        reason: ''
-      },
       todayWorkTime: '0시간 0분',
       monthlyWorkDays: 18,
       remainingVacation: 10,
@@ -343,7 +310,52 @@ export default {
           reason: '병가',
           status: '거부'
         }
-      ]
+      ],
+      chartData: {
+        labels: ['1주차', '2주차', '3주차', '4주차'],
+        datasets: [
+          {
+            label: '주간 근무 시간',
+            backgroundColor: '#409EFF',
+            borderColor: '#409EFF',
+            data: [40, 42, 38, 45],
+            tension: 0.3
+          },
+          {
+            label: '주간 초과 근무 시간',
+            backgroundColor: '#F56C6C',
+            borderColor: '#F56C6C',
+            data: [2, 3, 1, 5],
+            tension: 0.3
+          }
+        ]
+      },
+      chartOptions: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: '월별 근무 시간 추이',
+            font: {
+              size: 16
+            }
+          },
+          legend: {
+            display: true,
+            position: 'bottom'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '시간'
+            }
+          }
+        }
+      }
     }
   },
   computed: {
@@ -393,7 +405,48 @@ export default {
       return statusMap[status] || 'info'
     },
     editRecord(rec) {
-      this.info(`${rec.date} 근태 기록을 수정합니다.`)
+      this.recordToCorrect = rec;
+      this.showCorrectionModal = true;
+    },
+    openEssentialRequestModal() {
+      this.showEssentialRequestModal = true;
+    },
+    handleEssentialRequestSubmit(payload) {
+      this.showEssentialRequestModal = false;
+      const { requestType, startDate, endDate, reason, vacationType } = payload;
+      let routeName = '';
+      let queryParams = {
+        startDate: startDate,
+        endDate: endDate,
+        reason: reason
+      };
+
+      switch (requestType) {
+        case 'vacation_request':
+          routeName = 'VacationRequestForm';
+          if (vacationType) {
+            queryParams.vacationType = vacationType;
+          }
+          break;
+        case 'business_trip':
+          routeName = 'BusinessTripRequestForm';
+          break;
+        // Add other cases if more types are added to EssentialRequestInputModal
+        default:
+          this.error('알 수 없는 신청 유형입니다.');
+          return;
+      }
+
+      this.$router.push({
+        name: routeName,
+        query: queryParams
+      });
+      this.success(`${requestType} 신청 페이지로 이동합니다.`);
+    },
+    handleCorrectionSubmit(payload) {
+      console.log('Correction Request Submitted:', payload);
+      this.success(`${this.recordToCorrect.date}일자 근태 기록 수정 요청이 완료되었습니다.`);
+      // Here you would typically send the request to the backend
     },
     deleteRecord() {
       this.$confirm('정말로 삭제하시겠습니까?', '확인', {

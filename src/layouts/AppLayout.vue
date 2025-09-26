@@ -12,40 +12,35 @@
             <div class="logo-subtitle">HR MANAGEMENT</div>
           </div>
         </div>
-        <el-button 
-          v-if="!sidebarCollapsed"
-          type="text" 
-          @click="toggleSidebar"
-          class="collapse-btn"
-        >
-          <el-icon><Fold /></el-icon>
+        <el-button v-if="!sidebarCollapsed" type="text" @click="toggleSidebar" class="collapse-btn">
+          <el-icon>
+            <Fold />
+          </el-icon>
         </el-button>
       </div>
-      
-      <el-menu
-        :default-active="activeMenuIndex"
-        :default-openeds="openedMenus"
-        :collapse="sidebarCollapsed"
-        router
-        class="sidebar-menu"
-        :unique-opened="false"
-        :active-text-color="'#4f46e5'"
-        :background-color="'transparent'"
-        :text-color="'#606266'"
-      >
+
+      <el-menu :default-active="activeMenuIndex" :default-openeds="openedMenus" :collapse="sidebarCollapsed" router
+        class="sidebar-menu" :unique-opened="false" :active-text-color="'#4f46e5'" :background-color="'transparent'"
+        :text-color="'#606266'">
         <el-menu-item index="/">
-          <el-icon><House /></el-icon>
+          <el-icon>
+            <House />
+          </el-icon>
           <span>대시보드</span>
         </el-menu-item>
 
         <el-menu-item index="/search">
-          <el-icon><Search /></el-icon>
+          <el-icon>
+            <Search />
+          </el-icon>
           <span>통합 검색</span>
         </el-menu-item>
-        
+
         <el-sub-menu index="employee">
           <template #title>
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
             <span>직원 관리</span>
           </template>
           <el-menu-item index="/employee">
@@ -72,15 +67,36 @@
             </el-menu-item>
           </el-sub-menu>
         </el-sub-menu>
-        
-        <el-menu-item index="/attendance">
-          <el-icon><Clock /></el-icon>
-          <span>근태 관리</span>
-        </el-menu-item>
+
+        <el-sub-menu index="attendance">
+          <template #title>
+            <el-icon>
+              <Clock />
+            </el-icon>
+            <span>근태 관리</span>
+          </template>
+          <el-menu-item index="/attendance">
+            <span>내 근태 현황</span>
+          </el-menu-item>
+          <el-menu-item index="/leave-request">
+            <span>휴가/출장 신청</span>
+          </el-menu-item>
+          <el-menu-item index="/shared-calendar">
+            <span>공유 캘린더</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/attendance">
+            <span>관리자 근태 현황</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/leave-management">
+            <span>관리자 연차 현황</span>
+          </el-menu-item>
+        </el-sub-menu>
 
         <el-sub-menu index="performance">
           <template #title>
-            <el-icon><TrendCharts /></el-icon>
+            <el-icon>
+              <TrendCharts />
+            </el-icon>
             <span>성과 관리</span>
           </template>
           <el-menu-item index="/performance/team-goal">
@@ -90,10 +106,12 @@
             <span>내 목표 관리</span>
           </el-menu-item>
         </el-sub-menu>
-        
+
         <el-sub-menu index="payroll">
           <template #title>
-            <el-icon><Money /></el-icon>
+            <el-icon>
+              <Money />
+            </el-icon>
             <span>급여 관리</span>
           </template>
           <el-sub-menu index="payroll-management">
@@ -129,43 +147,42 @@
           </el-sub-menu>
         </el-sub-menu>
 
-
-        
-        <el-menu-item index="/chat">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>채팅</span>
-        </el-menu-item>
-        
         <el-menu-item index="/meeting">
-          <el-icon><VideoCamera /></el-icon>
+          <el-icon>
+            <VideoCamera />
+          </el-icon>
           <span>화상회의</span>
         </el-menu-item>
-        
+
         <el-menu-item index="/approval">
-          <el-icon><Document /></el-icon>
+          <el-icon>
+            <Document />
+          </el-icon>
           <span>전자결재</span>
         </el-menu-item>
-        
+
         <el-menu-item index="/board">
-          <el-icon><List /></el-icon>
+          <el-icon>
+            <List />
+          </el-icon>
           <span>게시판</span>
         </el-menu-item>
-        
+
         <el-menu-item index="/resource">
-          <el-icon><Calendar /></el-icon>
+          <el-icon>
+            <Calendar />
+          </el-icon>
           <span>예약</span>
         </el-menu-item>
-        
+
       </el-menu>
-      
+
       <!-- 조직도 고정 버튼 -->
       <div class="sidebar-footer">
-        <el-button 
-          type="text" 
-          class="organization-btn"
-          @click="showOrganizationModal"
-        >
-          <el-icon><OfficeBuilding /></el-icon>
+        <el-button type="text" class="organization-btn" @click="showOrganizationModal">
+          <el-icon>
+            <OfficeBuilding />
+          </el-icon>
           <span v-if="!sidebarCollapsed">조직/사원</span>
         </el-button>
       </div>
@@ -178,67 +195,65 @@
         <div class="header-left">
           <h1 class="page-title">{{ getPageTitle() }}</h1>
         </div>
-        
+
         <div class="header-right">
           <!-- 세션 타이머 -->
           <div class="session-timer" @click="extendSession">
-            <el-icon><Clock /></el-icon>
+            <el-icon>
+              <Clock />
+            </el-icon>
             <span class="timer-text">{{ sessionTimeLeft }}</span>
           </div>
-          
+
           <!-- 캘린더 -->
           <el-button type="text" class="calendar-btn" @click="openCalendarModal">
-            <el-icon><Calendar /></el-icon>
+            <el-icon>
+              <Calendar />
+            </el-icon>
           </el-button>
-          
+
           <!-- 알림 -->
-          <el-popover
-            placement="bottom-end"
-            :width="320"
-            trigger="click"
-          >
+          <el-popover placement="bottom-end" :width="320" trigger="click">
             <template #reference>
               <el-badge :value="notifications.length" class="notification-badge">
                 <el-button type="text" class="notification-btn">
-                  <el-icon><Bell /></el-icon>
+                  <el-icon>
+                    <Bell />
+                  </el-icon>
                 </el-button>
               </el-badge>
             </template>
-            
+
             <div class="notification-panel">
               <div class="notification-header">
                 <h3>알림</h3>
                 <el-button type="text" size="small">모두 읽음</el-button>
               </div>
               <div class="notification-list">
-                <div 
-                  v-for="notification in notifications" 
-                  :key="notification.id"
-                  class="notification-item"
-                >
+                <div v-for="notification in notifications" :key="notification.id" class="notification-item">
                   <div class="notification-content">
                     <div class="notification-title">{{ notification.title }}</div>
                     <div class="notification-message">{{ notification.message }}</div>
                     <div class="notification-time">{{ notification.time }}</div>
                   </div>
-                  <el-button 
-                    type="text" 
-                    size="small"
-                    @click="removeNotification(notification.id)"
-                  >
-                    <el-icon><Close /></el-icon>
+                  <el-button type="text" size="small" @click="removeNotification(notification.id)">
+                    <el-icon>
+                      <Close />
+                    </el-icon>
                   </el-button>
                 </div>
               </div>
             </div>
           </el-popover>
-          
+
           <!-- 사용자 메뉴 -->
           <el-dropdown @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="user.avatar" :size="32" />
               <span class="user-name">{{ user.name }}</span>
-              <el-icon><ArrowDown /></el-icon>
+              <el-icon>
+                <ArrowDown />
+              </el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -257,71 +272,53 @@
     </div>
 
     <!-- 조직도 모달 -->
-<el-dialog
-  v-model="showOrgModal"
-  title="조직/사원"
-  width="800px"
-  :before-close="handleClose"
-  class="organization-dialog"
->
-  <el-tabs v-model="activeOrgTab" class="organization-tabs-modal">
-    <el-tab-pane label="조직" name="org">
-      <div class="organization-modal">
-        <div class="org-tree-container-modal">
-          <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
-          <div class="tree-container">
-            <el-tree
-              ref="orgTree"
-              :data="orgTreeData"
-              :props="defaultProps"
-              @node-click="handleOrgNodeClick"
-              :filter-node-method="filterNode"
-              default-expand-all
-              :expand-on-click-node="false"
-              class="org-tree"
-            >
-              <template #default="{ node, data }">
-                <div class="custom-tree-node-modal">
-                  <span>{{ node.label }}</span>
-                  <span class="member-count">{{ data.members.length }}명</span>
-                </div>
-              </template>
-            </el-tree>
+    <el-dialog v-model="showOrgModal" title="조직/사원" width="800px" :before-close="handleClose"
+      class="organization-dialog">
+      <el-tabs v-model="activeOrgTab" class="organization-tabs-modal">
+        <el-tab-pane label="조직" name="org">
+          <div class="organization-modal">
+            <div class="org-tree-container-modal">
+              <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
+              <div class="tree-container">
+                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" @node-click="handleOrgNodeClick"
+                  :filter-node-method="filterNode" default-expand-all :expand-on-click-node="false" class="org-tree">
+                  <template #default="{ node, data }">
+                    <div class="custom-tree-node-modal">
+                      <span>{{ node.label }}</span>
+                      <span class="member-count">{{ data.members.length }}명</span>
+                    </div>
+                  </template>
+                </el-tree>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </el-tab-pane>
-    <el-tab-pane label="사원" name="employee">
-      <div class="employee-search-modal">
-        <div class="employee-search-bar-modal">
-          <el-input v-model="employeeSearch" placeholder="사원명 또는 부서명 입력" clearable @keyup.enter="searchEmployees" />
-          <el-button type="primary" @click="searchEmployees">검색</el-button>
-        </div>
-        <el-table :data="searchedEmployees" style="width: 100%" height="40vh" empty-text="검색된 사원이 없습니다.">
-          <el-table-column prop="name" label="이름" width="120"></el-table-column>
-          <el-table-column prop="department" label="부서"></el-table-column>
-          <el-table-column prop="team" label="팀"></el-table-column>
-          <el-table-column prop="position" label="직급" width="150"></el-table-column>
-          <el-table-column prop="email" label="이메일"></el-table-column>
-        </el-table>
-      </div>
-    </el-tab-pane>
-  </el-tabs>
-  <template #footer>
-    <span class="dialog-footer">
-      <el-button v-if="activeOrgTab === 'org'" @click="goToOrganizationManagement">조직 관리</el-button>
-      <el-button @click="showOrgModal = false">닫기</el-button>
-    </span>
-  </template>
-</el-dialog>
+        </el-tab-pane>
+        <el-tab-pane label="사원" name="employee">
+          <div class="employee-search-modal">
+            <div class="employee-search-bar-modal">
+              <el-input v-model="employeeSearch" placeholder="사원명 또는 부서명 입력" clearable @keyup.enter="searchEmployees" />
+              <el-button type="primary" @click="searchEmployees">검색</el-button>
+            </div>
+            <el-table :data="searchedEmployees" style="width: 100%" height="40vh" empty-text="검색된 사원이 없습니다.">
+              <el-table-column prop="name" label="이름" width="120"></el-table-column>
+              <el-table-column prop="department" label="부서"></el-table-column>
+              <el-table-column prop="team" label="팀"></el-table-column>
+              <el-table-column prop="position" label="직급" width="150"></el-table-column>
+              <el-table-column prop="email" label="이메일"></el-table-column>
+            </el-table>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button v-if="activeOrgTab === 'org'" @click="goToOrganizationManagement">조직 관리</el-button>
+          <el-button @click="showOrgModal = false">닫기</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 캘린더 모달 -->
-    <el-dialog
-      v-model="showCalendarModal"
-      title="일정 관리"
-      width="900px"
-      :before-close="handleCalendarClose"
-    >
+    <el-dialog v-model="showCalendarModal" title="일정 관리" width="900px" :before-close="handleCalendarClose">
       <div class="calendar-modal">
         <div class="calendar-header">
           <div class="calendar-controls">
@@ -331,37 +328,28 @@
           </div>
           <div class="calendar-actions">
             <el-button type="primary" @click="addEvent">
-              <el-icon><Plus /></el-icon>
+              <el-icon>
+                <Plus />
+              </el-icon>
               일정 추가
             </el-button>
           </div>
         </div>
-        
+
         <div class="calendar-grid">
           <div class="calendar-weekdays">
             <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
           </div>
           <div class="calendar-days">
-            <div 
-              v-for="day in calendarDays" 
-              :key="day.date"
-              class="calendar-day"
-              :class="{ 
-                'other-month': !day.currentMonth,
-                'today': day.isToday,
-                'has-events': day.events.length > 0
-              }"
-              @dblclick="addEvent(day.date)"
-            >
+            <div v-for="day in calendarDays" :key="day.date" class="calendar-day" :class="{
+              'other-month': !day.currentMonth,
+              'today': day.isToday,
+              'has-events': day.events.length > 0
+            }" @dblclick="addEvent(day.date)">
               <div class="day-number">{{ day.day }}</div>
               <div class="day-events">
-                <div 
-                  v-for="event in day.events.slice(0, 2)" 
-                  :key="event.id"
-                  class="event-item"
-                  :class="event.type"
-                  @click="viewEvent(event)"
-                >
+                <div v-for="event in day.events.slice(0, 2)" :key="event.id" class="event-item" :class="event.type"
+                  @click="viewEvent(event)">
                   {{ event.title }}
                 </div>
                 <div v-if="day.events.length > 2" class="more-events">
@@ -371,7 +359,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="calendar-legend">
           <div class="legend-item">
             <div class="legend-color meeting"></div>
@@ -397,6 +385,32 @@
     </el-dialog>
 
     <!-- 일정 추가 다이얼로그 -->
+    <el-dialog v-model="showEventDialog" title="일정 추가" width="480px" :before-close="handleEventDialogClose">
+      <el-form label-width="80px">
+        <el-form-item label="제목">
+          <el-input v-model="eventForm.title" placeholder="일정 제목을 입력" />
+        </el-form-item>
+        <el-form-item label="날짜">
+          <el-date-picker v-model="eventForm.date" type="date" placeholder="날짜 선택" format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="시간">
+          <el-time-picker v-model="eventForm.time" placeholder="시간 선택" format="HH:mm" value-format="HH:mm"
+            style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="유형">
+          <el-select v-model="eventForm.type" placeholder="유형 선택" style="width: 100%;">
+            <el-option v-for="type in eventTypes" :key="type.value" :label="type.label" :value="type.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="handleEventDialogClose">취소</el-button>
+        <el-button type="primary" @click="saveEvent">저장</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 스낵바 컨테이너 -->
     <SnackbarContainer />
   </div>
 </template>
@@ -671,9 +685,9 @@ export default {
       return []
     },
     currentMonthYear() {
-      return this.currentDate.toLocaleDateString('ko-KR', { 
-        year: 'numeric', 
-        month: 'long' 
+      return this.currentDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long'
       })
     },
     sessionTimeLeft() {
@@ -690,21 +704,21 @@ export default {
     calendarDays() {
       const year = this.currentDate.getFullYear()
       const month = this.currentDate.getMonth()
-      
+
       const firstDay = new Date(year, month, 1)
       const startDate = new Date(firstDay)
       startDate.setDate(startDate.getDate() - firstDay.getDay())
-      
+
       const days = []
       const today = new Date()
-      
+
       for (let i = 0; i < 42; i++) {
         const date = new Date(startDate)
         date.setDate(startDate.getDate() + i)
-        
+
         const dateStr = this.formatLocalDate(date)
         const dayEvents = this.events.filter(event => event.date === dateStr)
-        
+
         days.push({
           date: dateStr,
           day: date.getDate(),
@@ -713,7 +727,7 @@ export default {
           events: dayEvents
         })
       }
-      
+
       return days
     }
   },
@@ -833,18 +847,18 @@ export default {
       return employees;
     },
     searchEmployees() {
-        if (!this.employeeSearch) {
-            this.searchedEmployees = this.allEmployees;
-            return;
-        }
-        const searchTerm = this.employeeSearch.toLowerCase();
-        this.searchedEmployees = this.allEmployees.filter(emp => {
-            return (
-                (emp.name && emp.name.toLowerCase().includes(searchTerm)) ||
-                (emp.department && emp.department.toLowerCase().includes(searchTerm)) ||
-                (emp.team && emp.team.toLowerCase().includes(searchTerm))
-            );
-        });
+      if (!this.employeeSearch) {
+        this.searchedEmployees = this.allEmployees;
+        return;
+      }
+      const searchTerm = this.employeeSearch.toLowerCase();
+      this.searchedEmployees = this.allEmployees.filter(emp => {
+        return (
+          (emp.name && emp.name.toLowerCase().includes(searchTerm)) ||
+          (emp.department && emp.department.toLowerCase().includes(searchTerm)) ||
+          (emp.team && emp.team.toLowerCase().includes(searchTerm))
+        );
+      });
     },
     openCalendarModal() {
       this.showCalendarModal = true
@@ -903,16 +917,16 @@ export default {
     initSessionTimer() {
       // 세션 만료시간을 30분으로 설정
       this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
-      
+
       // 1초마다 타이머 업데이트
       this.sessionTimer = setInterval(() => {
         // 현재 시간 업데이트 (반응성 트리거)
         this.currentTime = new Date()
-        
+
         const now = this.currentTime.getTime()
         const expiry = this.sessionExpiryTime.getTime()
         const diff = expiry - now
-        
+
         if (diff <= 0) {
           this.handleSessionExpiry()
         } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
@@ -944,13 +958,13 @@ export default {
             if (this.isPayrollActive) {
               // 클래스 추가
               title.classList.add('is-payroll-active')
-              
+
               // 인라인 스타일로 강제 적용 (선택된 탭과 동일한 스타일)
               title.style.setProperty('background', '#f0f9ff', 'important')
               title.style.setProperty('color', '#4f46e5', 'important')
               title.style.setProperty('border-right', '3px solid #4f46e5', 'important')
               title.style.setProperty('font-weight', '600', 'important')
-              
+
               // 아이콘도 활성화
               const icon = title.querySelector('.el-icon')
               if (icon) {
@@ -959,13 +973,13 @@ export default {
             } else {
               // 클래스 제거
               title.classList.remove('is-payroll-active')
-              
+
               // 스타일 초기화
               title.style.removeProperty('background')
               title.style.removeProperty('color')
               title.style.removeProperty('border-right')
               title.style.removeProperty('font-weight')
-              
+
               // 아이콘도 원래대로
               const icon = title.querySelector('.el-icon')
               if (icon) {
@@ -1141,21 +1155,21 @@ export default {
 }
 
 /* 급여 관리 상위 메뉴 활성화 스타일 */
-.sidebar-menu .el-sub-menu.is-active > .el-sub-menu__title {
+.sidebar-menu .el-sub-menu.is-active>.el-sub-menu__title {
   background: #f0f9ff;
   color: #4f46e5;
   border-right: 3px solid #4f46e5;
 }
 
 /* 급여 하위 메뉴가 활성화된 경우 최상위 급여 관리 메뉴만 활성화 */
-.sidebar-menu .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active) > .el-sub-menu__title {
+.sidebar-menu .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active)>.el-sub-menu__title {
   background: #f0f9ff !important;
   color: #4f46e5 !important;
   border-right: 3px solid #4f46e5 !important;
   font-weight: 600 !important;
 }
 
-.sidebar-menu .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active) > .el-sub-menu__title .el-icon {
+.sidebar-menu .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active)>.el-sub-menu__title .el-icon {
   color: #4f46e5 !important;
 }
 
@@ -1355,7 +1369,8 @@ export default {
   /* min-height: 450px; */
 }
 
-.organization-modal, .employee-search-modal {
+.organization-modal,
+.employee-search-modal {
   padding-top: 16px;
 }
 
@@ -1607,14 +1622,14 @@ export default {
 
 <style>
 /* 급여 하위 메뉴가 활성화된 경우 최상위 급여 관리 메뉴만 활성화 */
-.el-sub-menu[index="payroll"]:has(.el-menu-item.is-active) > .el-sub-menu__title {
+.el-sub-menu[index="payroll"]:has(.el-menu-item.is-active)>.el-sub-menu__title {
   background: #f0f9ff !important;
   color: #4f46e5 !important;
   border-right: 3px solid #4f46e5 !important;
   font-weight: 600 !important;
 }
 
-.el-sub-menu[index="payroll"]:has(.el-menu-item.is-active) > .el-sub-menu__title .el-icon {
+.el-sub-menu[index="payroll"]:has(.el-menu-item.is-active)>.el-sub-menu__title .el-icon {
   color: #4f46e5 !important;
 }
 </style>

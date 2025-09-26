@@ -5,11 +5,6 @@ let idCounter = 0
 
 export function useSnackbar() {
   const showSnackbar = (options) => {
-    // 기존 스낵바들을 위로 밀어내는 애니메이션 시작
-    snackbars.value.forEach(snackbar => {
-      snackbar.pushing = true
-    })
-    
     const id = ++idCounter
     const snackbar = reactive({
       id,
@@ -18,16 +13,10 @@ export function useSnackbar() {
       title: options.title || '',
       message: options.message || '',
       duration: options.duration || 4000,
-      position: options.position || 'top-center',
-      pushing: false
+      position: options.position || 'top-center'
     })
 
     snackbars.value.push(snackbar)
-
-    // 기존 스낵바들을 애니메이션 후 제거
-    setTimeout(() => {
-      snackbars.value = snackbars.value.filter(s => s.id === id)
-    }, 300) // 애니메이션 시간과 맞춤
 
     // 자동으로 제거
     if (snackbar.duration > 0) {

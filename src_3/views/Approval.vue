@@ -6,11 +6,11 @@
         <p>사내 결재 워크플로우를 디지털로 관리하세요.</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="createApproval">
+        <el-button type="primary" @click="openTemplateSelector">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
-        <el-button @click="showTemplate = true">
+        <el-button @click="$router.push({ name: 'ApprovalTemplateManagement' })">
           <el-icon><Document /></el-icon>
           <span style="margin-left: 8px;">템플릿 관리</span>
         </el-button>
@@ -283,6 +283,12 @@
       </el-tabs>
     </div>
 
+    <!-- 결재 양식 선택 모달 -->
+    <approval-template-selector-modal
+      v-model:visible="showTemplateSelector"
+      @select="handleTemplateSelect"
+    />
+
     <!-- 결재 신청 모달 -->
     <el-dialog
       v-model="showCreateApproval"
@@ -352,9 +358,13 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue'
 
 export default {
   name: 'ApprovalPage',
+  components: {
+    ApprovalTemplateSelectorModal
+  },
   setup() {
     const { success, error, warning, info } = useSnackbar()
     return { success, error, warning, info }
@@ -363,6 +373,7 @@ export default {
     return {
       activeTab: 'pending',
       showCreateApproval: false,
+      showTemplateSelector: false,
       showTemplate: false,
       selectedType: '',
       selectedPriority: '',
@@ -509,7 +520,38 @@ export default {
     handleTabChange(tab) {
       this.activeTab = tab
     },
+    openTemplateSelector() {
+      this.showTemplateSelector = true
+    },
+    handleTemplateSelect(templateKey) {
+      this.showTemplateSelector = false;
+      if (templateKey === 'overtime_request') {
+        this.$router.push({ name: 'OvertimeRequest' });
+      } else if (templateKey === 'expense_report') {
+        this.$router.push({ name: 'ExpenseReport' });
+      } else if (templateKey === 'vacation_request') {
+        this.$router.push({ name: 'VacationRequestForm' });
+      } else if (templateKey === 'business_trip') {
+        this.$router.push({ name: 'BusinessTripRequestForm' });
+      } else if (templateKey === 'resource_booking') {
+        this.$router.push({ name: 'ResourceBookingForm' });
+      } else if (templateKey === 'other') {
+        this.$router.push({ name: 'OtherApprovalForm' });
+      } else {
+        // Fallback for any other templates, open the generic modal
+        this.approvalForm.type = templateKey;
+        this.showCreateApproval = true;
+      }
+    },
     createApproval() {
+      // Reset form for direct creation
+      this.approvalForm = {
+        type: '',
+        title: '',
+        amount: 0,
+        approvers: [],
+        description: ''
+      }
       this.showCreateApproval = true
     },
     getPriorityType(priority) {
