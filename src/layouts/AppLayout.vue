@@ -442,7 +442,7 @@ export default {
       activeOrgTab: 'org',
       orgSearch: '',
       employeeSearch: '',
-      currentDate: new Date(2024, 8, 1), // 2024년 9월
+      currentDate: new Date(2025, 8, 1), // 2025년 9월
       weekdays: ['일', '월', '화', '수', '목', '금', '토'],
       sessionExpiryTime: null,
       sessionTimer: null,
@@ -514,140 +514,140 @@ export default {
         {
           id: 1,
           title: '주간 팀 미팅',
-          date: '2024-09-20',
+          date: '2025-09-20',
           type: 'meeting',
           time: '14:00'
         },
         {
           id: 2,
           title: '회의실 예약',
-          date: '2024-09-22',
+          date: '2025-09-22',
           type: 'reservation',
           time: '10:00'
         },
         {
           id: 3,
           title: '연차 휴가',
-          date: '2024-09-25',
+          date: '2025-09-25',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 4,
           title: '프로젝트 마감',
-          date: '2024-09-30',
+          date: '2025-09-30',
           type: 'deadline',
           time: '18:00'
         },
         {
           id: 5,
           title: '월간 보고서 회의',
-          date: '2024-09-15',
+          date: '2025-09-15',
           type: 'meeting',
           time: '15:00'
         },
         {
           id: 6,
           title: '고객사 미팅',
-          date: '2024-09-18',
+          date: '2025-09-18',
           type: 'meeting',
           time: '11:00'
         },
         {
           id: 7,
           title: '법인 차량 예약',
-          date: '2024-09-19',
+          date: '2025-09-19',
           type: 'reservation',
           time: '09:00'
         },
         {
           id: 8,
           title: '반차 휴가',
-          date: '2024-09-23',
+          date: '2025-09-23',
           type: 'vacation',
           time: '14:00'
         },
         {
           id: 9,
           title: '신규 프로젝트 킥오프',
-          date: '2024-09-24',
+          date: '2025-09-24',
           type: 'meeting',
           time: '10:00'
         },
         {
           id: 10,
           title: '대회의실 예약',
-          date: '2024-09-26',
+          date: '2025-09-26',
           type: 'reservation',
           time: '16:00'
         },
         {
           id: 11,
           title: '개인 휴가',
-          date: '2024-09-27',
+          date: '2025-09-27',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 12,
           title: '부서 회의',
-          date: '2024-09-28',
+          date: '2025-09-28',
           type: 'meeting',
           time: '14:30'
         },
         {
           id: 13,
           title: '프레젠테이션 준비',
-          date: '2024-09-29',
+          date: '2025-09-29',
           type: 'deadline',
           time: '17:00'
         },
         {
           id: 14,
           title: '팀 빌딩',
-          date: '2024-09-30',
+          date: '2025-09-30',
           type: 'meeting',
           time: '13:00'
         },
         {
           id: 15,
           title: '고객 상담',
-          date: '2024-09-16',
+          date: '2025-09-16',
           type: 'meeting',
           time: '10:30'
         },
         {
           id: 16,
           title: '회의실 A 예약',
-          date: '2024-09-17',
+          date: '2025-09-17',
           type: 'reservation',
           time: '14:00'
         },
         {
           id: 17,
           title: '개인 휴가',
-          date: '2024-09-21',
+          date: '2025-09-21',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 18,
           title: '프로젝트 발표',
-          date: '2024-09-19',
+          date: '2025-09-19',
           type: 'deadline',
           time: '16:00'
         },
         {
           id: 19,
           title: '부서 교육',
-          date: '2024-09-24',
+          date: '2025-09-24',
           type: 'meeting',
           time: '09:30'
         },
         {
           id: 20,
           title: '차량 예약',
-          date: '2024-09-25',
+          date: '2025-09-25',
           type: 'reservation',
           time: '08:00'
         }
