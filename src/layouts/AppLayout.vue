@@ -168,12 +168,18 @@
           <span>게시판</span>
         </el-menu-item>
 
-        <el-menu-item index="/resource">
-          <el-icon>
-            <Calendar />
-          </el-icon>
-          <span>예약</span>
-        </el-menu-item>
+        <el-sub-menu index="resource">
+          <template #title>
+            <el-icon><Calendar /></el-icon>
+            <span>예약</span>
+          </template>
+          <el-menu-item index="/resource/reservation">
+            <span>예약하기</span>
+          </el-menu-item>
+          <el-menu-item index="/resource/management">
+            <span>자원 관리</span>
+          </el-menu-item>
+        </el-sub-menu>
 
       </el-menu>
 
