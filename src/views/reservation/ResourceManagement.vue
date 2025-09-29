@@ -35,6 +35,8 @@
           <el-option label="장비" value="equipment" />
           <el-option label="기타" value="other" />
         </el-select>
+      </div>
+      <div class="filter-section">
         <el-select v-model="selectedStatus" placeholder="상태" clearable @change="handleFilter">
           <el-option label="전체" value="" />
           <el-option label="사용가능" value="available" />
@@ -477,24 +479,26 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
-}
-
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.search-bar .el-input {
-  max-width: 400px;
-}
-
-.filter-section {
   display: flex;
   gap: 16px;
   align-items: center;
 }
 
+.search-bar {
+  flex: 2;
+  min-width: 180px;
+}
+
+.search-bar .el-input {
+  width: 100%;
+}
+
+.filter-section {
+  flex: 1;
+}
+
 .filter-section .el-select {
-  min-width: 150px;
+  width: 100%;
 }
 
 .table-section {
@@ -527,20 +531,26 @@ export default {
   
   .search-section {
     padding: 16px;
-  }
-  
-  .search-bar .el-input {
-    max-width: 100%;
-  }
-  
-  .filter-section {
     flex-direction: column;
-    align-items: stretch;
     gap: 12px;
   }
   
+  .search-bar {
+    max-width: 100%;
+    flex: none;
+  }
+  
+  .search-bar .el-input {
+    width: 100%;
+  }
+  
+  .filter-section {
+    flex: none;
+    width: 100%;
+  }
+  
   .filter-section .el-select {
-    min-width: auto;
+    width: 100%;
   }
   
   .table-section {

@@ -273,24 +273,28 @@
                 />
               </el-form-item>
               <el-form-item label="공동 사용자">
-                <div class="shared-users-input">
-                  <div class="shared-users-tags">
+                <div class="tag-input-container">
+                  <div class="tag-input-tags">
                     <el-tag
                       v-for="(user, index) in reservationForm.sharedUsers"
-                      :key="index"
+                      :key="`user-${index}`"
                       closable
                       @close="removeSharedUser(index)"
                       size="small"
+                      class="tag-input-tag"
                     >
                       {{ user }}
                     </el-tag>
                   </div>
                   <el-input
                     v-model="reservationForm.sharedUserInput"
-                    placeholder="공동 사용자 이름을 입력하세요"
+                    :placeholder="reservationForm.sharedUsers.length > 0 ? '' : '공동 사용자 이름을 입력하세요'"
                     @keyup.enter="addSharedUser"
                     @blur="addSharedUser"
+                    @keydown.backspace="handleBackspace"
+                    class="tag-input-field"
                     size="small"
+                    ref="mainInput"
                   />
                 </div>
               </el-form-item>
@@ -1517,15 +1521,20 @@ export default {
     addSharedUser() {
       if (this.reservationForm.sharedUserInput.trim()) {
         const user = this.reservationForm.sharedUserInput.trim()
-        if (!this.reservationForm.sharedUsers.includes(user)) {
-          this.reservationForm.sharedUsers.push(user)
-        }
+        this.reservationForm.sharedUsers.push(user)
         this.reservationForm.sharedUserInput = ''
       }
     },
     removeSharedUser(index) {
       this.reservationForm.sharedUsers.splice(index, 1)
-    }
+    },
+
+    // Backspace 키 처리
+    handleBackspace() {
+      if (this.reservationForm.sharedUserInput === '' && this.reservationForm.sharedUsers.length > 0) {
+        this.removeSharedUser(this.reservationForm.sharedUsers.length - 1)
+      }
+    },
   }
 }
 </script>
@@ -1819,12 +1828,8 @@ export default {
 }
 
 .reservation-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #606266;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
 }
 
 .reservation-details > div {
@@ -1919,6 +1924,18 @@ export default {
 .resource-selection,
 .date-selection {
   flex: 1;
+}
+
+.date-selection :deep(.el-date-picker) {
+  width: 100%;
+}
+
+.date-selection :deep(.el-input) {
+  width: 100%;
+}
+
+.date-selection :deep(.el-input__wrapper) {
+  width: 100%;
 }
 
 /* 예약 캘린더 스타일 */
@@ -2106,11 +2123,6 @@ export default {
   background: #4f46e5;
 }
 
-.reservation-details {
-  padding-top: 20px;
-  border-top: 1px solid #e9ecef;
-}
-
 .form-row {
   display: flex;
   gap: 20px;
@@ -2122,21 +2134,42 @@ export default {
   margin-bottom: 0;
 }
 
-.shared-users-input {
+.tag-input-container {
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  padding: 5px 11px;
+  min-height: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   width: 100%;
 }
 
-.shared-users-tags {
+.tag-input-container:focus-within {
+  border-color: #409eff;
+}
+
+.tag-input-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
-  min-height: 24px;
 }
 
-.shared-users-input .el-input {
-  margin-top: 8px;
+.tag-input-field {
+  border: none;
+  padding: 0;
+  flex: 1;
+  width: 100%;
 }
+
+.tag-input-field :deep(.el-input__wrapper) {
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+
+
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
