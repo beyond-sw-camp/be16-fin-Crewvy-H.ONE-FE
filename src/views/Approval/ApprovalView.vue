@@ -6,7 +6,7 @@
         <p>사내 결재 워크플로우를 디지털로 관리하세요.</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="createApproval">
+        <el-button type="primary" @click="openApprovalTemplateSelector">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
@@ -348,234 +348,284 @@
       </template>
     </el-dialog>
   </div>
+  <ApprovalTemplateSelectorModal
+    :visible="isApprovalTemplateSelectorModalOpen"
+    @update:visible="isApprovalTemplateSelectorModalOpen = $event"
+    @select="handleTemplateSelected"
+  />
 </template>
 
-<script>
-import { useSnackbar } from '@/composables/useSnackbar'
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useStore } from 'vuex';
+import { useRouter } from 'vue-router'; // Add this import
+import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
 
-export default {
-  name: 'ApprovalPage',
-  setup() {
-    const { success, error, warning, info } = useSnackbar()
-    return { success, error, warning, info }
+const store = useStore();
+const router = useRouter(); // Initialize router
+
+// Data properties
+const activeTab = ref('pending');
+const showCreateApproval = ref(false);
+const showTemplate = ref(false);
+const selectedType = ref('');
+const selectedPriority = ref('');
+const selectedStatus = ref('');
+const dateRange = ref([]);
+const approvalForm = reactive({
+  type: '',
+  title: '',
+  amount: 0,
+  approvers: [],
+  description: ''
+});
+const pendingApprovals = ref(5);
+const inProgressApprovals = ref(3);
+const completedApprovals = ref(12);
+const averageProcessTime = ref(2.5);
+const pendingApprovalsList = ref([
+  {
+    id: 1,
+    title: '월간 보고서',
+    type: '보고서',
+    requester: '김영희',
+    date: '2024-01-15',
+    priority: 'high',
+    amount: 0,
+    description: '1월 월간 성과 보고서입니다.',
+    steps: [
+      { name: '신청자', status: 'completed', statusText: '완료' },
+      { name: '팀장', status: 'current', statusText: '검토 중' },
+      { name: '부장', status: 'pending', statusText: '대기' },
+      { name: '임원', status: 'pending', statusText: '대기' }
+    ]
   },
-  data() {
-    return {
-      activeTab: 'pending',
-      showCreateApproval: false,
-      showTemplate: false,
-      selectedType: '',
-      selectedPriority: '',
-      selectedStatus: '',
-      dateRange: [],
-      approvalForm: {
-        type: '',
-        title: '',
-        amount: 0,
-        approvers: [],
-        description: ''
-      },
-      pendingApprovals: 5,
-      inProgressApprovals: 3,
-      completedApprovals: 12,
-      averageProcessTime: 2.5,
-      pendingApprovalsList: [
-        {
-          id: 1,
-          title: '월간 보고서',
-          type: '보고서',
-          requester: '김영희',
-          date: '2024-01-15',
-          priority: 'high',
-          amount: 0,
-          description: '1월 월간 성과 보고서입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'current', statusText: '검토 중' },
-            { name: '부장', status: 'pending', statusText: '대기' },
-            { name: '임원', status: 'pending', statusText: '대기' }
-          ]
-        },
-        {
-          id: 2,
-          title: '휴가 신청',
-          type: '휴가 신청',
-          requester: '박민수',
-          date: '2024-01-14',
-          priority: 'normal',
-          amount: 0,
-          description: '개인 사정으로 인한 휴가 신청입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'current', statusText: '검토 중' },
-            { name: '부장', status: 'pending', statusText: '대기' }
-          ]
-        },
-        {
-          id: 3,
-          title: '비용 정산',
-          type: '비용 정산',
-          requester: '이지은',
-          date: '2024-01-13',
-          priority: 'normal',
-          amount: 150000,
-          description: '출장비 정산 신청입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'current', statusText: '검토 중' },
-            { name: '부장', status: 'pending', statusText: '대기' },
-            { name: '임원', status: 'pending', statusText: '대기' }
-          ]
-        }
-      ],
-      myRequests: [
-        {
-          id: 1,
-          title: '프로젝트 비용 신청',
-          type: '비용 정산',
-          date: '2024-01-10',
-          status: '진행중',
-          amount: 500000,
-          description: '신규 프로젝트 관련 비용 신청입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'completed', statusText: '승인' },
-            { name: '부장', status: 'current', statusText: '검토 중' },
-            { name: '임원', status: 'pending', statusText: '대기' }
-          ]
-        },
-        {
-          id: 2,
-          title: '연차 휴가 신청',
-          type: '휴가 신청',
-          date: '2024-01-08',
-          status: '승인',
-          amount: 0,
-          description: '연차 휴가 신청입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'completed', statusText: '승인' },
-            { name: '부장', status: 'completed', statusText: '승인' }
-          ]
-        }
-      ],
-      completedList: [
-        {
-          id: 1,
-          title: '회의실 예약 신청',
-          type: '기타',
-          requester: '김철수',
-          completedDate: '2024-01-12',
-          status: '승인',
-          amount: 0,
-          description: '대회의실 예약 신청입니다.'
-        },
-        {
-          id: 2,
-          title: '교육비 신청',
-          type: '비용 정산',
-          requester: '박민수',
-          completedDate: '2024-01-10',
-          status: '승인',
-          amount: 300000,
-          description: '외부 교육 참가비 신청입니다.'
-        }
-      ],
-      employees: [
-        { id: 1, name: '김철수' },
-        { id: 2, name: '박민수' },
-        { id: 3, name: '이지은' },
-        { id: 4, name: '김영희' },
-        { id: 5, name: '정수진' }
-      ]
-    }
+  {
+    id: 2,
+    title: '휴가 신청',
+    type: '휴가 신청',
+    requester: '박민수',
+    date: '2024-01-14',
+    priority: 'normal',
+    amount: 0,
+    description: '개인 사정으로 인한 휴가 신청입니다.',
+    steps: [
+      { name: '신청자', status: 'completed', statusText: '완료' },
+      { name: '팀장', status: 'current', statusText: '검토 중' },
+      { name: '부장', status: 'pending', statusText: '대기' }
+    ]
   },
-  computed: {
-    filteredPendingApprovals() {
-      let filtered = this.pendingApprovalsList
-      
-      if (this.selectedType) {
-        filtered = filtered.filter(approval => approval.type === this.selectedType)
-      }
-      
-      if (this.selectedPriority) {
-        filtered = filtered.filter(approval => approval.priority === this.selectedPriority)
-      }
-      
-      return filtered
-    }
-  },
-  methods: {
-    handleTabChange(tab) {
-      this.activeTab = tab
-    },
-    createApproval() {
-      this.showCreateApproval = true
-    },
-    getPriorityType(priority) {
-      return priority === 'high' ? 'danger' : 'warning'
-    },
-    getStatusType(status) {
-      const statusMap = {
-        '승인': 'success',
-        '반려': 'danger',
-        '진행중': 'warning',
-        '대기': 'info'
-      }
-      return statusMap[status] || 'info'
-    },
-    approveItem() {
-      this.$confirm('정말로 승인하시겠습니까?', '확인', {
-        confirmButtonText: '승인',
-        cancelButtonText: '취소',
-        type: 'success'
-      }).then(() => {
-        this.success('승인되었습니다.')
-      })
-    },
-    rejectItem() {
-      this.$confirm('정말로 반려하시겠습니까?', '확인', {
-        confirmButtonText: '반려',
-        cancelButtonText: '취소',
-        type: 'warning'
-      }).then(() => {
-        this.info('반려되었습니다.')
-      })
-    },
-    viewDetails() {
-      this.info('상세보기')
-    },
-    viewRequestDetails() {
-      this.info('상세보기')
-    },
-    cancelRequest() {
-      this.$confirm('정말로 취소하시겠습니까?', '확인', {
-        confirmButtonText: '취소',
-        cancelButtonText: '돌아가기',
-        type: 'warning'
-      }).then(() => {
-        this.success('취소되었습니다.')
-      })
-    },
-    viewCompletedDetails(approval) {
-      this.info(`${approval.title} 상세보기`)
-    },
-    downloadApproval(approval) {
-      this.success(`${approval.title} 다운로드`)
-    },
-    submitApproval() {
-      this.success('결재 신청이 완료되었습니다.')
-      this.showCreateApproval = false
-      this.approvalForm = {
-        type: '',
-        title: '',
-        amount: 0,
-        approvers: [],
-        description: ''
-      }
-    }
+  {
+    id: 3,
+    title: '비용 정산',
+    type: '비용 정산',
+    requester: '이지은',
+    date: '2024-01-13',
+    priority: 'normal',
+    amount: 150000,
+    description: '출장비 정산 신청입니다.',
+    steps: [
+      { name: '신청자', status: 'completed', statusText: '완료' },
+      { name: '팀장', status: 'current', statusText: '검토 중' },
+      { name: '부장', status: 'pending', statusText: '대기' },
+      { name: '임원', status: 'pending', statusText: '대기' }
+    ]
   }
-}
+]);
+const myRequests = ref([
+  {
+    id: 1,
+    title: '프로젝트 비용 신청',
+    type: '비용 정산',
+    date: '2024-01-10',
+    status: '진행중',
+    amount: 500000,
+    description: '신규 프로젝트 관련 비용 신청입니다.',
+    steps: [
+      { name: '신청자', status: 'completed', statusText: '완료' },
+      { name: '팀장', status: 'completed', statusText: '승인' },
+      { name: '부장', status: 'current', statusText: '검토 중' },
+      { name: '임원', status: 'pending', statusText: '대기' }
+    ]
+  },
+  {
+    id: 2,
+    title: '연차 휴가 신청',
+    type: '휴가 신청',
+    date: '2024-01-08',
+    status: '승인',
+    amount: 0,
+    description: '연차 휴가 신청입니다.',
+    steps: [
+      { name: '신청자', status: 'completed', statusText: '완료' },
+      { name: '팀장', status: 'completed', statusText: '승인' },
+      { name: '부장', status: 'completed', statusText: '승인' }
+    ]
+  }
+]);
+const completedList = ref([
+  {
+    id: 1,
+    title: '회의실 예약 신청',
+    type: '기타',
+    requester: '김철수',
+    completedDate: '2024-01-12',
+    status: '승인',
+    amount: 0,
+    description: '대회의실 예약 신청입니다.'
+  },
+  {
+    id: 2,
+    title: '교육비 신청',
+    type: '비용 정산',
+    requester: '박민수',
+    completedDate: '2024-01-10',
+    status: '승인',
+    amount: 300000,
+    description: '외부 교육 참가비 신청입니다.'
+  }
+]);
+const employees = ref([
+  { id: 1, name: '김철수' },
+  { id: 2, name: '박민수' },
+  { id: 3, name: '이지은' },
+  { id: 4, name: '김영희' },
+  { id: 5, name: '정수진' }
+]);
+
+const isApprovalTemplateSelectorModalOpen = ref(false);
+
+// Computed properties
+const getApprovalRequests = computed(() => store.getters['approval/getApprovalRequests']);
+
+const filteredPendingApprovals = computed(() => {
+  let filtered = pendingApprovalsList.value;
+
+  if (selectedType.value) {
+    filtered = filtered.filter(approval => approval.type === selectedType.value);
+  }
+
+  if (selectedPriority.value) {
+    filtered = filtered.filter(approval => approval.priority === selectedPriority.value);
+  }
+
+  return filtered;
+});
+
+// Methods
+const handleTabChange = (tab) => {
+  activeTab.value = tab;
+};
+
+const fetchApprovalRequests = async () => {
+  return store.dispatch('approval/fetchApprovalRequests');
+};
+
+const approvalRequests = ref([]); // New ref for approval requests
+const loading = ref(false); // New ref for loading state
+const error = ref(null); // New ref for error state
+
+const loadApprovalRequests = async () => {
+  try {
+    loading.value = true;
+    await fetchApprovalRequests();
+    approvalRequests.value = getApprovalRequests.value; // Assign to ref's value
+  } catch (err) {
+    error.value = '결재 요청 목록을 불러오는 데 실패했습니다.';
+    console.error(err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const createApproval = () => {
+  showCreateApproval.value = true;
+};
+
+const getPriorityType = (priority) => {
+  return priority === 'high' ? 'danger' : 'warning';
+};
+
+const getStatusType = (status) => {
+  const statusMap = {
+    '승인': 'success',
+    '반려': 'danger',
+    '진행중': 'warning',
+    '대기': 'info'
+  };
+  return statusMap[status] || 'info';
+};
+
+const approveItem = () => {
+  // Assuming $confirm and $success are globally available or provided by Element Plus
+  // For Vue 3 Composition API, you'd typically use ElMessageBox.confirm and ElMessage.success
+  console.log('승인되었습니다.'); // Placeholder
+};
+
+const rejectItem = () => {
+  // Assuming $confirm and $info are globally available or provided by Element Plus
+  console.log('반려되었습니다.'); // Placeholder
+};
+
+const viewDetails = () => {
+  console.log('상세보기'); // Placeholder
+};
+
+const viewRequestDetails = () => {
+  console.log('상세보기'); // Placeholder
+};
+
+const cancelRequest = () => {
+  // Assuming $confirm and $success are globally available or provided by Element Plus
+  console.log('취소되었습니다.'); // Placeholder
+};
+
+const viewCompletedDetails = (approval) => {
+  console.log(`${approval.title} 상세보기`); // Placeholder
+};
+
+const downloadApproval = (approval) => {
+  console.log(`${approval.title} 다운로드`); // Placeholder
+};
+
+const submitApproval = () => {
+  // Assuming $success is globally available or provided by Element Plus
+  console.log('결재 신청이 완료되었습니다.'); // Placeholder
+  showCreateApproval.value = false;
+  approvalForm.type = '';
+  approvalForm.title = '';
+  approvalForm.amount = 0;
+  approvalForm.approvers = [];
+  approvalForm.description = '';
+};
+
+const openApprovalTemplateSelector = () => {
+  isApprovalTemplateSelectorModalOpen.value = true;
+};
+
+const handleTemplateSelected = (templateId) => {
+  isApprovalTemplateSelectorModalOpen.value = false;
+  const routeMap = {
+    'expense_report': 'ApprovalExpenseReport',
+    'overtime_request': 'ApprovalOvertimeRequest',
+    'vacation_request': 'ApprovalVacationRequest',
+    'business_trip': 'ApprovalBusinessTripRequest',
+    'resource_booking': 'ApprovalResourceBooking',
+    'other': 'ApprovalOtherForm',
+  };
+  const routeName = routeMap[templateId];
+  if (routeName) {
+    router.push({ name: routeName, params: { templateId } });
+  } else {
+    console.warn('Unknown template ID selected:', templateId);
+    // Optionally, navigate to a default form or show an error
+  }
+};
+
+// Lifecycle hooks
+onMounted(() => {
+  loadApprovalRequests();
+});
 </script>
 
 <style scoped>
