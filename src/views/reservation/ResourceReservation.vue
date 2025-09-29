@@ -135,7 +135,7 @@
     <!-- 예약 모달 -->
     <el-dialog
       v-model="showReservation"
-      title="예약하기"
+      :title="isEditingMode ? '예약 수정' : '예약하기'"
       width="900px"
       :before-close="handleReservationClose"
     >
@@ -248,40 +248,61 @@
         <!-- 예약 상세 정보 -->
         <div class="reservation-details">
           <el-form :model="reservationForm" label-width="100px">
-            <el-form-item label="사용 목적">
-              <el-input
-                v-model="reservationForm.purpose"
-                placeholder="사용 목적을 입력하세요"
-              />
-            </el-form-item>
-            <el-form-item label="참석자 수">
-              <el-input-number
-                v-model="reservationForm.attendees"
-                :min="1"
-                :max="getMaxCapacity()"
-                placeholder="참석자 수"
-              />
-            </el-form-item>
-            <el-form-item label="비고">
-              <el-input
-                v-model="reservationForm.notes"
-                type="textarea"
-                placeholder="추가 사항을 입력하세요"
-                :rows="2"
-              />
-            </el-form-item>
-            <el-form-item label="공동 사용자">
-              <el-input
-                v-model="reservationForm.sharedUsers"
-                placeholder="공동 사용자 이름을 입력하세요"
-              />
-            </el-form-item>
+            <div class="form-row">
+              <el-form-item label="사용 목적">
+                <el-input
+                  v-model="reservationForm.purpose"
+                  placeholder="사용 목적을 입력하세요"
+                />
+              </el-form-item>
+              <el-form-item label="참석자 수">
+                <el-input-number
+                  v-model="reservationForm.attendees"
+                  :min="1"
+                  :max="getMaxCapacity()"
+                />
+              </el-form-item>
+            </div>
+            <div class="form-row">
+              <el-form-item label="비고">
+                <el-input
+                  v-model="reservationForm.notes"
+                  type="textarea"
+                  placeholder="추가 사항을 입력하세요"
+                  :rows="2"
+                />
+              </el-form-item>
+              <el-form-item label="공동 사용자">
+                <div class="shared-users-input">
+                  <div class="shared-users-tags">
+                    <el-tag
+                      v-for="(user, index) in reservationForm.sharedUsers"
+                      :key="index"
+                      closable
+                      @close="removeSharedUser(index)"
+                      size="small"
+                    >
+                      {{ user }}
+                    </el-tag>
+                  </div>
+                  <el-input
+                    v-model="reservationForm.sharedUserInput"
+                    placeholder="공동 사용자 이름을 입력하세요"
+                    @keyup.enter="addSharedUser"
+                    @blur="addSharedUser"
+                    size="small"
+                  />
+                </div>
+              </el-form-item>
+            </div>
           </el-form>
         </div>
       </div>
       <template #footer>
         <el-button @click="showReservation = false">취소</el-button>
-        <el-button type="primary" @click="submitReservation" :disabled="!canSubmitReservation">예약</el-button>
+        <el-button type="primary" @click="submitReservation" :disabled="!canSubmitReservation">
+          {{ isEditingMode ? '수정' : '예약' }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -465,6 +486,7 @@ export default {
       showMyReservations: false,
       showStatistics: false,
       showUsageCompletion: false,
+      isEditingMode: false,
       monthlyChartInstance: null,
       resourceChartInstance: null,
       reservationForm: {
@@ -475,7 +497,8 @@ export default {
         purpose: '',
         attendees: 1,
         notes: '',
-        sharedUsers: ''
+        sharedUsers: [],
+        sharedUserInput: ''
       },
       // 시간대 선택 관련
       timeSlots: [],
@@ -928,7 +951,7 @@ export default {
         {
           id: 1,
           resourceName: '대회의실',
-          date: '2024-01-20',
+          date: '2025-09-25',
           startTime: '14:00',
           endTime: '16:00',
           purpose: '월간 보고서 검토',
@@ -938,7 +961,7 @@ export default {
         {
           id: 2,
           resourceName: '법인 차량 1',
-          date: '2024-01-22',
+          date: '2025-09-26',
           startTime: '09:00',
           endTime: '18:00',
           purpose: '고객사 방문',
@@ -1061,6 +1084,7 @@ export default {
       return statusMap[status] || 'info'
     },
     openReservationModal() {
+      this.isEditingMode = false
       this.reservationForm.resourceId = ''
       this.reservationForm.date = ''
       this.reservationForm.startTime = ''
@@ -1068,12 +1092,14 @@ export default {
       this.reservationForm.purpose = ''
       this.reservationForm.attendees = 1
       this.reservationForm.notes = ''
-      this.reservationForm.sharedUsers = ''
+      this.reservationForm.sharedUsers = []
+      this.reservationForm.sharedUserInput = ''
       this.showReservation = true
       this.generateTimeSlots()
       this.generateWeekDates()
     },
     reserveResource(resource) {
+      this.isEditingMode = false
       this.reservationForm.resourceId = resource.id
       this.reservationForm.date = ''
       this.reservationForm.startTime = ''
@@ -1081,7 +1107,8 @@ export default {
       this.reservationForm.purpose = ''
       this.reservationForm.attendees = 1
       this.reservationForm.notes = ''
-      this.reservationForm.sharedUsers = ''
+      this.reservationForm.sharedUsers = []
+      this.reservationForm.sharedUserInput = ''
       this.showReservation = true
       this.generateTimeSlots()
       this.generateWeekDates()
@@ -1227,6 +1254,7 @@ export default {
     },
     handleReservationClose(done) {
       this.showReservation = false
+      this.isEditingMode = false
       this.resetReservationForm()
       if (done) done()
     },
@@ -1239,7 +1267,7 @@ export default {
         purpose: '',
         attendees: 1,
         notes: '',
-        sharedUsers: ''
+        sharedUsers: []
       }
       this.isSelecting = false
       this.selectionStartDate = null
@@ -1329,6 +1357,7 @@ export default {
     },
     editReservation(reservation) {
       // 예약 수정 모달 표시
+      this.isEditingMode = true
       this.reservationForm = {
         resourceId: this.getResourceIdByName(reservation.resourceName),
         date: reservation.date,
@@ -1337,9 +1366,18 @@ export default {
         purpose: reservation.purpose,
         attendees: reservation.attendees,
         notes: '',
-        sharedUsers: ''
+        sharedUsers: [],
+        sharedUserInput: ''
       }
       this.showReservation = true
+      this.generateTimeSlots()
+      this.generateWeekDates()
+      // 선택 상태 초기화
+      this.isSelecting = false
+      this.selectionStartDate = null
+      this.selectionStartHour = null
+      this.selectionEndDate = null
+      this.selectionEndHour = null
     },
     getResourceIdByName(resourceName) {
       const resource = this.resources.find(r => r.name === resourceName)
@@ -1475,6 +1513,18 @@ export default {
         condition: '',
         notes: ''
       }
+    },
+    addSharedUser() {
+      if (this.reservationForm.sharedUserInput.trim()) {
+        const user = this.reservationForm.sharedUserInput.trim()
+        if (!this.reservationForm.sharedUsers.includes(user)) {
+          this.reservationForm.sharedUsers.push(user)
+        }
+        this.reservationForm.sharedUserInput = ''
+      }
+    },
+    removeSharedUser(index) {
+      this.reservationForm.sharedUsers.splice(index, 1)
     }
   }
 }
@@ -2061,9 +2111,41 @@ export default {
   border-top: 1px solid #e9ecef;
 }
 
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.form-row .el-form-item {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.shared-users-input {
+  width: 100%;
+}
+
+.shared-users-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-height: 24px;
+}
+
+.shared-users-input .el-input {
+  margin-top: 8px;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .reservation-form-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .form-row {
     flex-direction: column;
     gap: 16px;
   }
