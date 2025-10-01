@@ -6,6 +6,10 @@
         <p>회의실, 차량 등 공용 자원을 관리하세요.</p>
       </div>
       <div class="header-actions">
+        <el-button type="success" @click="showCategoryDialog">
+          <el-icon><Setting /></el-icon>
+          <span style="margin-left: 8px;">카테고리 관리</span>
+        </el-button>
         <el-button type="primary" @click="showAddDialog">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">자원 추가</span>
@@ -30,10 +34,12 @@
       <div class="filter-section">
         <el-select v-model="selectedCategory" placeholder="카테고리" clearable @change="handleFilter">
           <el-option label="전체" value="" />
-          <el-option label="회의실" value="meeting_room" />
-          <el-option label="차량" value="vehicle" />
-          <el-option label="장비" value="equipment" />
-          <el-option label="기타" value="other" />
+          <el-option 
+            v-for="category in categories" 
+            :key="category.id" 
+            :label="category.name" 
+            :value="category.value" 
+          />
         </el-select>
       </div>
       <div class="filter-section">
@@ -54,6 +60,8 @@
         stripe
         style="width: 100%"
         empty-text="등록된 자원이 없습니다."
+        :reserve-selection="true"
+        :row-key="row => row.id"
       >
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="자원명" min-width="150" />
@@ -94,6 +102,8 @@
       v-model="dialogVisible"
       width="600px"
       @close="resetForm"
+      :destroy-on-close="true"
+      :close-on-click-modal="false"
     >
       <el-form
         ref="resourceForm"
@@ -106,10 +116,12 @@
         </el-form-item>
         <el-form-item label="카테고리" prop="category">
           <el-select v-model="resourceForm.category" placeholder="카테고리를 선택하세요">
-            <el-option label="회의실" value="meeting_room" />
-            <el-option label="차량" value="vehicle" />
-            <el-option label="장비" value="equipment" />
-            <el-option label="기타" value="other" />
+            <el-option 
+              v-for="category in categories" 
+              :key="category.id" 
+              :label="category.name" 
+              :value="category.value" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="위치" prop="location">
@@ -123,7 +135,7 @@
             placeholder="수용인원"
           />
         </el-form-item>
-        <el-form-item label="상태" prop="status">
+        <el-form-item v-if="isEditMode" label="상태" prop="status">
           <el-select v-model="resourceForm.status" placeholder="상태를 선택하세요">
             <el-option label="사용가능" value="available" />
             <el-option label="사용중" value="in_use" />
@@ -148,18 +160,117 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 카테고리 관리 다이얼로그 -->
+    <el-dialog
+      title="카테고리 관리"
+      v-model="categoryDialogVisible"
+      width="600px"
+      @close="resetCategoryForm"
+      :destroy-on-close="true"
+      :close-on-click-modal="false"
+    >
+      <div class="category-management">
+        <div class="category-form">
+          <div class="category-form-content">
+            <el-form
+              ref="categoryForm"
+              :model="categoryForm"
+              :rules="categoryFormRules"
+              label-width="100px"
+              inline
+            >
+              <el-form-item label="카테고리명" prop="name">
+                <el-input 
+                  v-model="categoryForm.name" 
+                  placeholder="카테고리명을 입력하세요" 
+                  style="width: 200px;"
+                />
+              </el-form-item>
+            </el-form>
+            <div class="category-form-buttons">
+              <el-button type="primary" @click="saveCategory" :loading="categorySaving">
+                {{ isCategoryEditMode ? '수정' : '추가' }}
+              </el-button>
+              <el-button v-if="isCategoryEditMode" @click="cancelCategoryEdit">
+                취소
+              </el-button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="category-list">
+          <el-table 
+            :data="categories" 
+            style="width: 100%"
+            :reserve-selection="true"
+            :row-key="row => row.id"
+          >
+            <el-table-column prop="name" label="카테고리명" align="center" />
+            <el-table-column label="관리" align="center">
+              <template #default="{ row, $index }">
+                <el-button 
+                  size="small" 
+                  @click="editCategory(row, $index)"
+                >
+                  수정
+                </el-button>
+                <el-button 
+                  size="small" 
+                  type="danger" 
+                  @click="deleteCategory(row, $index)"
+                  :disabled="categories.length <= 1"
+                >
+                  삭제
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="categoryDialogVisible = false">닫기</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
+import { Plus, Search, Setting } from '@element-plus/icons-vue'
+import { useSnackbar } from '@/composables/useSnackbar'
 
 export default {
   name: 'ResourceManagement',
   components: {
     Plus,
-    Search
+    Search,
+    Setting
+  },
+  setup() {
+    const { success, error } = useSnackbar()
+    
+    // ResizeObserver 루프 경고 방지
+    const suppressResizeObserverError = () => {
+      const originalError = console.error
+      console.error = (...args) => {
+        if (args[0] && args[0].includes && args[0].includes('ResizeObserver loop completed with undelivered notifications')) {
+          return
+        }
+        originalError.apply(console, args)
+      }
+    }
+    
+    // 컴포넌트 마운트 시 에러 억제
+    suppressResizeObserverError()
+    
+    return {
+      success,
+      error
+    }
   },
   data() {
     return {
@@ -170,6 +281,27 @@ export default {
       searchQuery: '',
       selectedCategory: '',
       selectedStatus: '',
+      
+      // 카테고리 관리
+      categoryDialogVisible: false,
+      categorySaving: false,
+      isCategoryEditMode: false,
+      editingCategoryIndex: -1,
+      categories: [
+        { id: 1, name: '회의실', value: 'meeting_room' },
+        { id: 2, name: '차량', value: 'vehicle' },
+        { id: 3, name: '장비', value: 'equipment' },
+        { id: 4, name: '기타', value: 'other' }
+      ],
+      categoryForm: {
+        name: ''
+      },
+      categoryFormRules: {
+        name: [
+          { required: true, message: '카테고리명을 입력해주세요', trigger: 'blur' },
+          { min: 2, max: 20, message: '카테고리명은 2-20자 사이여야 합니다', trigger: 'blur' }
+        ]
+      },
       
       // 자원 목록 데이터
       resources: [
@@ -254,7 +386,7 @@ export default {
           { type: 'number', min: 1, max: 1000, message: '수용인원은 1-1000명 사이여야 합니다', trigger: 'blur' }
         ],
         status: [
-          { required: true, message: '상태를 선택해주세요', trigger: 'change' }
+          { required: this.isEditMode, message: '상태를 선택해주세요', trigger: 'change' }
         ]
       }
     }
@@ -326,7 +458,13 @@ export default {
         const index = this.resources.findIndex(r => r.id === resource.id)
         if (index > -1) {
           this.resources.splice(index, 1)
-          ElMessage.success('자원이 삭제되었습니다.')
+          
+          // ID 자동 정렬 (1부터 순차적으로 재할당)
+          this.resources.forEach((resource, index) => {
+            resource.id = index + 1
+          })
+          
+          this.success('자원이 삭제되었습니다.')
         }
       } catch (error) {
         // 사용자가 취소한 경우
@@ -348,7 +486,7 @@ export default {
           const index = this.resources.findIndex(r => r.id === this.resourceForm.id)
           if (index > -1) {
             this.resources.splice(index, 1, { ...this.resourceForm })
-            ElMessage.success('자원이 수정되었습니다.')
+            this.success('자원이 수정되었습니다.')
           }
         } else {
           // 추가
@@ -359,7 +497,7 @@ export default {
             createdAt: new Date().toISOString().split('T')[0]
           }
           this.resources.unshift(newResource)
-          ElMessage.success('자원이 추가되었습니다.')
+          this.success('자원이 추가되었습니다.')
         }
         
         this.dialogVisible = false
@@ -367,7 +505,7 @@ export default {
         
       } catch (error) {
         if (error !== false) { // 폼 검증 실패가 아닌 경우
-          ElMessage.error('저장 중 오류가 발생했습니다.')
+          this.error('저장 중 오류가 발생했습니다.')
         }
       } finally {
         this.saving = false
@@ -437,6 +575,128 @@ export default {
       if (!dateString) return ''
       const date = new Date(dateString)
       return date.toLocaleDateString('ko-KR')
+    },
+    
+    // 카테고리 관리 다이얼로그 표시
+    showCategoryDialog() {
+      this.categoryDialogVisible = true
+    },
+    
+    // 카테고리 저장 (추가/수정)
+    async saveCategory() {
+      try {
+        await this.$refs.categoryForm.validate()
+        
+        this.categorySaving = true
+        
+        // 실제 API 호출 시뮬레이션
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // 중복 체크 (수정 모드에서는 현재 편집 중인 카테고리 제외)
+        const existingCategory = this.categories.find((cat, index) => 
+          index !== this.editingCategoryIndex && (
+            cat.name === this.categoryForm.name || 
+            cat.value === this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
+          )
+        )
+        
+        if (existingCategory) {
+          this.error('이미 존재하는 카테고리입니다.')
+          return
+        }
+        
+        if (this.isCategoryEditMode) {
+          // 수정
+          const newValue = this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
+          
+          // 기존 자원들의 카테고리 값도 업데이트
+          this.resources.forEach(resource => {
+            if (resource.category === this.categories[this.editingCategoryIndex].value) {
+              resource.category = newValue
+            }
+          })
+          
+          // 카테고리 정보 업데이트
+          this.categories[this.editingCategoryIndex].name = this.categoryForm.name
+          this.categories[this.editingCategoryIndex].value = newValue
+          
+          this.success('카테고리가 수정되었습니다.')
+        } else {
+          // 추가
+          const newCategory = {
+            id: Math.max(...this.categories.map(c => c.id)) + 1,
+            name: this.categoryForm.name,
+            value: this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
+          }
+          
+          this.categories.push(newCategory)
+          this.success('카테고리가 추가되었습니다.')
+        }
+        
+        this.resetCategoryForm()
+        
+      } catch (error) {
+        if (error !== false) { // 폼 검증 실패가 아닌 경우
+          this.error(this.isCategoryEditMode ? '카테고리 수정 중 오류가 발생했습니다.' : '카테고리 추가 중 오류가 발생했습니다.')
+        }
+      } finally {
+        this.categorySaving = false
+      }
+    },
+    
+    // 카테고리 수정
+    editCategory(category, index) {
+      this.isCategoryEditMode = true
+      this.editingCategoryIndex = index
+      this.categoryForm.name = category.name
+    },
+    
+    // 카테고리 수정 취소
+    cancelCategoryEdit() {
+      this.isCategoryEditMode = false
+      this.editingCategoryIndex = -1
+      this.resetCategoryForm()
+    },
+    
+    // 카테고리 삭제
+    async deleteCategory(category, index) {
+      try {
+        // 해당 카테고리를 사용하는 자원이 있는지 확인
+        const usedResources = this.resources.filter(resource => resource.category === category.value)
+        
+        if (usedResources.length > 0) {
+          this.error(`"${category.name}" 카테고리를 사용하는 자원이 있어 삭제할 수 없습니다.`)
+          return
+        }
+        
+        await ElMessageBox.confirm(
+          `"${category.name}" 카테고리를 삭제하시겠습니까?`,
+          '카테고리 삭제',
+          {
+            confirmButtonText: '삭제',
+            cancelButtonText: '취소',
+            type: 'warning'
+          }
+        )
+        
+        this.categories.splice(index, 1)
+        this.success('카테고리가 삭제되었습니다.')
+        
+      } catch (error) {
+        // 사용자가 취소한 경우
+      }
+    },
+    
+    // 카테고리 폼 초기화
+    resetCategoryForm() {
+      this.categoryForm = {
+        name: ''
+      }
+      this.isCategoryEditMode = false
+      this.editingCategoryIndex = -1
+      if (this.$refs.categoryForm) {
+        this.$refs.categoryForm.clearValidate()
+      }
     }
   }
 }
@@ -624,5 +884,81 @@ export default {
 :deep(.el-dialog__footer) {
   padding: 10px 20px 20px;
   border-top: 1px solid #ebeef5;
+}
+
+/* 카테고리 관리 스타일 */
+.category-management {
+  padding: 10px 0;
+}
+
+.category-form {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  width: 100%;
+  min-width: 500px;
+}
+
+.category-form :deep(.el-form-item) {
+  margin-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.category-form :deep(.el-form-item__label) {
+  margin-bottom: 0 !important;
+  line-height: 32px;
+}
+
+.category-form-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.category-form-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.category-form :deep(.el-form-item) {
+  margin-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.category-form :deep(.el-form-item__label) {
+  margin-bottom: 0 !important;
+  line-height: 32px;
+}
+
+.category-form :deep(.el-form-item__content) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.category-list {
+  margin-top: 20px;
+}
+
+.category-list .el-table {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.category-list :deep(.el-table th) {
+  background-color: #f8f9fa;
+  font-weight: 600;
 }
 </style>
