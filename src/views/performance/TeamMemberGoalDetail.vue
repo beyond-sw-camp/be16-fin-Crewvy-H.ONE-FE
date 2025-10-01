@@ -2,26 +2,22 @@
   <div class="member-goal-detail-container">
     <div class="header">
       <el-page-header @back="goBack"></el-page-header>
-      <h1 class="main-goal-title">{{ goal.title }}</h1>
+      <h1 class="main-goal-title">{{ goalDetail.title }}</h1>
     </div>
 
     <div class="goal-details">
       <el-card>
         <div class="detail-item description-item">
           <label>목표 설명</label>
-          <p>{{ goal.description }}</p>
-        </div>
-        <div class="detail-item">
-          <label>담당자</label>
-          <p>{{ goal.user.name }} ({{ goal.user.position }})</p>
+          <p>{{ goalDetail.contents }}</p>
         </div>
         <div class="detail-item">
           <label>기간</label>
-          <p>{{ goal.startDate }} ~ {{ goal.endDate }}</p>
+          <p>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</p>
         </div>
         <div class="detail-item">
           <label>상태</label>
-          <p><el-tag :type="getStatusType(goal.status)" effect="dark">{{ goal.status }}</el-tag></p>
+          <p><el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag></p>
         </div>
       </el-card>
     </div>
@@ -31,35 +27,22 @@
     <div class="evidence-section">
         <el-card>
             <h3>증적 자료</h3>
-            <el-upload
-                class="upload-demo"
-                drag
-                action="https://jsonplaceholder.typicode.com/posts/"
-                :on-preview="handlePreview"
-                :on-remove="handleRemove"
-                :before-remove="beforeRemove"
-                multiple
-                :limit="3"
-                :on-exceed="handleExceed"
-                :file-list="fileList"
-            >
-                <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                <div class="el-upload__text">
-                클릭하거나 파일을 드래그하여 업로드하세요
-                </div>
-                <template #tip>
-                <div class="el-upload__tip">
-                    파일 용량 500kb 이하
-                </div>
-                </template>
-            </el-upload>
+            <div v-if="fileList.length > 0" class="file-list-readonly">
+              <div v-for="file in fileList" :key="file.name" class="file-item">
+                <el-icon><Document /></el-icon>
+                <span class="file-name">{{ file.name }}</span>
+              </div>
+            </div>
+            <div v-else>
+              <p>업로드된 증적 자료가 없습니다.</p>
+            </div>
         </el-card>
     </div>
 
     <div class="actions-container">
-        <el-button type="success">승인</el-button>
-        <el-button type="danger" @click="rejectDialogVisible = true">반려</el-button>
-        <el-button type="primary" @click="evaluateDialogVisible = true">평가</el-button>
+        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== 'REQUESTED'">승인</el-button>
+        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== 'REQUESTED'">반려</el-button>
+        <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== 'APPROVED'">평가</el-button>
     </div>
 
     <el-dialog v-model="rejectDialogVisible" title="목표 반려" width="500px">
@@ -80,11 +63,11 @@
       <el-form :model="evaluateForm" label-position="top">
         <el-form-item label="등급">
           <el-select v-model="evaluateForm.rating" placeholder="등급을 선택하세요">
-            <el-option label="S" value="S"></el-option>
+            <el-option label="A+" value="A+"></el-option>
             <el-option label="A" value="A"></el-option>
+            <el-option label="B+" value="B+"></el-option>
             <el-option label="B" value="B"></el-option>
-            <el-option label="C" value="C"></el-option>
-            <el-option label="D" value="D"></el-option>
+            <el-option label="F" value="F"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="평가 코멘트">
@@ -103,26 +86,24 @@
 </template>
 
 <script>
-import { UploadFilled } from '@element-plus/icons-vue'
+import axios from 'axios';
+import { Document } from '@element-plus/icons-vue'
 
 export default {
   name: 'TeamMemberGoalDetail',
   components: {
-    UploadFilled,
+    Document, // 아이콘 컴포넌트 등록
   },
   data() {
     return {
-      goal: {},
-      fileList: [
-        {
-            name: '2024년 8월 실적 보고서.pdf',
-            url: ''
-        },
-        {
-            name: '신규 고객 계약서 스캔본.jpg',
-            url: ''
-        }
-      ],
+      goalDetail: { // API 응답 데이터를 담을 객체
+        title: '',
+        contents: '',
+        startDate: '',
+        endDate: '',
+        status: ''
+      },
+      fileList: [], // 증적 자료 파일 리스트
       rejectDialogVisible: false,
       rejectForm: {
           reason: ''
@@ -138,37 +119,149 @@ export default {
     goBack() {
       this.$router.go(-1);
     },
-    fetchMemberGoalDetails() {
-      const { memberGoalId } = this.$route.params;
-      // Mock data fetching
-      this.goal = {
-        id: memberGoalId,
-        title: '신규 고객 50개사 확보',
-        description: '콜드콜, 박람회 참여 등을 통해 신규 고객 확보',
-        user: {
-          name: '박영업',
-          position: '사원',
-        },
-        startDate: '2024-07-01',
-        endDate: '2024-09-30',
-        status: '승인 완료',
-      };
+    async fetchGoalDetail() {
+      const goalId = this.$route.params.memberGoalId; // 라우터에서 goalId 가져오기
+      try {
+        // In a real environment, you would use the actual API call:
+        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
+        this.goalDetail = response.data;
+        // this.fileList = response.data.files; // Assuming files are part of the response
+
+        // Using mock data provided by the user for demonstration:
+        // this.goalDetail = {
+        //     "goalId": goalId,
+        //     "title": "신규 클라이언트 5곳 발굴 및 계약 (API)",
+        //     "contents": "4분기 내 잠재 고객 리스트를 기반으로 신규 클라이언트 5곳과 계약을 체결하여 팀 매출 목표 달성에 기여합니다.",
+        //     "startDate": "2025-10-01",
+        //     "endDate": "2025-12-31",
+        //     "status": "REQUESTED"
+        // };
+        // Mock file list for demonstration
+        this.fileList = [
+          { name: '2025년 4분기 실적 보고서 초안.pdf' },
+          { name: '신규 클라이언트 계약 관련 이메일.eml' },
+        ];
+
+      } catch (error) {
+        console.error('Error fetching goal detail:', error);
+        this.$message.error('목표 상세 정보를 불러오는 데 실패했습니다.');
+      }
     },
     getStatusType(status) {
-      if (status === '승인 완료') return 'success';
-      if (status === '반려') return 'danger';
-      if (status === '승인 대기') return 'warning';
+      if (status === 'APPROVED') return 'success';
+      if (status === 'REJECTED') return 'danger';
+      if (status === 'REQUESTED') return 'warning';
+      if (status === 'CANCELED') return 'info';
       return '';
     },
-    handleReject() {
-        // Add rejection logic here
-        console.log('Rejection reason:', this.rejectForm.reason);
-        this.rejectDialogVisible = false;
+    async handleApprove() {
+      try {
+        await this.$confirm('해당 목표를 승인하시겠습니까?', '목표 승인', {
+          confirmButtonText: '확인',
+          cancelButtonText: '취소',
+          type: 'warning',
+        });
+
+        // 사용자가 확인을 눌렀을 때 API 요청 실행
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          status: 'APPROVED'
+        };
+        // 데이터를 Request Body가 아닌 Query Parameter로 전송
+        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+
+        this.goalDetail.status = 'APPROVED'; // 화면 상태 업데이트
+        this.$message({
+          type: 'success',
+          message: '승인되었습니다.',
+        });
+
+      } catch (error) {
+        if (error === 'cancel') {
+          this.$message({
+            type: 'info',
+            message: '승인이 취소되었습니다.',
+          });
+        } else {
+          console.error('Error approving goal:', error);
+          this.$message.error('승인 처리에 실패했습니다.');
+        }
+      }
     },
-    handleEvaluate() {
-        // Add evaluation logic here
-        console.log('Evaluation:', this.evaluateForm);
+    async handleReject() {
+      if (!this.rejectForm.reason) {
+        this.$message.warning('반려 사유를 입력해주세요.');
+        return;
+      }
+      try {
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          status: 'REJECTED',
+          comment: this.rejectForm.reason
+        };
+        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+
+        this.goalDetail.status = 'REJECTED';
+        this.rejectDialogVisible = false;
+        this.rejectForm.reason = ''; // Clear form
+        this.$message.success('반려 처리되었습니다.');
+
+      } catch (error) {
+        console.error('Error rejecting goal:', error);
+        this.$message.error('반려 처리에 실패했습니다.');
+      }
+    },
+    async openEvaluateDialog() {
+      this.evaluateForm.rating = ''; // Reset form before opening
+      this.evaluateForm.comment = '';
+
+      try {
+        const params = {
+          goalId: this.goalDetail.goalId,
+          type: 'SUPERVISOR'
+        };
+        const response = await axios.get('http://localhost:8080/performance/find-evaluation', { params });
+
+        if (response.data) {
+          this.evaluateForm.rating = response.data.grade;
+          this.evaluateForm.comment = response.data.comment;
+        }
+
+      } catch (error) {
+        // 404 Not Found는 평가가 아직 없는 정상이므로 에러 처리하지 않음
+        if (error.response && error.response.status !== 404) {
+          console.error('Error fetching evaluation:', error);
+          // this.$message.error('평가 정보를 불러오는 데 실패했습니다.'); // 사용자향 에러 메시지 제거
+        }
+      }
+      this.evaluateDialogVisible = true;
+    },
+
+    async handleEvaluate() {
+      if (!this.evaluateForm.rating) {
+        this.$message.warning('등급을 선택해주세요.');
+        return;
+      }
+
+      try {
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          grade: this.evaluateForm.rating,
+          type: 'SUPERVISOR',
+          comment: this.evaluateForm.comment
+        };
+
+        await axios.post('http://localhost:8080/performance/create-evaluation', null, { params: payload });
+
         this.evaluateDialogVisible = false;
+        this.$message.success('평가가 저장되었습니다.');
+        // 평가 저장 후 상세 정보를 다시 불러와 화면에 반영할 수 있습니다.
+        await this.fetchGoalDetail();
+
+      } catch (error) {
+        console.error('Error saving evaluation:', error);
+        this.$message.error('평가 저장에 실패했습니다.');
+      }
     },
     // Placeholder methods for el-upload
     handleRemove(file, fileList) {
@@ -185,7 +278,7 @@ export default {
     }
   },
   created() {
-    this.fetchMemberGoalDetails();
+    this.fetchGoalDetail();
   },
 };
 </script>
