@@ -67,7 +67,7 @@
 
     <div class="actions-container">
         <el-button @click="goBack">취소</el-button>
-        <el-button type="primary" @click="saveChanges">저장</el-button>
+        <el-button type="primary" @click="saveChanges" :disabled="!['REQUESTED', 'APPROVED'].includes(goalDetail.status)">저장</el-button>
     </div>
   </div>
 </template>
@@ -98,30 +98,59 @@ export default {
     goBack() {
       this.$router.push('/performance/my-goal');
     },
-    saveChanges() {
-        // 저장 로직
-        console.log('Saving changes:', this.goalDetail);
+    async saveChanges() {
+      try {
+        await this.$confirm('변경 사항을 저장하시겠습니까?', '저장 확인', {
+          confirmButtonText: '저장',
+          cancelButtonText: '취소',
+          type: 'info',
+        });
+
+        // 1. gradingSystem을 DTO 형식(Map)에 맞게 변환
+        const gradingSystemAsMap = this.scoringRubric.reduce((acc, item) => {
+          acc[item.grade] = item.description;
+          return acc;
+        }, {});
+
+        // 2. DTO 형식에 맞는 payload 생성
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          title: this.goalDetail.title,
+          contents: this.goalDetail.contents,
+          startDate: this.goalDetail.startDate,
+          endDate: this.goalDetail.endDate,
+          gradingSystem: gradingSystemAsMap
+        };
+        
+        await axios.patch(`http://localhost:8080/performance/update-my-goal`, payload);
+
+        this.$message.success('변경 사항이 저장되었습니다.');
         this.goBack();
+
+      } catch (error) {
+        if (error === 'cancel') {
+          this.$message.info('저장이 취소되었습니다.');
+        } else {
+          console.error('Error saving changes:', error);
+          this.$message.error('변경 사항 저장에 실패했습니다.');
+        }
+      }
     },
     async fetchGoalDetail() {
       const goalId = this.$route.params.goalId;
       try {
-        // In a real environment, use the actual API call:
         const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data;
 
-        // Using mock data for demonstration:
-        // this.goalDetail = {
-        //     "goalId": goalId,
-        //     "title": "신규 클라이언트 5곳 발굴 및 계약",
-        //     "contents": "4분기 내 잠재 고객 리스트를 기반으로 신규 클라이언트 5곳과 계약을 체결하여 팀 매출 목표 달성에 기여합니다.",
-        //     "startDate": "2025-10-01",
-        //     "endDate": "2025-12-31",
-        //     "status": "REQUESTED",
-        //     "teamGoalTitle": "2025년 4분기 팀 매출 20% 성장 달성",
-        //     "teamGoalContents": "신규 고객 확보 및 기존 고객 유지 전략을 통해 4분기 팀 목표 매출액 1억 2천만원을 달성하는 것을 목표로 합니다."
-        // };
-        // this.fileList = []; // 증적 자료도 API를 통해 받아와야 합니다.
+        // gradingSystem 데이터가 있으면, 화면에 표시될 scoringRubric 배열을 업데이트합니다.
+        if (this.goalDetail.gradingSystem) {
+          const gradingMap = this.goalDetail.gradingSystem;
+          this.scoringRubric.forEach(item => {
+            if (Object.prototype.hasOwnProperty.call(gradingMap, item.grade)) {
+              item.description = gradingMap[item.grade];
+            }
+          });
+        }
 
       } catch (error) {
         console.error(`Error fetching goal detail for ID: ${goalId}`, error);

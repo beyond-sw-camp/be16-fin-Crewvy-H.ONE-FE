@@ -100,13 +100,20 @@ export default {
           type: 'info',
         });
 
+        // gradingSystem을 DTO 형식(Map)에 맞게 변환
+        const gradingSystemAsMap = this.scoringRubric.reduce((acc, item) => {
+          acc[item.grade] = item.description;
+          return acc;
+        }, {});
+
         // 사용자가 확인을 눌렀을 때 API 요청 실행
         const payload = {
             teamGoalId: this.$route.params.teamGoalId,
             title: this.myGoalForm.title,
             contents: this.myGoalForm.contents,
             startDate: this.myGoalForm.dateRange[0],
-            endDate: this.myGoalForm.dateRange[1]
+            endDate: this.myGoalForm.dateRange[1],
+            gradingSystem: gradingSystemAsMap
         }
         
         await axios.post('http://localhost:8080/performance/create-my-goal', payload);

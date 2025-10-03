@@ -22,6 +22,16 @@
       </el-card>
     </div>
 
+    <el-card class="card-section" v-if="goalDetail.gradingSystem && Object.keys(goalDetail.gradingSystem).length">
+        <template #header>
+            <span>점수 체계</span>
+        </template>
+        <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
+            <span class="rubric-grade">{{ item.grade }}</span>
+            <p class="rubric-description">{{ item.description }}</p>
+        </div>
+    </el-card>
+
     <el-divider></el-divider>
 
     <div class="evidence-section">
@@ -112,7 +122,15 @@ export default {
       evaluateForm: {
           rating: '',
           comment: ''
-      }
+      },
+
+      scoringRubric: [
+        { grade: 'A+', description: '' },
+        { grade: 'A', description: '' },
+        { grade: 'B+', description: '' },
+        { grade: 'B', description: '' },
+        { grade: 'F', description: '' }
+      ]
     };
   },
   methods: {
@@ -125,6 +143,17 @@ export default {
         // In a real environment, you would use the actual API call:
         const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data;
+
+        // gradingSystem 데이터가 있으면, 화면에 표시될 scoringRubric 배열을 업데이트합니다.
+        if (this.goalDetail.gradingSystem) {
+          const gradingMap = this.goalDetail.gradingSystem;
+          this.scoringRubric.forEach(item => {
+            if (Object.prototype.hasOwnProperty.call(gradingMap, item.grade)) {
+              item.description = gradingMap[item.grade];
+            }
+          });
+        }
+
         // this.fileList = response.data.files; // Assuming files are part of the response
 
         // Using mock data provided by the user for demonstration:
@@ -348,5 +377,40 @@ export default {
     margin-top: 24px;
     display: flex;
     justify-content: flex-end;
+}
+
+.card-section {
+    margin-bottom: 24px;
+}
+
+.rubric-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rubric-item:last-child {
+    margin-bottom: 0;
+}
+
+.rubric-grade {
+  width: 50px;
+  text-align: center;
+  font-weight: 600;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+
+.rubric-description {
+  flex-grow: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #DCDFE6;
+  border-radius: 4px;
+  background-color: #F5F7FA;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  word-break: break-word;
 }
 </style>
