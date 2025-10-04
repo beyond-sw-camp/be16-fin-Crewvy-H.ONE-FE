@@ -52,11 +52,16 @@
             <span>증적 자료</span>
         </template>
         <el-upload
+            ref="uploader"
             class="upload-demo"
             drag
-            action="https://jsonplaceholder.typicode.com/posts/"
+            action="https://jsonplaceholder.typicode.com/posts/" 
             multiple
             :file-list="fileList"
+            :on-remove="handleFileRemove"
+            :on-change="handleFileChange"
+            :on-preview="handleFilePreview"
+            :auto-upload="false"
         >
             <el-icon class="el-icon--upload"><upload-filled /></el-icon>
             <div class="el-upload__text">
@@ -83,8 +88,9 @@ export default {
   },
   data() {
     return {
-      goalDetail: {}, // API 응답 데이터를 담을 단일 객체
+      goalDetail: {},
       fileList: [],
+      filesToDelete: [],
       scoringRubric: [
         { grade: 'A+', description: '' },
         { grade: 'A', description: '' },
@@ -95,6 +101,24 @@ export default {
     };
   },
   methods: {
+    handleFileChange(file, fileList) {
+      this.fileList = fileList;
+    },
+    handleFileRemove(file, fileList) {
+      if (file.fileId) {
+        this.filesToDelete.push(file.fileId);
+      }
+      this.fileList = fileList;
+    },
+    handleFilePreview(file) {
+      // 파일 클릭 시 다운로드하는 로직
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
     goBack() {
       this.$router.push('/performance/my-goal');
     },
@@ -106,33 +130,57 @@ export default {
           type: 'info',
         });
 
-        // 1. gradingSystem을 DTO 형식(Map)에 맞게 변환
-        const gradingSystemAsMap = this.scoringRubric.reduce((acc, item) => {
-          acc[item.grade] = item.description;
-          return acc;
-        }, {});
+        const goalId = this.goalDetail.goalId;
 
-        // 2. DTO 형식에 맞는 payload 생성
-        const payload = {
-          goalId: this.goalDetail.goalId,
+        // --- 1. API 1 호출: 텍스트 정보 수정 ---
+        const textUpdateDto = {
+          goalId: goalId,
           title: this.goalDetail.title,
           contents: this.goalDetail.contents,
           startDate: this.goalDetail.startDate,
           endDate: this.goalDetail.endDate,
-          gradingSystem: gradingSystemAsMap
+          gradingSystem: this.scoringRubric.reduce((acc, item) => {
+            acc[item.grade] = item.description;
+            return acc;
+          }, {}),
         };
-        
-        await axios.patch(`http://localhost:8080/performance/update-my-goal`, payload);
 
-        this.$message.success('변경 사항이 저장되었습니다.');
+        await axios.patch(`http://localhost:8080/performance/update-my-goal`, textUpdateDto);
+        this.$message.success('목표 정보가 성공적으로 수정되었습니다.');
+
+        // --- 2. API 2 호출: 파일 정보 동기화 (조건부 실행) ---
+        const newFiles = this.fileList.filter(f => !f.fileId).map(f => f.raw);
+
+        if (newFiles.length > 0 || this.filesToDelete.length > 0) {
+          const existingFileIds = this.fileList
+            .filter(f => f.fileId)
+            .map(f => f.fileId);
+
+          const formData = new FormData();
+          const syncDto = { existingFileIds: existingFileIds };
+
+          formData.append('evidenceInfo', new Blob([JSON.stringify(syncDto)], { type: 'application/json' }));
+          newFiles.forEach(file => {
+            formData.append('newFiles', file);
+          });
+
+          await axios.patch(`http://localhost:8080/performance/evidence/${goalId}`, formData);
+          this.$message.success('증적 자료가 성공적으로 업데이트되었습니다.');
+
+          this.filesToDelete = [];
+        } else {
+          console.log('파일 변경사항이 없어 파일 동기화를 건너뜁니다.');
+        }
+
+        // --- 3. 모든 작업 성공 시, 이전 페이지로 이동 ---
         this.goBack();
 
       } catch (error) {
         if (error === 'cancel') {
           this.$message.info('저장이 취소되었습니다.');
         } else {
-          console.error('Error saving changes:', error);
-          this.$message.error('변경 사항 저장에 실패했습니다.');
+          console.error('저장 중 오류 발생:', error);
+          this.$message.error('저장 중 문제가 발생했습니다. 다시 시도해주세요.');
         }
       }
     },
@@ -142,7 +190,21 @@ export default {
         const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data;
 
-        // gradingSystem 데이터가 있으면, 화면에 표시될 scoringRubric 배열을 업데이트합니다.
+        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
+          this.fileList = response.data.evidenceList.map(evidence => {
+            const url = evidence.evidenceUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
+
+            return {
+              name: name,
+              url: url,
+              fileId: evidence.evidenceId,
+              uid: evidence.evidenceId
+            }
+          });
+        }
+
         if (this.goalDetail.gradingSystem) {
           const gradingMap = this.goalDetail.gradingSystem;
           this.scoringRubric.forEach(item => {

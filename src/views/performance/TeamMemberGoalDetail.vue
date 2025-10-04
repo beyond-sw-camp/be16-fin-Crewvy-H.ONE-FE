@@ -37,13 +37,14 @@
     <div class="evidence-section">
         <el-card>
             <h3>증적 자료</h3>
-            <div v-if="fileList.length > 0" class="file-list-readonly">
-              <div v-for="file in fileList" :key="file.name" class="file-item">
-                <el-icon><Document /></el-icon>
-                <span class="file-name">{{ file.name }}</span>
-              </div>
-            </div>
-            <div v-else>
+            <el-upload
+                class="upload-demo"
+                :file-list="fileList"
+                :on-preview="handleFilePreview"
+                disabled
+            >
+            </el-upload>
+            <div v-if="!fileList || fileList.length === 0">
               <p>업로드된 증적 자료가 없습니다.</p>
             </div>
         </el-card>
@@ -97,23 +98,22 @@
 
 <script>
 import axios from 'axios';
-import { Document } from '@element-plus/icons-vue'
+
 
 export default {
   name: 'TeamMemberGoalDetail',
   components: {
-    Document, // 아이콘 컴포넌트 등록
   },
   data() {
     return {
-      goalDetail: { // API 응답 데이터를 담을 객체
+      goalDetail: { 
         title: '',
         contents: '',
         startDate: '',
         endDate: '',
         status: ''
       },
-      fileList: [], // 증적 자료 파일 리스트
+      fileList: [],
       rejectDialogVisible: false,
       rejectForm: {
           reason: ''
@@ -123,7 +123,6 @@ export default {
           rating: '',
           comment: ''
       },
-
       scoringRubric: [
         { grade: 'A+', description: '' },
         { grade: 'A', description: '' },
@@ -138,13 +137,25 @@ export default {
       this.$router.go(-1);
     },
     async fetchGoalDetail() {
-      const goalId = this.$route.params.memberGoalId; // 라우터에서 goalId 가져오기
+      const goalId = this.$route.params.memberGoalId;
       try {
-        // In a real environment, you would use the actual API call:
         const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data;
 
-        // gradingSystem 데이터가 있으면, 화면에 표시될 scoringRubric 배열을 업데이트합니다.
+        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
+          this.fileList = response.data.evidenceList.map(evidence => {
+            const url = evidence.evidenceUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
+
+            return {
+              name: name,
+              url: url,
+              uid: evidence.evidenceId
+            }
+          });
+        }
+
         if (this.goalDetail.gradingSystem) {
           const gradingMap = this.goalDetail.gradingSystem;
           this.scoringRubric.forEach(item => {
@@ -153,23 +164,6 @@ export default {
             }
           });
         }
-
-        // this.fileList = response.data.files; // Assuming files are part of the response
-
-        // Using mock data provided by the user for demonstration:
-        // this.goalDetail = {
-        //     "goalId": goalId,
-        //     "title": "신규 클라이언트 5곳 발굴 및 계약 (API)",
-        //     "contents": "4분기 내 잠재 고객 리스트를 기반으로 신규 클라이언트 5곳과 계약을 체결하여 팀 매출 목표 달성에 기여합니다.",
-        //     "startDate": "2025-10-01",
-        //     "endDate": "2025-12-31",
-        //     "status": "REQUESTED"
-        // };
-        // Mock file list for demonstration
-        this.fileList = [
-          { name: '2025년 4분기 실적 보고서 초안.pdf' },
-          { name: '신규 클라이언트 계약 관련 이메일.eml' },
-        ];
 
       } catch (error) {
         console.error('Error fetching goal detail:', error);
@@ -183,6 +177,14 @@ export default {
       if (status === 'CANCELED') return 'info';
       return '';
     },
+    handleFilePreview(file) {
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
     async handleApprove() {
       try {
         await this.$confirm('해당 목표를 승인하시겠습니까?', '목표 승인', {
@@ -191,15 +193,13 @@ export default {
           type: 'warning',
         });
 
-        // 사용자가 확인을 눌렀을 때 API 요청 실행
         const payload = {
           goalId: this.goalDetail.goalId,
           status: 'APPROVED'
         };
-        // 데이터를 Request Body가 아닌 Query Parameter로 전송
         await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
 
-        this.goalDetail.status = 'APPROVED'; // 화면 상태 업데이트
+        this.goalDetail.status = 'APPROVED';
         this.$message({
           type: 'success',
           message: '승인되었습니다.',
@@ -232,7 +232,7 @@ export default {
 
         this.goalDetail.status = 'REJECTED';
         this.rejectDialogVisible = false;
-        this.rejectForm.reason = ''; // Clear form
+        this.rejectForm.reason = '';
         this.$message.success('반려 처리되었습니다.');
 
       } catch (error) {
@@ -241,7 +241,7 @@ export default {
       }
     },
     async openEvaluateDialog() {
-      this.evaluateForm.rating = ''; // Reset form before opening
+      this.evaluateForm.rating = '';
       this.evaluateForm.comment = '';
 
       try {
@@ -257,10 +257,8 @@ export default {
         }
 
       } catch (error) {
-        // 404 Not Found는 평가가 아직 없는 정상이므로 에러 처리하지 않음
         if (error.response && error.response.status !== 404) {
           console.error('Error fetching evaluation:', error);
-          // this.$message.error('평가 정보를 불러오는 데 실패했습니다.'); // 사용자향 에러 메시지 제거
         }
       }
       this.evaluateDialogVisible = true;
@@ -284,7 +282,6 @@ export default {
 
         this.evaluateDialogVisible = false;
         this.$message.success('평가가 저장되었습니다.');
-        // 평가 저장 후 상세 정보를 다시 불러와 화면에 반영할 수 있습니다.
         await this.fetchGoalDetail();
 
       } catch (error) {
@@ -292,19 +289,6 @@ export default {
         this.$message.error('평가 저장에 실패했습니다.');
       }
     },
-    // Placeholder methods for el-upload
-    handleRemove(file, fileList) {
-      console.log(file, fileList);
-    },
-    handlePreview(file) {
-      console.log(file);
-    },
-    handleExceed(files, fileList) {
-      this.$message.warning(`The limit is 3, you selected ${files.length} files this time, add up to ${files.length + fileList.length} totally`);
-    },
-    beforeRemove(file) {
-      return this.$confirm(`Cancel the transfert of ${ file.name } ?`);
-    }
   },
   created() {
     this.fetchGoalDetail();
@@ -363,14 +347,6 @@ export default {
 
 .evidence-section h3 {
   margin-bottom: 16px;
-}
-
-.upload-demo {
-  width: 100%;
-}
-
-.upload-demo :deep(.el-upload-list__item-name) {
-    font-size: 16px;
 }
 
 .actions-container {
