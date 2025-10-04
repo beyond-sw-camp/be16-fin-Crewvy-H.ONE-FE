@@ -30,7 +30,7 @@
         <div class="card-content">
           <div class="card-title">회의실</div>
           <div class="d-flex">
-            <div class="card-value">{{ meetingRooms.length }}개</div>
+            <div class="card-value">{{ safeMeetingRooms.length }}개</div>
             <div class="card-subtitle">사용 가능</div> 
           </div>
           
@@ -43,7 +43,7 @@
         </div>
         <div class="card-content">
           <div class="card-title">법인 차량</div>
-          <div class="card-value">{{ vehicles.length }}대</div>
+          <div class="card-value">{{ safeVehicles.length }}대</div>
           <div class="card-subtitle">예약 가능</div>
         </div>
       </div>
@@ -252,7 +252,7 @@
               <el-form-item label="사용 목적">
                 <el-input
                   v-model="reservationForm.purpose"
-                  placeholder="사용 목적을 입력하세요"
+                  placeholder="사용 목적을 입력하세요."
                 />
               </el-form-item>
               <el-form-item label="참석자 수">
@@ -268,7 +268,7 @@
                 <el-input
                   v-model="reservationForm.notes"
                   type="textarea"
-                  placeholder="추가 사항을 입력하세요"
+                  placeholder="추가 사항을 입력하세요."
                   :rows="2"
                 />
               </el-form-item>
@@ -288,7 +288,7 @@
                   </div>
                   <el-input
                     v-model="reservationForm.sharedUserInput"
-                    :placeholder="reservationForm.sharedUsers.length > 0 ? '' : '공동 사용자 이름을 입력하세요'"
+                    :placeholder="(reservationForm.sharedUsers || []).length > 0 ? '' : '공동 사용자 이름을 입력하세요.'"
                     @keyup.enter="addSharedUser"
                     @blur="addSharedUser"
                     @keydown.backspace="handleBackspace"
@@ -504,7 +504,7 @@ export default {
         sharedUsers: [],
         sharedUserInput: ''
       },
-      // 시간대 선택 관련
+
       timeSlots: [],
       weekDates: [],
       isSelecting: false,
@@ -512,9 +512,7 @@ export default {
       selectionStartHour: null,
       selectionEndDate: null,
       selectionEndHour: null,
-      // 예약 데이터 (실제로는 서버에서 가져와야 함)
       reservations: [
-        // 대회의실 (resourceId: 1) 예약들
         {
           id: 1,
           resourceId: 1,
@@ -576,7 +574,6 @@ export default {
           userId: 'user6'
         },
         
-        // 소회의실 A (resourceId: 2) 예약들
         {
           id: 7,
           resourceId: 2,
@@ -618,7 +615,6 @@ export default {
           userId: 'user10'
         },
         
-        // 소회의실 B (resourceId: 3) 예약들
         {
           id: 11,
           resourceId: 3,
@@ -650,7 +646,6 @@ export default {
           userId: 'user13'
         },
         
-        // 법인 차량 1 (resourceId: 4) 예약들
         {
           id: 14,
           resourceId: 4,
@@ -682,7 +677,6 @@ export default {
           userId: 'user16'
         },
         
-        // 법인 차량 2 (resourceId: 5) 예약들
         {
           id: 17,
           resourceId: 5,
@@ -704,7 +698,6 @@ export default {
           userId: 'user18'
         },
         
-        // 오늘 날짜 예약들 (동적으로 생성되는 날짜에 맞춰 추가)
         {
           id: 19,
           resourceId: 1,
@@ -736,7 +729,6 @@ export default {
           userId: 'user21'
         },
         
-        // 내일 날짜 예약들
         {
           id: 22,
           resourceId: 1,
@@ -768,7 +760,6 @@ export default {
           userId: 'user24'
         },
         
-        // 모레 날짜 예약들
         {
           id: 25,
           resourceId: 2,
@@ -790,7 +781,6 @@ export default {
           userId: 'user26'
         },
         
-        // 3일 후 예약들
         {
           id: 27,
           resourceId: 1,
@@ -812,7 +802,6 @@ export default {
           userId: 'user28'
         },
         
-        // 4일 후 예약들
         {
           id: 29,
           resourceId: 2,
@@ -834,7 +823,6 @@ export default {
           userId: 'user30'
         },
         
-        // 5일 후 예약들
         {
           id: 31,
           resourceId: 1,
@@ -856,7 +844,6 @@ export default {
           userId: 'user32'
         },
         
-        // 6일 후 예약들
         {
           id: 33,
           resourceId: 3,
@@ -1025,12 +1012,13 @@ export default {
     }
   },
   beforeUnmount() {
-    // 컴포넌트 파괴 시 차트 인스턴스 정리
     if (this.monthlyChartInstance) {
       this.monthlyChartInstance.destroy()
+      this.monthlyChartInstance = null
     }
     if (this.resourceChartInstance) {
       this.resourceChartInstance.destroy()
+      this.resourceChartInstance = null
     }
   },
   computed: {
@@ -1052,6 +1040,12 @@ export default {
              this.reservationForm.startTime && 
              this.reservationForm.endTime && 
              this.reservationForm.purpose
+    },
+    safeMeetingRooms() {
+      return this.meetingRooms || []
+    },
+    safeVehicles() {
+      return this.vehicles || []
     }
   },
   methods: {
@@ -1090,7 +1084,7 @@ export default {
     openReservationModal() {
       this.isEditingMode = false
       this.reservationForm.resourceId = ''
-      this.reservationForm.date = ''
+      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
       this.reservationForm.purpose = ''
@@ -1105,7 +1099,7 @@ export default {
     reserveResource(resource) {
       this.isEditingMode = false
       this.reservationForm.resourceId = resource.id
-      this.reservationForm.date = ''
+      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
       this.reservationForm.purpose = ''
@@ -1129,12 +1123,14 @@ export default {
     },
     generateWeekDates() {
       this.weekDates = []
-      const today = new Date()
       
-      // 오늘부터 7일간의 날짜 생성
+      // 선택된 날짜가 있으면 해당 날짜부터, 없으면 오늘부터 시작
+      const startDate = this.reservationForm.date ? new Date(this.reservationForm.date) : new Date()
+      
+      // 선택된 날짜부터 7일간의 날짜 생성
       for (let i = 0; i < 7; i++) {
-        const date = new Date(today)
-        date.setDate(today.getDate() + i)
+        const date = new Date(startDate)
+        date.setDate(startDate.getDate() + i)
         
         this.weekDates.push({
           date: this.formatDate(date),
@@ -1168,6 +1164,17 @@ export default {
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
       this.reservationForm.date = ''
+      this.isSelecting = false
+      this.selectionStartDate = null
+      this.selectionStartHour = null
+      this.selectionEndDate = null
+      this.selectionEndHour = null
+      this.generateWeekDates()
+    },
+    onDateChange() {
+      // 날짜가 변경되면 선택된 시간을 초기화하고 캘린더를 다시 렌더링
+      this.reservationForm.startTime = ''
+      this.reservationForm.endTime = ''
       this.isSelecting = false
       this.selectionStartDate = null
       this.selectionStartHour = null
@@ -1399,20 +1406,28 @@ export default {
     showStatisticsModal() {
       this.showStatistics = true
       this.$nextTick(() => {
-        this.createMonthlyChart()
-        this.createResourceChart()
+        // DOM이 완전히 렌더링된 후 차트 생성
+        setTimeout(() => {
+          this.createMonthlyChart()
+          this.createResourceChart()
+        }, 100)
       })
     },
     createMonthlyChart() {
       const ctx = this.$refs.monthlyChart
-      if (!ctx) return
+      if (!ctx || !ctx.getContext) {
+        console.warn('Monthly chart canvas not available')
+        return
+      }
       
       // 기존 차트가 있다면 파괴
       if (this.monthlyChartInstance) {
         this.monthlyChartInstance.destroy()
+        this.monthlyChartInstance = null
       }
       
-      this.monthlyChartInstance = new Chart(ctx, {
+      try {
+        this.monthlyChartInstance = new Chart(ctx, {
         type: 'line',
         data: this.monthlyData,
         options: {
@@ -1449,17 +1464,26 @@ export default {
           }
         }
       })
+      } catch (error) {
+        console.error('Error creating monthly chart:', error)
+        this.monthlyChartInstance = null
+      }
     },
     createResourceChart() {
       const ctx = this.$refs.resourceChart
-      if (!ctx) return
+      if (!ctx || !ctx.getContext) {
+        console.warn('Resource chart canvas not available')
+        return
+      }
       
       // 기존 차트가 있다면 파괴
       if (this.resourceChartInstance) {
         this.resourceChartInstance.destroy()
+        this.resourceChartInstance = null
       }
       
-      this.resourceChartInstance = new Chart(ctx, {
+      try {
+        this.resourceChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: this.resourceData,
         options: {
@@ -1481,6 +1505,10 @@ export default {
           }
         }
       })
+      } catch (error) {
+        console.error('Error creating resource chart:', error)
+        this.resourceChartInstance = null
+      }
     },
     completeUsage(reservation) {
       this.usageCompletionForm = {
@@ -1531,8 +1559,8 @@ export default {
 
     // Backspace 키 처리
     handleBackspace() {
-      if (this.reservationForm.sharedUserInput === '' && this.reservationForm.sharedUsers.length > 0) {
-        this.removeSharedUser(this.reservationForm.sharedUsers.length - 1)
+      if (this.reservationForm.sharedUserInput === '' && (this.reservationForm.sharedUsers || []).length > 0) {
+        this.removeSharedUser((this.reservationForm.sharedUsers || []).length - 1)
       }
     },
   }
@@ -1830,6 +1858,19 @@ export default {
 .reservation-details {
   padding-top: 20px;
   border-top: 1px solid #e9ecef;
+}
+
+/* reservation-details 내부 폼 아이템 정렬 */
+.reservation-details :deep(.el-form-item) {
+  align-items: flex-start;
+}
+
+.reservation-details :deep(.el-form-item__label) {
+  align-self: flex-start;
+}
+
+.reservation-details :deep(.el-form-item__content) {
+  align-self: flex-start;
 }
 
 .reservation-details > div {
@@ -2137,8 +2178,8 @@ export default {
 .tag-input-container {
   border: 1px solid #dcdfe6;
   border-radius: 6px;
-  padding: 5px 11px;
-  min-height: 30px;
+  padding: 1px 11px;
+  min-height: 32px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2154,6 +2195,11 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+}
+
+.tag-input-tags:empty {
+  display: none;
 }
 
 .tag-input-field {
@@ -2161,12 +2207,21 @@ export default {
   padding: 0;
   flex: 1;
   width: 100%;
+  min-width: 0;
 }
 
 .tag-input-field :deep(.el-input__wrapper) {
   box-shadow: none;
   border: none;
   padding: 0;
+}
+
+.tag-input-field :deep(.el-input__inner) {
+  font-size: 14px;
+}
+
+.tag-input-field :deep(.el-input__inner::placeholder) {
+  font-size: 14px;
 }
 
 
