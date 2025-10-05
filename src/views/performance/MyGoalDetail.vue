@@ -8,37 +8,60 @@
         <template #header>
             <span>팀 목표 정보</span>
         </template>
-        <h2>{{ teamGoal.title }}</h2>
-        <p>{{ teamGoal.description }}</p>
+        <h2>{{ goalDetail.teamGoalTitle }}</h2>
+        <p>{{ goalDetail.teamGoalContents }}</p>
     </el-card>
 
     <el-card class="card-section">
         <template #header>
             <span>내 목표 정보</span>
         </template>
-        <el-form :model="myGoal" label-position="top">
+        <el-form :model="goalDetail" label-position="top">
             <el-form-item label="목표 제목">
-                <el-input v-model="myGoal.title"></el-input>
+                <el-input v-model="goalDetail.title"></el-input>
             </el-form-item>
             <el-form-item label="목표 상세 내용">
-                <el-input v-model="myGoal.description" type="textarea" :rows="5"></el-input>
+                <el-input v-model="goalDetail.contents" type="textarea" :rows="5"></el-input>
+            </el-form-item>
+            <el-form-item label="목표 기간">
+                <span>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</span>
             </el-form-item>
             <el-form-item label="상태">
-                <el-tag :type="getStatusType(myGoal.status)" effect="dark">{{ myGoal.status }}</el-tag>
+                <el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag>
             </el-form-item>
         </el-form>
     </el-card>
 
     <el-card class="card-section">
         <template #header>
+            <span>점수 체계</span>
+        </template>
+        <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
+            <span class="rubric-grade">{{ item.grade }}</span>
+            <el-input
+                v-model="item.description"
+                type="textarea"
+                :rows="2"
+                :placeholder="item.grade + ' 등급에 대한 달성 기준을 입력하세요.'"
+            ></el-input>
+        </div>
+    </el-card>
+
+    <el-card class="card-section" v-if="goalDetail.status === 'APPROVED'">
+        <template #header>
             <span>증적 자료</span>
         </template>
         <el-upload
+            ref="uploader"
             class="upload-demo"
             drag
-            action="https://jsonplaceholder.typicode.com/posts/"
+            action="https://jsonplaceholder.typicode.com/posts/" 
             multiple
             :file-list="fileList"
+            :on-remove="handleFileRemove"
+            :on-change="handleFileChange"
+            :on-preview="handleFilePreview"
+            :auto-upload="false"
         >
             <el-icon class="el-icon--upload"><upload-filled /></el-icon>
             <div class="el-upload__text">
@@ -49,12 +72,13 @@
 
     <div class="actions-container">
         <el-button @click="goBack">취소</el-button>
-        <el-button type="primary" @click="saveChanges">저장</el-button>
+        <el-button type="primary" @click="saveChanges" :disabled="!['REQUESTED', 'APPROVED'].includes(goalDetail.status)">저장</el-button>
     </div>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
 import { UploadFilled } from '@element-plus/icons-vue';
 
 export default {
@@ -64,51 +88,147 @@ export default {
   },
   data() {
     return {
-      teamGoal: {},
-      myGoal: {},
-      fileList: []
+      goalDetail: {},
+      fileList: [],
+      filesToDelete: [],
+      scoringRubric: [
+        { grade: 'A+', description: '' },
+        { grade: 'A', description: '' },
+        { grade: 'B+', description: '' },
+        { grade: 'B', description: '' },
+        { grade: 'F', description: '' }
+      ]
     };
   },
   methods: {
+    handleFileChange(file, fileList) {
+      this.fileList = fileList;
+    },
+    handleFileRemove(file, fileList) {
+      if (file.fileId) {
+        this.filesToDelete.push(file.fileId);
+      }
+      this.fileList = fileList;
+    },
+    handleFilePreview(file) {
+      // 파일 클릭 시 다운로드하는 로직
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
     goBack() {
       this.$router.push('/performance/my-goal');
     },
-    saveChanges() {
-        // 저장 로직
-        console.log('Saving changes:', this.myGoal);
+    async saveChanges() {
+      try {
+        await this.$confirm('변경 사항을 저장하시겠습니까?', '저장 확인', {
+          confirmButtonText: '저장',
+          cancelButtonText: '취소',
+          type: 'info',
+        });
+
+        const goalId = this.goalDetail.goalId;
+
+        // --- 1. API 1 호출: 텍스트 정보 수정 ---
+        const textUpdateDto = {
+          goalId: goalId,
+          title: this.goalDetail.title,
+          contents: this.goalDetail.contents,
+          startDate: this.goalDetail.startDate,
+          endDate: this.goalDetail.endDate,
+          gradingSystem: this.scoringRubric.reduce((acc, item) => {
+            acc[item.grade] = item.description;
+            return acc;
+          }, {}),
+        };
+
+        await axios.patch(`http://localhost:8080/performance/update-my-goal`, textUpdateDto);
+        this.$message.success('목표 정보가 성공적으로 수정되었습니다.');
+
+        // --- 2. API 2 호출: 파일 정보 동기화 (조건부 실행) ---
+        const newFiles = this.fileList.filter(f => !f.fileId).map(f => f.raw);
+
+        if (newFiles.length > 0 || this.filesToDelete.length > 0) {
+          const existingFileIds = this.fileList
+            .filter(f => f.fileId)
+            .map(f => f.fileId);
+
+          const formData = new FormData();
+          const syncDto = { existingFileIds: existingFileIds };
+
+          formData.append('evidenceInfo', new Blob([JSON.stringify(syncDto)], { type: 'application/json' }));
+          newFiles.forEach(file => {
+            formData.append('newFiles', file);
+          });
+
+          await axios.patch(`http://localhost:8080/performance/evidence/${goalId}`, formData);
+          this.$message.success('증적 자료가 성공적으로 업데이트되었습니다.');
+
+          this.filesToDelete = [];
+        } else {
+          console.log('파일 변경사항이 없어 파일 동기화를 건너뜁니다.');
+        }
+
+        // --- 3. 모든 작업 성공 시, 이전 페이지로 이동 ---
         this.goBack();
+
+      } catch (error) {
+        if (error === 'cancel') {
+          this.$message.info('저장이 취소되었습니다.');
+        } else {
+          console.error('저장 중 오류 발생:', error);
+          this.$message.error('저장 중 문제가 발생했습니다. 다시 시도해주세요.');
+        }
+      }
     },
-    fetchGoalDetails() {
+    async fetchGoalDetail() {
       const goalId = this.$route.params.goalId;
-      // Mock data fetching
-      console.log('Fetching goal details for ID:', goalId);
-      this.teamGoal = {
-        title: '2024년 하반기 매출 20% 증대',
-        description: '신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다.'
-      };
-      this.myGoal = {
-        id: goalId,
-        title: '1분기 개인 매출 1억 달성',
-        description: '신규 고객 발굴 및 기존 고객 추가 계약을 통해 목표 달성',
-        status: '승인',
-        grade: 'A',
-      };
-      this.fileList = [
-          {
-            name: '2024년 1분기 실적 보고서.pdf',
-            url: ''
-          }
-      ]
+      try {
+        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
+        this.goalDetail = response.data;
+
+        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
+          this.fileList = response.data.evidenceList.map(evidence => {
+            const url = evidence.evidenceUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
+
+            return {
+              name: name,
+              url: url,
+              fileId: evidence.evidenceId,
+              uid: evidence.evidenceId
+            }
+          });
+        }
+
+        if (this.goalDetail.gradingSystem) {
+          const gradingMap = this.goalDetail.gradingSystem;
+          this.scoringRubric.forEach(item => {
+            if (Object.prototype.hasOwnProperty.call(gradingMap, item.grade)) {
+              item.description = gradingMap[item.grade];
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error fetching goal detail for ID: ${goalId}`, error);
+        this.$message.error('목표 정보를 불러오는 데 실패했습니다.');
+      }
     },
     getStatusType(status) {
-      if (status === '승인') return 'success';
-      if (status === '반려') return 'danger';
-      if (status === '요청') return 'warning';
+      if (status === 'APPROVED') return 'success';
+      if (status === 'REJECTED') return 'danger';
+      if (status === 'REQUESTED') return 'warning';
+      if (status === 'CANCELED') return 'info';
       return '';
     },
   },
   created() {
-    this.fetchGoalDetails();
+    this.fetchGoalDetail();
   }
 };
 </script>
@@ -126,5 +246,23 @@ export default {
 .actions-container {
     display: flex;
     justify-content: flex-end;
+}
+
+.rubric-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rubric-item:last-child {
+    margin-bottom: 0;
+}
+
+.rubric-grade {
+  width: 50px;
+  text-align: center;
+  font-weight: 600;
+  margin-right: 16px;
+  flex-shrink: 0;
 }
 </style>

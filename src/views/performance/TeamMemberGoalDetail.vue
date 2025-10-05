@@ -2,29 +2,35 @@
   <div class="member-goal-detail-container">
     <div class="header">
       <el-page-header @back="goBack"></el-page-header>
-      <h1 class="main-goal-title">{{ goal.title }}</h1>
+      <h1 class="main-goal-title">{{ goalDetail.title }}</h1>
     </div>
 
     <div class="goal-details">
       <el-card>
         <div class="detail-item description-item">
           <label>목표 설명</label>
-          <p>{{ goal.description }}</p>
-        </div>
-        <div class="detail-item">
-          <label>담당자</label>
-          <p>{{ goal.user.name }} ({{ goal.user.position }})</p>
+          <p>{{ goalDetail.contents }}</p>
         </div>
         <div class="detail-item">
           <label>기간</label>
-          <p>{{ goal.startDate }} ~ {{ goal.endDate }}</p>
+          <p>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</p>
         </div>
         <div class="detail-item">
           <label>상태</label>
-          <p><el-tag :type="getStatusType(goal.status)" effect="dark">{{ goal.status }}</el-tag></p>
+          <p><el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag></p>
         </div>
       </el-card>
     </div>
+
+    <el-card class="card-section" v-if="goalDetail.gradingSystem && Object.keys(goalDetail.gradingSystem).length">
+        <template #header>
+            <span>점수 체계</span>
+        </template>
+        <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
+            <span class="rubric-grade">{{ item.grade }}</span>
+            <p class="rubric-description">{{ item.description }}</p>
+        </div>
+    </el-card>
 
     <el-divider></el-divider>
 
@@ -33,33 +39,21 @@
             <h3>증적 자료</h3>
             <el-upload
                 class="upload-demo"
-                drag
-                action="https://jsonplaceholder.typicode.com/posts/"
-                :on-preview="handlePreview"
-                :on-remove="handleRemove"
-                :before-remove="beforeRemove"
-                multiple
-                :limit="3"
-                :on-exceed="handleExceed"
                 :file-list="fileList"
+                :on-preview="handleFilePreview"
+                disabled
             >
-                <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                <div class="el-upload__text">
-                클릭하거나 파일을 드래그하여 업로드하세요
-                </div>
-                <template #tip>
-                <div class="el-upload__tip">
-                    파일 용량 500kb 이하
-                </div>
-                </template>
             </el-upload>
+            <div v-if="!fileList || fileList.length === 0">
+              <p>업로드된 증적 자료가 없습니다.</p>
+            </div>
         </el-card>
     </div>
 
     <div class="actions-container">
-        <el-button type="success">승인</el-button>
-        <el-button type="danger" @click="rejectDialogVisible = true">반려</el-button>
-        <el-button type="primary" @click="evaluateDialogVisible = true">평가</el-button>
+        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== 'REQUESTED'">승인</el-button>
+        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== 'REQUESTED'">반려</el-button>
+        <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== 'APPROVED'">평가</el-button>
     </div>
 
     <el-dialog v-model="rejectDialogVisible" title="목표 반려" width="500px">
@@ -80,11 +74,11 @@
       <el-form :model="evaluateForm" label-position="top">
         <el-form-item label="등급">
           <el-select v-model="evaluateForm.rating" placeholder="등급을 선택하세요">
-            <el-option label="S" value="S"></el-option>
+            <el-option label="A+" value="A+"></el-option>
             <el-option label="A" value="A"></el-option>
+            <el-option label="B+" value="B+"></el-option>
             <el-option label="B" value="B"></el-option>
-            <el-option label="C" value="C"></el-option>
-            <el-option label="D" value="D"></el-option>
+            <el-option label="F" value="F"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="평가 코멘트">
@@ -103,26 +97,23 @@
 </template>
 
 <script>
-import { UploadFilled } from '@element-plus/icons-vue'
+import axios from 'axios';
+
 
 export default {
   name: 'TeamMemberGoalDetail',
   components: {
-    UploadFilled,
   },
   data() {
     return {
-      goal: {},
-      fileList: [
-        {
-            name: '2024년 8월 실적 보고서.pdf',
-            url: ''
-        },
-        {
-            name: '신규 고객 계약서 스캔본.jpg',
-            url: ''
-        }
-      ],
+      goalDetail: { 
+        title: '',
+        contents: '',
+        startDate: '',
+        endDate: '',
+        status: ''
+      },
+      fileList: [],
       rejectDialogVisible: false,
       rejectForm: {
           reason: ''
@@ -131,61 +122,176 @@ export default {
       evaluateForm: {
           rating: '',
           comment: ''
-      }
+      },
+      scoringRubric: [
+        { grade: 'A+', description: '' },
+        { grade: 'A', description: '' },
+        { grade: 'B+', description: '' },
+        { grade: 'B', description: '' },
+        { grade: 'F', description: '' }
+      ]
     };
   },
   methods: {
     goBack() {
       this.$router.go(-1);
     },
-    fetchMemberGoalDetails() {
-      const { memberGoalId } = this.$route.params;
-      // Mock data fetching
-      this.goal = {
-        id: memberGoalId,
-        title: '신규 고객 50개사 확보',
-        description: '콜드콜, 박람회 참여 등을 통해 신규 고객 확보',
-        user: {
-          name: '박영업',
-          position: '사원',
-        },
-        startDate: '2024-07-01',
-        endDate: '2024-09-30',
-        status: '승인 완료',
-      };
+    async fetchGoalDetail() {
+      const goalId = this.$route.params.memberGoalId;
+      try {
+        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
+        this.goalDetail = response.data;
+
+        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
+          this.fileList = response.data.evidenceList.map(evidence => {
+            const url = evidence.evidenceUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
+
+            return {
+              name: name,
+              url: url,
+              uid: evidence.evidenceId
+            }
+          });
+        }
+
+        if (this.goalDetail.gradingSystem) {
+          const gradingMap = this.goalDetail.gradingSystem;
+          this.scoringRubric.forEach(item => {
+            if (Object.prototype.hasOwnProperty.call(gradingMap, item.grade)) {
+              item.description = gradingMap[item.grade];
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error('Error fetching goal detail:', error);
+        this.$message.error('목표 상세 정보를 불러오는 데 실패했습니다.');
+      }
     },
     getStatusType(status) {
-      if (status === '승인 완료') return 'success';
-      if (status === '반려') return 'danger';
-      if (status === '승인 대기') return 'warning';
+      if (status === 'APPROVED') return 'success';
+      if (status === 'REJECTED') return 'danger';
+      if (status === 'REQUESTED') return 'warning';
+      if (status === 'CANCELED') return 'info';
       return '';
     },
-    handleReject() {
-        // Add rejection logic here
-        console.log('Rejection reason:', this.rejectForm.reason);
+    handleFilePreview(file) {
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
+    async handleApprove() {
+      try {
+        await this.$confirm('해당 목표를 승인하시겠습니까?', '목표 승인', {
+          confirmButtonText: '확인',
+          cancelButtonText: '취소',
+          type: 'warning',
+        });
+
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          status: 'APPROVED'
+        };
+        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+
+        this.goalDetail.status = 'APPROVED';
+        this.$message({
+          type: 'success',
+          message: '승인되었습니다.',
+        });
+
+      } catch (error) {
+        if (error === 'cancel') {
+          this.$message({
+            type: 'info',
+            message: '승인이 취소되었습니다.',
+          });
+        } else {
+          console.error('Error approving goal:', error);
+          this.$message.error('승인 처리에 실패했습니다.');
+        }
+      }
+    },
+    async handleReject() {
+      if (!this.rejectForm.reason) {
+        this.$message.warning('반려 사유를 입력해주세요.');
+        return;
+      }
+      try {
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          status: 'REJECTED',
+          comment: this.rejectForm.reason
+        };
+        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+
+        this.goalDetail.status = 'REJECTED';
         this.rejectDialogVisible = false;
+        this.rejectForm.reason = '';
+        this.$message.success('반려 처리되었습니다.');
+
+      } catch (error) {
+        console.error('Error rejecting goal:', error);
+        this.$message.error('반려 처리에 실패했습니다.');
+      }
     },
-    handleEvaluate() {
-        // Add evaluation logic here
-        console.log('Evaluation:', this.evaluateForm);
+    async openEvaluateDialog() {
+      this.evaluateForm.rating = '';
+      this.evaluateForm.comment = '';
+
+      try {
+        const params = {
+          goalId: this.goalDetail.goalId,
+          type: 'SUPERVISOR'
+        };
+        const response = await axios.get('http://localhost:8080/performance/find-evaluation', { params });
+
+        if (response.data) {
+          this.evaluateForm.rating = response.data.grade;
+          this.evaluateForm.comment = response.data.comment;
+        }
+
+      } catch (error) {
+        if (error.response && error.response.status !== 404) {
+          console.error('Error fetching evaluation:', error);
+        }
+      }
+      this.evaluateDialogVisible = true;
+    },
+
+    async handleEvaluate() {
+      if (!this.evaluateForm.rating) {
+        this.$message.warning('등급을 선택해주세요.');
+        return;
+      }
+
+      try {
+        const payload = {
+          goalId: this.goalDetail.goalId,
+          grade: this.evaluateForm.rating,
+          type: 'SUPERVISOR',
+          comment: this.evaluateForm.comment
+        };
+
+        await axios.post('http://localhost:8080/performance/create-evaluation', null, { params: payload });
+
         this.evaluateDialogVisible = false;
+        this.$message.success('평가가 저장되었습니다.');
+        await this.fetchGoalDetail();
+
+      } catch (error) {
+        console.error('Error saving evaluation:', error);
+        this.$message.error('평가 저장에 실패했습니다.');
+      }
     },
-    // Placeholder methods for el-upload
-    handleRemove(file, fileList) {
-      console.log(file, fileList);
-    },
-    handlePreview(file) {
-      console.log(file);
-    },
-    handleExceed(files, fileList) {
-      this.$message.warning(`The limit is 3, you selected ${files.length} files this time, add up to ${files.length + fileList.length} totally`);
-    },
-    beforeRemove(file) {
-      return this.$confirm(`Cancel the transfert of ${ file.name } ?`);
-    }
   },
   created() {
-    this.fetchMemberGoalDetails();
+    this.fetchGoalDetail();
   },
 };
 </script>
@@ -243,17 +349,44 @@ export default {
   margin-bottom: 16px;
 }
 
-.upload-demo {
-  width: 100%;
-}
-
-.upload-demo :deep(.el-upload-list__item-name) {
-    font-size: 16px;
-}
-
 .actions-container {
     margin-top: 24px;
     display: flex;
     justify-content: flex-end;
+}
+
+.card-section {
+    margin-bottom: 24px;
+}
+
+.rubric-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rubric-item:last-child {
+    margin-bottom: 0;
+}
+
+.rubric-grade {
+  width: 50px;
+  text-align: center;
+  font-weight: 600;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+
+.rubric-description {
+  flex-grow: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #DCDFE6;
+  border-radius: 4px;
+  background-color: #F5F7FA;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  word-break: break-word;
 }
 </style>

@@ -6,11 +6,12 @@
     </div>
 
     <div class="goal-list">
-      <el-card v-for="goal in myGoals" :key="goal.id" class="goal-card" @click="goToDetail(goal.id)">
+      <el-card v-for="goal in myGoals" :key="goal.goalId" class="goal-card" @click="goToDetail(goal.goalId)">
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
-            <p class="goal-description">{{ goal.description }}</p>
+            <p class="goal-description">{{ goal.contents }}</p>
+            <p class="goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
             <p v-if="goal.grade" class="goal-grade">평가 등급: {{ goal.grade }}</p>
           </div>
           <div class="goal-meta">
@@ -19,11 +20,11 @@
         </div>
         <el-divider></el-divider>
         <div class="card-actions">
-            <template v-if="goal.status === '반려'">
-                <el-button type="danger" plain @click.stop="viewRejectionReason(goal.id)">반려 사유 보기</el-button>
+            <template v-if="goal.status === 'REJECTED'">
+                <el-button type="danger" plain @click.stop="viewRejectionReason(goal)">반려 사유 보기</el-button>
             </template>
             <template v-else>
-                <el-button type="primary" :disabled="goal.status === '요청'" @click.stop="selfEvaluate(goal.id)">본인 평가</el-button>
+                <el-button type="primary" :disabled="goal.status === 'REQUESTED'" @click.stop="selfEvaluate(goal.goalId)">본인 평가</el-button>
             </template>
         </div>
       </el-card>
@@ -33,13 +34,13 @@
         <div class="team-goal-select-group">
             <el-card 
                 v-for="goal in teamGoalsForSelection" 
-                :key="goal.id" 
+                :key="goal.teamGoalId" 
                 class="dialog-team-goal-card" 
-                @click="selectedTeamGoal = goal.id"
-                :class="{ 'selected-card': selectedTeamGoal === goal.id }"
+                @click="selectedTeamGoal = goal.teamGoalId"
+                :class="{ 'selected-card': selectedTeamGoal === goal.teamGoalId }"
             >
                 <h4 class="dialog-team-goal-title">{{ goal.title }}</h4>
-                <p class="dialog-team-goal-description">{{ goal.description }}</p>
+                <p class="dialog-team-goal-description">{{ goal.contents }}</p>
             </el-card>
         </div>
       <template #footer>
@@ -54,11 +55,11 @@
       <el-form :model="selfEvaluateForm" label-position="top">
         <el-form-item label="등급">
           <el-select v-model="selfEvaluateForm.rating" placeholder="등급을 선택하세요">
-            <el-option label="S" value="S"></el-option>
+            <el-option label="A+" value="A+"></el-option>
             <el-option label="A" value="A"></el-option>
+            <el-option label="B+" value="B+"></el-option>
             <el-option label="B" value="B"></el-option>
-            <el-option label="C" value="C"></el-option>
-            <el-option label="D" value="D"></el-option>
+            <el-option label="F" value="F"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="평가 코멘트">
@@ -102,55 +103,16 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'MyGoal',
   data() {
     return {
-      myGoals: [
-        {
-          id: 1,
-          title: '1분기 개인 매출 1억 달성',
-          description: '신규 고객 발굴 및 기존 고객 추가 계약을 통해 목표 달성',
-          status: '승인',
-          grade: 'A',
-        },
-        {
-          id: 2,
-          title: '신규 기능 A 개발 완료',
-          description: '요구사항 분석, 설계, 개발, 테스트 포함',
-          status: '반려',
-          grade: null,
-          rejectionReason: '목표 설정이 너무 광범위합니다. 구체적인 개발 범위와 일정을 포함하여 재작성해주세요.'
-        },
-        {
-          id: 3,
-          title: '고객 만족도 설문 분석 및 보고',
-          description: '설문 결과를 바탕으로 개선 방안 도출 및 보고서 작성',
-          status: '요청',
-          grade: null,
-        },
-        {
-          id: 4,
-          title: '자격증 취득',
-          description: 'Vue.js 관련 전문 자격증 취득하여 개발 역량 강화',
-          status: '승인',
-          grade: null,
-        },
-      ],
+      myGoals: [], // API로부터 데이터를 받아올 배열
       newGoalDialogVisible: false,
       selectedTeamGoal: null,
-      teamGoalsForSelection: [
-        {
-            id: 101,
-            title: '2024년 하반기 매출 20% 증대',
-            description: '신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다.'
-        },
-        {
-            id: 102,
-            title: '신제품 개발 프로젝트 완료',
-            description: 'A-Project의 프로토타입을 10월까지 완료하고, 12월에 정식 출시하는 것을 목표로 합니다.'
-        }
-      ],
+      teamGoalsForSelection: [], // 이 부분도 필요 시 API로 받아올 수 있습니다.
       selfEvaluateDialogVisible: false,
       selfEvaluateForm: {
         rating: '',
@@ -161,7 +123,60 @@ export default {
     };
   },
   methods: {
-    addNewGoal() {
+    async fetchMyGoals() {
+      try {
+        // In a real environment, you would use the actual API call:
+        const response = await axios.get('http://localhost:8080/performance/get-my-goal');
+        this.myGoals = response.data;
+
+        // Using mock data provided by the user for demonstration:
+        // this.myGoals = [
+        //     {
+        //         "goalId": "89f9f7fb-e59b-4e31-b90d-2d6829cabe93",
+        //         "title": "신규 클라이언트 5곳 발굴 및 계약 (API)",
+        //         "contents": "4분기 내 잠재 고객 리스트를 기반으로 신규 클라이언트 5곳과 계약을 체결하여 팀 매출 목표 달성에 기여합니다.",
+        //         "startDate": "2025-10-01",
+        //         "endDate": "2025-12-31",
+        //         "status": "REQUESTED",
+        //         "grade": null,
+        //         "rejectionReason": null
+        //     },
+        //     {
+        //         "goalId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+        //         "title": "Vue.js 전문 자격증 취득 (API)",
+        //         "contents": "개발 역량 강화를 위해 Vue.js 관련 전문 자격증을 취득합니다.",
+        //         "startDate": "2025-08-01",
+        //         "endDate": "2025-12-31",
+        //         "status": "APPROVED",
+        //         "grade": null,
+        //         "rejectionReason": null
+        //     }
+        // ];
+      } catch (error) {
+        console.error('Error fetching my goals:', error);
+        this.$message.error('목표 목록을 불러오는 데 실패했습니다.');
+      }
+    },
+    async addNewGoal() {
+      // 데이터가 비어있을 때만 API 호출
+      if (this.teamGoalsForSelection.length === 0) {
+        try {
+          // For demonstration, using mock data. In real environment, use axios call.
+          const response = await axios.get('http://localhost:8080/performance/team-goal');
+          this.teamGoalsForSelection = response.data;
+          // this.teamGoalsForSelection = [
+          //   {
+          //       "teamGoalId": "36e7c5a6-8df6-4c0a-9efa-c5f66377b431",
+          //       "title": "2025년 4분기 팀 매출 20% 성장 달성",
+          //       "contents": "신규 고객 확보 및 기존 고객 유지 전략을 통해 4분기 팀 목표 매출액 1억 2천만원을 달성하는 것을 목표로 합니다.",
+          //   }
+          // ];
+        } catch (error) {
+          console.error('Error fetching team goals for selection:', error);
+          this.$message.error('팀 목표 목록을 불러오는 데 실패했습니다.');
+          return; // 에러 발생 시 다이얼로그를 열지 않음
+        }
+      }
       this.newGoalDialogVisible = true;
     },
     saveNewGoal() {
@@ -172,31 +187,30 @@ export default {
       }
     },
     getStatusType(status) {
-      if (status === '승인') return 'success';
-      if (status === '반려') return 'danger';
-      if (status === '요청') return 'warning';
+      if (status === 'APPROVED') return 'success';
+      if (status === 'REJECTED') return 'danger';
+      if (status === 'REQUESTED') return 'warning';
+      if (status === 'CANCELED') return 'info';
       return '';
     },
     selfEvaluate(id) {
       this.selfEvaluateDialogVisible = true;
-      // You might want to pass the goal id to the dialog as well
       console.log('Evaluating goal:', id);
     },
     handleSelfEvaluate() {
-      // Add evaluation save logic here
       console.log('Self Evaluation:', this.selfEvaluateForm);
       this.selfEvaluateDialogVisible = false;
     },
-    viewRejectionReason(id) {
-      const goal = this.myGoals.find(g => g.id === id);
-      if (goal) {
-        this.selectedRejectedGoal = goal;
-        this.rejectionReasonDialogVisible = true;
-      }
+    viewRejectionReason(goal) {
+      this.selectedRejectedGoal = goal;
+      this.rejectionReasonDialogVisible = true;
     },
     goToDetail(id) {
       this.$router.push(`/performance/my-goal/${id}`);
     },
+  },
+  created() {
+    this.fetchMyGoals();
   },
 };
 </script>
@@ -256,6 +270,12 @@ export default {
 .goal-description {
   font-size: 14px;
   color: #606266;
+  margin-bottom: 8px;
+}
+
+.goal-period {
+  font-size: 12px;
+  color: #909399;
   margin-bottom: 8px;
 }
 
