@@ -437,9 +437,10 @@ export default {
     },
     async joinActiveMeeting(meeting) {
       try {
-        await joinVideoConference(meeting.id)
+        const res = await joinVideoConference(meeting.id)
         this.success('회의에 참여합니다.')
-        // res.sessionId, res.token 사용해 OpenVidu 연결 로직 추가 가능
+        // 새 창으로 실제 회의실 오픈
+        this.openMeetingWindow(res, meeting.title)
       } catch (e) {
         this.error('회의 참여에 실패했습니다.')
       }
@@ -461,9 +462,9 @@ export default {
     },
     async startScheduledMeeting(meet) {
       try {
-        await startVideoConference(meet.id)
+        const res = await startVideoConference(meet.id)
         this.success(`${meet.title}을 시작합니다.`)
-        // res.sessionId, res.token 사용해 OpenVidu 연결 로직 추가 가능
+        this.openMeetingWindow(res, meet.title)
         this.loadMeetingLists()
       } catch (e) {
         this.error('회의 시작에 실패했습니다.')
@@ -516,9 +517,9 @@ export default {
           inviteeIdList: this.meetingForm.participants,
           isRecording: this.meetingForm.recording
         }
-        await createVideoConference(payload)
+        const res = await createVideoConference(payload)
         this.success('회의가 시작되었습니다.')
-        // res.sessionId, res.token 사용해 OpenVidu 연결 로직 추가 가능
+        this.openMeetingWindow(res, this.meetingForm.title)
         this.showStartMeeting = false
         this.meetingForm = { title: '', description: '', participants: [], recording: false }
         this.loadMeetingLists()
@@ -570,14 +571,28 @@ export default {
     },
     async joinMeetingRoom() {
       try {
-        await joinVideoConference(this.joinForm.meetingId)
+        const res = await joinVideoConference(this.joinForm.meetingId)
         this.success('회의에 참여합니다.')
-        // res.sessionId, res.token 사용해 OpenVidu 연결 로직 추가 가능
+        this.openMeetingWindow(res, '')
         this.showJoinMeeting = false
         this.joinForm = { meetingId: '', password: '' }
       } catch (e) {
         this.error('회의 참여에 실패했습니다.')
       }
+    }
+    ,
+    openMeetingWindow(apiResult, title) {
+      if (!apiResult) return
+      const sessionId = apiResult.sessionId || apiResult.sessionID || apiResult.id
+      const token = apiResult.token || apiResult.connectionToken || apiResult.accessToken
+      if (!sessionId || !token) {
+        this.warning('세션/토큰 정보를 찾지 못했습니다.')
+        return
+      }
+      const params = new URLSearchParams({ sid: String(sessionId), token: String(token), title: String(title || '') })
+      const base = (process.env.BASE_URL || '/').replace(/\/+$/, '')
+      const url = `${window.location.origin}${base}/meeting/room?${params.toString()}`
+      window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')
     }
   }
 }
