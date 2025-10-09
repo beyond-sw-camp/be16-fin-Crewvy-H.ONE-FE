@@ -3,15 +3,17 @@
     <!-- 사이드바 -->
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <div class="logo" @click="sidebarCollapsed ? toggleSidebar() : null" :class="{ 'clickable': sidebarCollapsed }">
-          <div class="logo-icon">
-            <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
+        <router-link to="/" class="logo-link">
+          <div class="logo">
+            <div class="logo-icon">
+              <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
+            </div>
+            <div v-if="!sidebarCollapsed" class="logo-text-container">
+              <div class="logo-text">H.ONE</div>
+              <div class="logo-subtitle">HR MANAGEMENT</div>
+            </div>
           </div>
-          <div v-if="!sidebarCollapsed" class="logo-text-container">
-            <div class="logo-text">H.ONE</div>
-            <div class="logo-subtitle">HR MANAGEMENT</div>
-          </div>
-        </div>
+        </router-link>
         <el-button v-if="!sidebarCollapsed" type="text" @click="toggleSidebar" class="collapse-btn">
           <el-icon>
             <Fold />
@@ -258,7 +260,7 @@
           </el-popover>
 
           <!-- 사용자 메뉴 -->
-          <el-dropdown @command="handleUserCommand">
+          <el-dropdown v-if="user" @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="user.avatar" :size="32" />
               <span class="user-name">{{ user.name }}</span>
@@ -818,6 +820,7 @@ export default {
           this.$router.push('/my-info');
           break;
         case 'logout':
+          this.$store.dispatch('logout');
           this.$router.push('/landing');
           break
       }
@@ -1057,6 +1060,14 @@ export default {
 
 <style scoped>
 /* ... (existing styles) */
+.logo-link {
+  text-decoration: none;
+}
+
+.logo {
+  cursor: pointer;
+}
+
 .main-layout {
   display: flex;
   height: 100vh;

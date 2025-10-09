@@ -4,7 +4,8 @@ const routes = [
   {
     path: '/meeting',
     name: 'Meeting',
-    component: Meeting
+    component: Meeting,
+    meta: { requiresAuth: true }
   },
 ];
 

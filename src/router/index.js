@@ -7,21 +7,23 @@ import payrollRoutes from './routes/payroll';
 import appsRoutes from './routes/apps';
 import approvalRoutes from './routes/approval';
 import Dashboard from '@/views/dashboard/Dashboard.vue';
-import LandingPage3 from '@/views/LandingPage3.vue';
 import PerformanceRoutes from './routes/performance';
 import meetingRoutes from './routes/meeting';
 import reservationRoutes from './routes/reservation';
+import LandingPage from '@/views/LandingPage.vue';
 
 const routes = [
   {
     path: '/',
     name: 'Dashboard',
-    component: Dashboard
+    component: Dashboard,
+    meta: { requiresAuth: true }
   },
   {
     path: '/landing',
     name: 'Landing',
-    component: LandingPage3
+    component: LandingPage,
+    meta: { layout: 'BlankLayout', requiresAuth: false }
   },
   ...mainRoutes,
   ...authenticationRoutes,
@@ -38,6 +40,17 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes
+});
+
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = !!localStorage.getItem('userInfo');
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+
+  if (requiresAuth && !isAuthenticated) {
+    next('/landing');
+  } else {
+    next();
+  }
 });
 
 export default router;

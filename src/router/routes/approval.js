@@ -13,49 +13,57 @@ const routes = [
   {
     path: '/approval',
     name: 'ApprovalView',
-    component: ApprovalView
+    component: ApprovalView,
+    meta: { requiresAuth: true }
   },
   {
     path: '/approval/templates',
     name: 'ApprovalTemplateManagement',
-    component: ApprovalTemplateManagement
+    component: ApprovalTemplateManagement,
+    meta: { requiresAuth: true }
   },
   // Policy Form Routes
   {
     path: '/approval/expense-report/:templateId?', // templateId is optional
     name: 'ApprovalExpenseReport',
     component: ExpenseReport,
-    props: true // Pass route.params as props
+    props: true,
+    meta: { requiresAuth: true } // Pass route.params as props
   },
   {
     path: '/approval/overtime-request/:templateId?',
     name: 'ApprovalOvertimeRequest',
     component: OvertimeRequest,
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
   {
     path: '/approval/vacation-request/:templateId?',
     name: 'ApprovalVacationRequest',
     component: VacationRequestForm,
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
   {
     path: '/approval/business-trip-request/:templateId?',
     name: 'ApprovalBusinessTripRequest',
     component: BusinessTripRequestForm,
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
   {
     path: '/approval/resource-booking/:templateId?',
     name: 'ApprovalResourceBooking',
     component: ResourceBookingForm,
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
   {
     path: '/approval/other-form/:templateId?',
     name: 'ApprovalOtherForm',
     component: OtherApprovalForm,
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
 ];
 

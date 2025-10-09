@@ -16,102 +16,122 @@ const routes = [
   {
     path: '/attendance',
     name: 'Attendance',
-    component: Attendance
+    component: Attendance,
+    meta: { requiresAuth: true }
   },
   {
     path: '/leave-request',
     name: 'LeaveRequest',
-    component: LeaveRequest
+    component: LeaveRequest,
+    meta: { requiresAuth: true }
   },
   {
     path: '/shared-calendar',
     name: 'SharedCalendar',
-    component: SharedCalendar
+    component: SharedCalendar,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/attendance',
     name: 'AdminAttendance',
-    component: AdminAttendance
+    component: AdminAttendance,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/leave-management',
     name: 'LeaveManagement',
-    component: LeaveManagement
+    component: LeaveManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/policy-management',
     name: 'PolicyManagement',
-    component: PolicyManagement
+    component: PolicyManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/work-location-management',
     name: 'WorkLocationManagement',
-    component: WorkLocationManagement
+    component: WorkLocationManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/audit-log',
     name: 'AuditLog',
-    component: AuditLog
+    component: AuditLog,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/policy-management/leave-editor',
     name: 'LeavePolicyEditor',
-    component: LeavePolicyEditor
+    component: LeavePolicyEditor,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/policy-management/trip-editor',
     name: 'BusinessTripPolicyEditor',
-    component: BusinessTripPolicyEditor
+    component: BusinessTripPolicyEditor,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/policy-management/work-editor',
     name: 'WorkPolicyEditor',
-    component: WorkPolicyEditor
+    component: WorkPolicyEditor,
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/overtime-request',
     name: 'OvertimeRequest',
-    component: () => import('../../views/policy/OvertimeRequest.vue')
+    component: () => import('../../views/policy/OvertimeRequest.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/expense-report',
     name: 'ExpenseReport',
-    component: () => import('../../views/policy/ExpenseReport.vue')
+    component: () => import('../../views/policy/ExpenseReport.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/vacation-request',
     name: 'VacationRequestForm',
-    component: () => import('../../views/policy/VacationRequestForm.vue')
+    component: () => import('../../views/policy/VacationRequestForm.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/business-trip-request',
     name: 'BusinessTripRequestForm',
-    component: () => import('../../views/policy/BusinessTripRequestForm.vue')
+    component: () => import('../../views/policy/BusinessTripRequestForm.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/resource-booking',
     name: 'ResourceBookingForm',
-    component: () => import('../../views/policy/ResourceBookingForm.vue')
+    component: () => import('../../views/policy/ResourceBookingForm.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/policy/other-approval',
     name: 'OtherApprovalForm',
-    component: () => import('../../views/policy/OtherApprovalForm.vue')
+    component: () => import('../../views/policy/OtherApprovalForm.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/balance',
     name: 'BalanceManagement',
-    component: BalanceManagement
+    component: BalanceManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/approval-lines',
     name: 'ApprovalLineManagement',
-    component: ApprovalLineManagement
+    component: ApprovalLineManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/work-schedule',
     name: 'WorkScheduleManagement',
-    component: () => import('../../views/admin/WorkScheduleManagement.vue')
+    component: () => import('../../views/admin/WorkScheduleManagement.vue'),
+    meta: { requiresAuth: true }
   },
 ];
 

@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <!-- 환영 메시지 -->
-    <div class="welcome-section">
+    <div v-if="user" class="welcome-section">
       <div class="welcome-content">
         <h2>안녕하세요, {{ user.name }}님!</h2>
         <p>오늘도 좋은 하루 되세요. H.ONE에서 효율적인 업무를 시작해보세요.</p>
