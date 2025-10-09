@@ -85,7 +85,11 @@ export default {
       isChatOpen: true,
       messages: [],
       chatText: '',
-      icons
+      icons,
+      userInfo: {
+        id: '00000000-0000-007b-0000-00000000007b',
+        name: '김민수' // 임시 유저명
+      }
     }
   },
   computed: {
@@ -132,7 +136,9 @@ export default {
       })
 
       try {
-        await this.session.connect(token)
+        // 사용자 정보를 포함한 연결
+        const userName = `${this.userInfo.id}:${this.userInfo.name}`
+        await this.session.connect(token, userName)
 
         // 퍼블리셔를 컨테이너에 직접 생성해 부착
         const container = this.$refs.videoContainer

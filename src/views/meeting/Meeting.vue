@@ -107,7 +107,7 @@
                 <div class="meeting-info">
                   <div class="meeting-title">{{ meeting.title }}</div>
                   <div class="meeting-details">
-                    <span class="meeting-time">{{ meeting.date }} {{ meeting.time }}</span>
+                    <span class="meeting-time">{{ meeting.dateTimeFormatted }}</span>
                     <span class="meeting-host">주최: {{ meeting.host }}</span>
                     <span class="meeting-participants">{{ meeting.participants }}명 초대</span>
                   </div>
@@ -326,6 +326,11 @@ export default {
   },
   data() {
     return {
+      // 시간 상수들
+      MINUTE_MS: 60 * 1000,
+      HOUR_MS: 60 * 60 * 1000,
+      DAY_MS: 24 * 60 * 60 * 1000,
+      
       activeTab: 'active',
       showStartMeeting: false,
       showScheduleMeeting: false,
@@ -372,14 +377,81 @@ export default {
     this.loadMeetingLists()
   },
   methods: {
+    getLocalDate() {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    },
     startMeeting() {
       this.showStartMeeting = true
     },
     joinMeeting() {
       this.showJoinMeeting = true
     },
-    handleTabChange(tab) {
+    parseActiveMeetings(inProgress) {
+      return (inProgress?.content || []).map(m => ({
+        id: m.id,
+        title: m.name || '임시 회의',
+        host: m.host || '주최자',
+        participants: m.participants || 0,
+        duration: this.calculateElapsedTime(m.actualStartTime),
+        actualStartTime: m.actualStartTime
+      }))
+    },
+    parseScheduledMeetings(waiting) {
+      return (waiting?.content || []).map(m => {
+        const dt = m.scheduledStartTime || '';
+        let datetimeStr = '-';
+        if(dt) {
+          const d = new Date(dt);
+          datetimeStr = d.toLocaleString('ko-KR', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+          }).replace(/\. /g, '. ').replace(/\.\s*$/, '');
+        }
+        const [date, time] = dt.split('T');
+        return {
+          id: m.id,
+          title: m.name || '임시 회의',
+          date: date || '',
+          time: (time || '').slice(0, 8),
+          rawDateTime: dt,
+          dateTimeFormatted: datetimeStr,
+          host: m.host || '주최자',
+          participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
+          description: m.description || '',
+          isRecording: m.isRecording === true,
+          inviteeIdList: Array.isArray(m.inviteeIdList) ? m.inviteeIdList : []
+        }
+      })
+    },
+    parseMeetingHistory(ended) {
+      return (ended?.content || []).map(m => ({
+        id: m.id,
+        title: m.name || '임시 회의',
+        date: this.formatMeetingDate(m.actualStartTime || m.scheduledStartTime),
+        host: m.host || '주최자',
+        duration: m.duration || '-',
+        participants: m.participants || 0,
+        status: '완료'
+      }))
+    },
+    async handleTabChange(tab) {
       this.activeTab = tab
+      if(tab === 'active') {
+        const inProgress = await getMyVideoConferences('IN_PROGRESS')
+        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
+        this.activeMeetings = this.activeMeetingsList.length
+      } else if(tab === 'scheduled') {
+        const waiting = await getMyVideoConferences('WAITING')
+        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
+        const localDate = this.getLocalDate();
+        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
+      } else if(tab === 'history') {
+        const ended = await getMyVideoConferences('ENDED')
+        this.meetingHistory = this.parseMeetingHistory(ended)
+      }
     },
     async loadMeetingLists() {
       try {
@@ -389,47 +461,15 @@ export default {
           getMyVideoConferences('ENDED')
         ])
 
-        // 진행 중 회의 목록
-        this.activeMeetingsList = (inProgress?.content || []).map((m) => ({
-          id: m.id,
-          title: m.name,
-          host: m.host || '주최자',
-          participants: m.participants || 0,
-          duration: '진행 중'
-        }))
+        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
         this.activeMeetings = this.activeMeetingsList.length
 
-        // 예정된 회의 (WAITING)
-        this.scheduledMeetings = (waiting?.content || []).map((m) => {
-          const dt = m.scheduledStartTime || ''
-          const [date, time] = dt.split('T')
-          return {
-            id: m.id,
-            title: m.name,
-            date: date || '',
-            time: (time || '').slice(0, 8),
-            rawDateTime: dt, // ISO "yyyy-MM-dd'T'HH:mm:ss"
-            host: m.host || '주최자',
-            participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
-            description: m.description || '',
-            isRecording: m.isRecording === true,
-            inviteeIdList: Array.isArray(m.inviteeIdList) ? m.inviteeIdList : []
-          }
-        })
+        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
+        const localDate = this.getLocalDate();
+        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
 
-        // 종료된 회의 기록
-        this.meetingHistory = (ended?.content || []).map((m) => ({
-          id: m.id,
-          title: m.name,
-          date: (m.scheduledStartTime || '').split('T')[0] || '',
-          host: m.host || '주최자',
-          duration: m.duration || '-',
-          participants: m.participants || 0,
-          status: '완료'
-        }))
+        this.meetingHistory = this.parseMeetingHistory(ended)
 
-        // 간단 지표 (필요시 백엔드 제공값으로 대체)
-        this.todayMeetings = this.scheduledMeetings.length
         this.totalParticipants = this.activeMeetingsList.reduce((acc, cur) => acc + (cur.participants || 0), 0)
       } catch (e) {
         this.error('회의 목록을 불러오지 못했습니다.')
@@ -452,6 +492,8 @@ export default {
         type: 'warning'
       }).then(() => {
         this.success('회의가 종료되었습니다.')
+      }).catch(() => {
+        // 사용자가 "돌아가기"를 선택한 경우 - 아무것도 하지 않음
       })
     },
     scheduleMeeting() {
@@ -500,6 +542,8 @@ export default {
         } catch (e) {
           this.error('회의 취소에 실패했습니다.')
         }
+      }).catch(() => {
+        // 사용자가 "돌아가기"를 선택한 경우 - 아무것도 하지 않음
       })
     },
     viewRecording(meeting) {
@@ -558,7 +602,7 @@ export default {
           this.success('회의 일정이 등록되었습니다.')
         }
         this.onCloseScheduleModal()
-        this.loadMeetingLists()
+        this.handleTabChange('scheduled')
       } catch (e) {
         this.error(this.isEditingSchedule ? '회의 일정 수정에 실패했습니다.' : '회의 일정 등록에 실패했습니다.')
       }
@@ -593,6 +637,42 @@ export default {
       const base = (process.env.BASE_URL || '/').replace(/\/+$/, '')
       const url = `${window.location.origin}${base}/meeting/room?${params.toString()}`
       window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')
+    },
+    calculateElapsedTime(actualStartTime) {
+      if (!actualStartTime) return '진행 중'
+      
+      const startTime = new Date(actualStartTime)
+      const now = new Date()
+      const diffMs = now - startTime
+      
+      if (diffMs < 0) return '진행 중'
+      
+      const hours = Math.floor(diffMs / this.HOUR_MS)
+      const minutes = Math.floor((diffMs % this.HOUR_MS) / this.MINUTE_MS)
+      
+      return hours > 0 ? `${hours}시간 ${minutes}분 경과` : `${minutes}분 경과`
+    },
+    formatMeetingDate(dateTime) {
+      if (!dateTime) return '-'
+      
+      const meetingDate = new Date(dateTime)
+      const today = new Date()
+      
+      // 날짜만 비교 (시간 제거)
+      const meetingDateOnly = new Date(meetingDate.getFullYear(), meetingDate.getMonth(), meetingDate.getDate())
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      
+      const diffDays = Math.floor((todayOnly - meetingDateOnly) / this.DAY_MS)
+      
+      if (diffDays === 0) return '오늘'
+      if (diffDays === 1) return '어제'
+      if (diffDays < 7) return `${diffDays}일 전`
+      
+      return meetingDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
     }
   }
 }
