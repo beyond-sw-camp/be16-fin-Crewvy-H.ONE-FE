@@ -57,18 +57,21 @@
       <el-table
         :data="filteredResources"
         v-loading="loading"
-        stripe
         style="width: 100%"
         empty-text="등록된 자원이 없습니다."
         :reserve-selection="true"
         :row-key="row => row.id"
       >
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="80">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="자원명" min-width="150" />
-        <el-table-column prop="category" label="카테고리" width="120">
+        <el-table-column prop="reservationCategoryName" label="카테고리" width="120">
           <template #default="{ row }">
-            <el-tag :type="getCategoryTagType(row.category)">
-              {{ getCategoryLabel(row.category) }}
+            <el-tag :type="getCategoryTagTypeByName(row.reservationCategoryName)">
+              {{ row.reservationCategoryName || getCategoryLabel(row.reservationCategoryId) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -81,12 +84,8 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="facilities" label="시설" min-width="150" show-overflow-tooltip />
         <el-table-column prop="description" label="설명" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="등록일" width="120">
-          <template #default="{ row }">
-            {{ formatDate(row.createdAt) }}
-          </template>
-        </el-table-column>
         <el-table-column label="관리" width="150" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="editResource(row)">수정</el-button>
@@ -133,6 +132,12 @@
             :min="1"
             :max="1000"
             placeholder="수용인원"
+          />
+        </el-form-item>
+        <el-form-item label="시설" prop="facilities">
+          <el-input 
+            v-model="resourceForm.facilities" 
+            placeholder="시설 정보를 입력하세요 (예: 프로젝터, 화이트보드, 에어컨 등)"
           />
         </el-form-item>
         <el-form-item v-if="isEditMode" label="상태" prop="status">
@@ -242,6 +247,7 @@
 import { ElMessageBox } from 'element-plus'
 import { Plus, Search, Setting } from '@element-plus/icons-vue'
 import { useSnackbar } from '@/composables/useSnackbar'
+import axios from 'axios'
 
 export default {
   name: 'ResourceManagement',
@@ -304,58 +310,7 @@ export default {
       },
       
       // 자원 목록 데이터
-      resources: [
-        {
-          id: 1,
-          name: '대회의실 A',
-          category: 'meeting_room',
-          location: '3층 301호',
-          capacity: 20,
-          status: 'available',
-          description: '프레젠테이션 시설이 완비된 대형 회의실',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 2,
-          name: '소회의실 B',
-          category: 'meeting_room',
-          location: '3층 302호',
-          capacity: 8,
-          status: 'in_use',
-          description: '소규모 회의용 회의실',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 3,
-          name: '회사 차량 1',
-          category: 'vehicle',
-          location: '지하 1층 주차장',
-          capacity: 5,
-          status: 'available',
-          description: '승용차 - 외근 및 출장용',
-          createdAt: '2024-01-10'
-        },
-        {
-          id: 4,
-          name: '프로젝터',
-          category: 'equipment',
-          location: '3층 보관실',
-          capacity: 1,
-          status: 'maintenance',
-          description: '고화질 프로젝터 - 회의실 사용',
-          createdAt: '2024-01-20'
-        },
-        {
-          id: 5,
-          name: '노트북',
-          category: 'equipment',
-          location: 'IT팀 사무실',
-          capacity: 1,
-          status: 'available',
-          description: '회의용 노트북',
-          createdAt: '2024-01-25'
-        }
-      ],
+      resources: [],
       
       // 폼 데이터
       resourceForm: {
@@ -364,6 +319,7 @@ export default {
         category: '',
         location: '',
         capacity: 1,
+        facilities: '',
         status: 'available',
         description: ''
       },
@@ -390,6 +346,10 @@ export default {
         ]
       }
     }
+  },
+  mounted() {
+    this.loadResourceList()
+    this.loadCategories()
   },
   computed: {
     filteredResources() {
@@ -418,6 +378,35 @@ export default {
     }
   },
   methods: {
+    async loadResourceList() {
+      this.loading = true
+      try {
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
+          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        // 응답을 화면 테이블 스키마로 매핑
+        this.resources = list.map(item => ({
+          id: item.id || item.uuid || item.reservationTypeId,
+          name: item.name || item.resourceName,
+          reservationCategoryId: item.reservationCategory?.id || item.reservationCategoryId || null,
+          reservationCategoryName: item.categoryName || item.reservationCategory?.name || '',
+          category: item.category || (item.categoryName || item.reservationCategory?.name || '').toLowerCase().replace(/\s+/g, '_'),
+          location: item.location || '',
+          capacity: item.capacity ?? 1,
+          facilities: item.facilities || '',
+          status: item.status || 'available',
+          description: item.description || '',
+          createdAt: item.createdAt || ''
+        }))
+      } catch (e) {
+        this.error('자원 목록 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+      } finally {
+        this.loading = false
+      }
+    },
     // 검색 처리
     handleSearch() {
       // 검색은 computed property에서 자동으로 처리됨
@@ -432,13 +421,34 @@ export default {
     showAddDialog() {
       this.isEditMode = false
       this.resetForm()
+      // 카테고리 목록 최신화
+      this.loadCategories()
       this.dialogVisible = true
     },
     
     // 자원 수정
     editResource(resource) {
       this.isEditMode = true
-      this.resourceForm = { ...resource }
+      
+      // 카테고리 매핑: reservationCategoryName을 기반으로 category value 찾기
+      let categoryValue = ''
+      if (resource.reservationCategoryName) {
+        const category = this.categories.find(cat => cat.name === resource.reservationCategoryName)
+        categoryValue = category ? category.value : ''
+      } else if (resource.reservationCategoryId) {
+        const category = this.categories.find(cat => cat.id === resource.reservationCategoryId)
+        categoryValue = category ? category.value : ''
+      } else {
+        categoryValue = resource.category || ''
+      }
+      
+      this.resourceForm = { 
+        ...resource,
+        category: categoryValue,
+        facilities: resource.facilities || ''
+      }
+      // 카테고리 목록 최신화
+      this.loadCategories()
       this.dialogVisible = true
     },
     
@@ -455,19 +465,18 @@ export default {
           }
         )
         
-        const index = this.resources.findIndex(r => r.id === resource.id)
-        if (index > -1) {
-          this.resources.splice(index, 1)
-          
-          // ID 자동 정렬 (1부터 순차적으로 재할당)
-          this.resources.forEach((resource, index) => {
-            resource.id = index + 1
-          })
-          
-          this.success('자원이 삭제되었습니다.')
-        }
+        // 실제 API 삭제 요청
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/delete/${resource.id}`)
+        
+        // 삭제 후 목록을 다시 로드하여 최신 데이터 반영
+        await this.loadResourceList()
+        this.success('자원이 삭제되었습니다.')
+        
       } catch (error) {
-        // 사용자가 취소한 경우
+        if (error.message !== 'cancel') { // 사용자가 취소한 경우가 아닌 경우
+          this.error('자원 삭제 중 오류가 발생했습니다.')
+          console.error('자원 삭제 오류:', error)
+        }
       }
     },
     
@@ -478,25 +487,43 @@ export default {
         
         this.saving = true
         
-        // 실제 API 호출 시뮬레이션
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const selectedCategory = this.categories.find(cat => cat.value === this.resourceForm.category)
         
         if (this.isEditMode) {
           // 수정
-          const index = this.resources.findIndex(r => r.id === this.resourceForm.id)
-          if (index > -1) {
-            this.resources.splice(index, 1, { ...this.resourceForm })
-            this.success('자원이 수정되었습니다.')
+          const updateData = {
+            reservationCategory: {
+              id: selectedCategory?.id || null
+            },
+            name: this.resourceForm.name,
+            location: this.resourceForm.location,
+            capacity: this.resourceForm.capacity,
+            facilities: this.resourceForm.facilities || '',
+            description: this.resourceForm.description
           }
+          
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData)
+          
+          // 자원 수정 후 목록을 다시 로드하여 최신 데이터 반영
+          await this.loadResourceList()
+          this.success('자원이 수정되었습니다.')
         } else {
           // 추가
-          const newId = Math.max(...this.resources.map(r => r.id)) + 1
-          const newResource = {
-            ...this.resourceForm,
-            id: newId,
-            createdAt: new Date().toISOString().split('T')[0]
+          const createData = {
+            reservationCategory: {
+              id: selectedCategory?.id || null
+            },
+            name: this.resourceForm.name,
+            location: this.resourceForm.location,
+            capacity: this.resourceForm.capacity,
+            facilities: this.resourceForm.facilities || '',
+            description: this.resourceForm.description
           }
-          this.resources.unshift(newResource)
+          
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/register`, createData)
+          
+          // 자원 추가 후 목록을 다시 로드하여 최신 데이터 반영
+          await this.loadResourceList()
           this.success('자원이 추가되었습니다.')
         }
         
@@ -507,6 +534,7 @@ export default {
         if (error !== false) { // 폼 검증 실패가 아닌 경우
           this.error('저장 중 오류가 발생했습니다.')
         }
+        console.error('자원 저장 오류:', error)
       } finally {
         this.saving = false
       }
@@ -520,6 +548,7 @@ export default {
         category: '',
         location: '',
         capacity: 1,
+        facilities: '',
         status: 'available',
         description: ''
       }
@@ -539,15 +568,43 @@ export default {
       return labels[category] || category
     },
     
-    // 카테고리 태그 타입 반환
-    getCategoryTagType(category) {
-      const types = {
-        meeting_room: 'primary',
-        vehicle: 'success',
-        equipment: 'warning',
-        other: 'info'
+    // 카테고리 이름을 기반으로 태그 타입 반환
+    getCategoryTagTypeByName(categoryName) {
+      if (!categoryName) return 'info'
+      
+      const name = categoryName.toLowerCase()
+      
+      // 회의실 관련
+      if (name.includes('회의실') || name.includes('meeting') || 
+          name.includes('conference') || name.includes('room')) {
+        return 'primary'
       }
-      return types[category] || 'info'
+      // 차량 관련
+      else if (name.includes('차량') || name.includes('vehicle') || 
+               name.includes('car') || name.includes('법인차량') ||
+               name.includes('자동차')) {
+        return 'success'
+      }
+      // 장비 관련
+      else if (name.includes('장비') || name.includes('equipment') || 
+               name.includes('기자재') || name.includes('device') ||
+               name.includes('노트북') || name.includes('laptop')) {
+        return 'warning'
+      }
+      // 시설 관련
+      else if (name.includes('시설') || name.includes('facility') || 
+               name.includes('공간') || name.includes('space')) {
+        return 'info'
+      }
+      // 기타
+      else if (name.includes('기타') || name.includes('other') || 
+               name.includes('etc')) {
+        return 'danger'
+      }
+      // 기본값
+      else {
+        return 'info'
+      }
     },
     
     // 상태 라벨 반환
@@ -580,6 +637,31 @@ export default {
     // 카테고리 관리 다이얼로그 표시
     showCategoryDialog() {
       this.categoryDialogVisible = true
+      this.loadCategories()
+    },
+
+    async loadCategories() {
+      this.categorySaving = true
+      try {
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
+          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        this.categories = list.map(cat => ({
+          id: cat.id || cat.categoryId || cat.uuid,
+          name: cat.name,
+          value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
+        }))
+        
+        // 카테고리 데이터 로깅 (개발용)
+        console.log('로드된 카테고리 목록:', this.categories)
+      } catch (e) {
+        this.error('카테고리 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+      } finally {
+        this.categorySaving = false
+      }
     },
     
     // 카테고리 저장 (추가/수정)
@@ -589,50 +671,23 @@ export default {
         
         this.categorySaving = true
         
-        // 실제 API 호출 시뮬레이션
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // 중복 체크 (수정 모드에서는 현재 편집 중인 카테고리 제외)
-        const existingCategory = this.categories.find((cat, index) => 
-          index !== this.editingCategoryIndex && (
-            cat.name === this.categoryForm.name || 
-            cat.value === this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
-          )
-        )
-        
-        if (existingCategory) {
-          this.error('이미 존재하는 카테고리입니다.')
-          return
-        }
-        
         if (this.isCategoryEditMode) {
-          // 수정
-          const newValue = this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
-          
-          // 기존 자원들의 카테고리 값도 업데이트
-          this.resources.forEach(resource => {
-            if (resource.category === this.categories[this.editingCategoryIndex].value) {
-              resource.category = newValue
-            }
+          // 수정: PUT /update/{id}
+          const id = this.categories[this.editingCategoryIndex]?.id
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/update/${id}`, {
+            name: this.categoryForm.name
           })
-          
-          // 카테고리 정보 업데이트
-          this.categories[this.editingCategoryIndex].name = this.categoryForm.name
-          this.categories[this.editingCategoryIndex].value = newValue
-          
           this.success('카테고리가 수정되었습니다.')
         } else {
-          // 추가
-          const newCategory = {
-            id: Math.max(...this.categories.map(c => c.id)) + 1,
+          // 추가: POST /register
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
             name: this.categoryForm.name,
-            value: this.categoryForm.name.toLowerCase().replace(/\s+/g, '_')
-          }
-          
-          this.categories.push(newCategory)
+            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e'
+          })
           this.success('카테고리가 추가되었습니다.')
         }
         
+        await this.loadCategories()
         this.resetCategoryForm()
         
       } catch (error) {
@@ -659,16 +714,8 @@ export default {
     },
     
     // 카테고리 삭제
-    async deleteCategory(category, index) {
+    async deleteCategory(category) {
       try {
-        // 해당 카테고리를 사용하는 자원이 있는지 확인
-        const usedResources = this.resources.filter(resource => resource.category === category.value)
-        
-        if (usedResources.length > 0) {
-          this.error(`"${category.name}" 카테고리를 사용하는 자원이 있어 삭제할 수 없습니다.`)
-          return
-        }
-        
         await ElMessageBox.confirm(
           `"${category.name}" 카테고리를 삭제하시겠습니까?`,
           '카테고리 삭제',
@@ -679,7 +726,8 @@ export default {
           }
         )
         
-        this.categories.splice(index, 1)
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/delete/${category.id}`)
+        await this.loadCategories()
         this.success('카테고리가 삭제되었습니다.')
         
       } catch (error) {
