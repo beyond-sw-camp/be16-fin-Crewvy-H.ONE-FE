@@ -14,11 +14,6 @@ const routes = [
     name: 'Board',
     component: () => import('@/views/dashboard/Board.vue')
   },
-  {
-    path: '/resource',
-    name: 'Resource',
-    component: () => import('@/views/reservation/Resource.vue')
-  }
 ];
 
 export default routes;
