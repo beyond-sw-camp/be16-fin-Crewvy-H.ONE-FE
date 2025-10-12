@@ -44,6 +44,11 @@ const routes = [
     component: PolicyManagement
   },
   {
+    path: '/admin/policy-management/create',
+    name: 'PolicyCreate',
+    component: () => import('@/views/attendance/PolicyEditor.vue')
+  },
+  {
     path: '/admin/work-location-management',
     name: 'WorkLocationManagement',
     component: WorkLocationManagement

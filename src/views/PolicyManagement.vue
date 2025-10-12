@@ -3,7 +3,7 @@
     <div class="content-card">
       <div class="card-header">
         <h3>근태 정책 관리</h3>
-        <el-button type="primary" @click="openNewPolicyDialog">
+        <el-button type="primary" @click="goToCreatePage">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">새 정책 추가</span>
         </el-button>
@@ -188,6 +188,11 @@ export default {
       editPolicy,
     };
   },
+  methods: {
+    goToCreatePage() {
+      this.$router.push({ name: 'PolicyCreate' });
+    }
+  }
 };
 </script>
 
