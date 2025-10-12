@@ -57,6 +57,23 @@
       </div>
     </div>
 
+    <!-- Attachment Display Section -->
+    <el-card class="box-card attachment-display-section">
+      <template #header>
+        <div class="card-header">
+          <span>첨부파일</span>
+        </div>
+      </template>
+      <div v-if="attachments.length > 0" class="attachment-list">
+        <div v-for="file in attachments" :key="file.id" class="attachment-item">
+          <a :href="file.url" target="_blank" rel="noopener noreferrer">{{ file.name }}</a>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <p>첨부파일이 없습니다.</p>
+      </div>
+    </el-card>
+
     <!-- Comment Section -->
     <el-card class="box-card comment-section">
       <template #header>
@@ -116,6 +133,7 @@ export default {
     const currentApprovalLine = ref([]);
     const comments = ref([]);
     const newComment = ref('');
+    const attachments = ref([]); // For attachment list
 
     const fetchApprovalDetails = async (id) => {
       try {
@@ -130,6 +148,21 @@ export default {
             if (details.document.metadata) {
                 formSchema.value = details.document.metadata.schema;
             }
+        }
+
+        if (details.attachmentList) {
+          attachments.value = details.attachmentList.map(file => {
+            const url = file.attachmentUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const displayName = firstUnderscoreIndex !== -1 
+              ? url.substring(firstUnderscoreIndex + 1) 
+              : url;
+            return {
+              name: displayName,
+              url: url,
+              id: file.attachmentId
+            };
+          });
         }
         
         // approvalLine is not in this response, so it will be empty for now.
@@ -196,6 +229,7 @@ export default {
       newComment,
       addComment,
       goBack,
+      attachments,
     };
   },
 };
@@ -215,6 +249,22 @@ export default {
 .approver-display-item { padding: 8px; border-bottom: 1px solid #f0f0f0; }
 .empty-state { text-align: center; color: #909399; padding-top: 20px; padding-bottom: 20px;}
 .form-actions { display: flex; justify-content: flex-end; margin-top: 24px; gap: 10px; }
+
+/* Attachment Display Section Styles */
+.attachment-display-section { margin-top: 24px; }
+.attachment-list { padding: 10px; }
+.attachment-item {
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+.attachment-item a {
+  text-decoration: none;
+  color: #409EFF;
+}
+.attachment-item:hover {
+  background-color: #f5f7fa;
+}
 
 /* Comment Section Styles */
 .comment-section { margin-top: 24px; }

@@ -74,6 +74,24 @@
                 </el-col>
               </el-row>
             </el-form>
+
+            <!-- Attachment Section -->
+            <el-divider>첨부파일</el-divider>
+            <div class="attachment-section">
+              <el-upload
+                v-model:file-list="fileList"
+                class="upload-demo"
+                drag
+                action="#"
+                :auto-upload="false"
+                multiple
+              >
+                <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+                <div class="el-upload__text">
+                  클릭하거나 파일을 드래그하여 업로드하세요
+                </div>
+              </el-upload>
+            </div>
           </div>
           <div v-else class="form-placeholder">
             <p>선택된 결재 양식을 불러오는 중입니다...</p>
@@ -121,11 +139,13 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import ApprovalLineEditorModal from '@/components/approval/ApprovalLineEditorModal.vue';
+import { UploadFilled } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalRequestForm',
   components: {
     ApprovalLineEditorModal,
+    UploadFilled,
   },
   setup() {
     const router = useRouter();
@@ -138,6 +158,7 @@ export default {
     const approvalTitle = ref('');
     const showApprovalLineEditor = ref(false);
     const currentApprovalLine = ref([]);
+    const fileList = ref([]); // For <el-upload>
 
     const initializeFormData = (schema) => {
       const data = {};
@@ -180,10 +201,28 @@ export default {
                 formSchema.value = draftData.document.metadata.schema;
             }
         }
-        // Assuming approval line is also part of this response for drafts
-        if (draftData.approvalLine) {
-            currentApprovalLine.value = draftData.approvalLine;
+        
+        if (draftData.attachmentList) {
+          fileList.value = draftData.attachmentList.map(file => {
+            const url = file.attachmentUrl;
+            const firstUnderscoreIndex = url.indexOf('_');
+            const displayName = firstUnderscoreIndex !== -1 
+              ? url.substring(firstUnderscoreIndex + 1) 
+              : url; // Fallback to full URL if no underscore
+
+            return {
+              name: displayName,
+              id: file.attachmentId,
+              status: 'success',
+              url: url // Keep the original URL for potential downloads
+            };
+          });
         }
+
+        if (draftData.lineList) {
+            currentApprovalLine.value = draftData.lineList;
+        }
+
       } catch (error) {
         console.error('Failed to fetch draft data:', error);
       }
@@ -194,15 +233,60 @@ export default {
       const documentIdFromRoute = route.params.documentId;
 
       if (approvalIdFromRoute) {
-        // Editing a draft
         draftApprovalId.value = approvalIdFromRoute;
         fetchDraftData(approvalIdFromRoute);
       } else if (documentIdFromRoute) {
-        // Creating a new form
         documentId.value = documentIdFromRoute;
         fetchFormSchema(documentIdFromRoute);
       }
     });
+
+    const handleFileUpload = async (approvalId) => {
+      if (fileList.value.length === 0) return; // No files to upload
+
+      const formData = new FormData();
+      const newFiles = [];
+      const existingFileIds = [];
+
+      fileList.value.forEach(file => {
+        if (file.raw) { // New file selected by user
+          newFiles.push(file.raw);
+        } else if (file.status === 'success') { // Existing file
+          existingFileIds.push(file.id);
+        }
+      });
+
+      // Do not send request if there are no changes in files
+      if (newFiles.length === 0 && existingFileIds.length === fileList.value.length) {
+          // This condition can be more robust by checking initial state
+          // For now, we assume if no new files, no changes needed.
+          // A better check would be to compare initial existingFileIds with current.
+          // return;
+      }
+
+      const attachmentInfoDto = {
+        existingFileIds: existingFileIds,
+      };
+
+      formData.append('attachmentInfo', new Blob([JSON.stringify(attachmentInfoDto)], { type: 'application/json' }));
+      
+      if (newFiles.length > 0) {
+        newFiles.forEach(file => {
+          formData.append('newFiles', file);
+        });
+      }
+
+      try {
+        await axios.patch(`http://localhost:8080/approval/attachment/${approvalId}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } catch (error) {
+        console.error('File upload failed:', error);
+        alert('파일 업로드에 실패했습니다.');
+      }
+    };
 
     const submitApproval = async () => {
       const lineDtoList = currentApprovalLine.value.map((approver, index) => ({
@@ -222,7 +306,11 @@ export default {
       }
 
       try {
-        await axios.post('http://localhost:8080/approval/create-approval', approvalData);
+        const response = await axios.post('http://localhost:8080/approval/create-approval', approvalData);
+        const newApprovalId = response.data.approvalId;
+        if (newApprovalId) {
+          await handleFileUpload(newApprovalId);
+        }
         alert('결재 요청이 성공적으로 전송되었습니다.');
         router.push('/approval');
       } catch (error) {
@@ -249,17 +337,18 @@ export default {
       }
 
       try {
-        await axios.post('http://localhost:8080/approval/draft-approval', approvalData);
+        const response = await axios.post('http://localhost:8080/approval/draft-approval', approvalData);
+        const newApprovalId = response.data;
+        console.log(newApprovalId);
+        if (newApprovalId) {
+          await handleFileUpload(newApprovalId);
+        }
         alert('결재가 임시저장되었습니다.');
         router.push('/approval');
       } catch (error) {
         console.error('임시저장 실패:', error);
         alert('임시저장에 실패했습니다.');
       }
-    };
-
-    const updateApprovalLine = (newLine) => {
-      currentApprovalLine.value = newLine;
     };
 
     const deleteDraft = async () => {
@@ -277,6 +366,10 @@ export default {
       }
     };
 
+    const updateApprovalLine = (newLine) => {
+      currentApprovalLine.value = newLine;
+    };
+
     return {
       documentId,
       draftApprovalId,
@@ -290,6 +383,7 @@ export default {
       showApprovalLineEditor,
       currentApprovalLine,
       updateApprovalLine,
+      fileList,
     };
   },
 };
@@ -337,6 +431,10 @@ export default {
 
 .dynamic-form {
   padding: 20px;
+}
+
+.attachment-section {
+  padding: 0 20px 20px 20px;
 }
 
 .form-placeholder {
