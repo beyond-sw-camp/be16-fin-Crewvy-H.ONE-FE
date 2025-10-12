@@ -87,48 +87,19 @@
             </div>
             
             <div class="approval-list">
-              <div class="approval-item" v-for="approval in filteredPendingApprovals" :key="approval.id">
+              <div class="approval-item" v-for="approval in filteredPendingApprovals" :key="approval.approvalId">
                 <div class="approval-info">
                   <div class="approval-header">
                     <div class="approval-title">{{ approval.title }}</div>
                   </div>
                   <div class="approval-details">
-                    <span class="approval-requester">{{ approval.requester }}</span>
-                    <span class="approval-type">{{ approval.type }}</span>
-                    <span class="approval-amount" v-if="approval.amount">{{ approval.amount.toLocaleString() }}원</span>
-                  </div>
-                  <div class="approval-description">{{ approval.description }}</div>
-                  <div class="approval-progress">
-                    <div class="progress-steps">
-                      <div 
-                        class="progress-step" 
-                        v-for="(step, index) in approval.steps" 
-                        :key="index"
-                        :class="{
-                          'completed': step.status === 'completed',
-                          'current': step.status === 'current',
-                          'pending': step.status === 'pending'
-                        }"
-                      >
-                        <div class="step-icon">
-                          <el-icon v-if="step.status === 'completed'"><Check /></el-icon>
-                          <el-icon v-else-if="step.status === 'current'"><Clock /></el-icon>
-                          <el-icon v-else><Minus /></el-icon>
-                        </div>
-                        <div class="step-info">
-                          <div class="step-name">{{ step.name }}</div>
-                          <div class="step-status">{{ step.statusText }}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <span class="approval-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="approval-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
                 </div>
                 <div class="approval-right-section">
                   <div class="approval-top-row">
-                    <el-tag :type="getPriorityType(approval.priority)" size="small">
-                      {{ approval.priority === 'high' ? '긴급' : '일반' }}
-                    </el-tag>
-                    <div class="approval-date">{{ approval.date }}</div>
+                    <div class="approval-date">{{ approval.createAt }}</div>
                   </div>
                   <div class="approval-actions">
                     <el-button type="success" size="small" @click="approveItem(approval)">
@@ -210,17 +181,15 @@
             </div>
             
             <div class="completed-list">
-              <div class="completed-item" v-for="approval in completedList" :key="approval.id">
+              <div class="completed-item" v-for="approval in completedList" :key="approval.approvalId">
                 <div class="completed-info">
                   <div class="completed-header">
                     <div class="completed-title">{{ approval.title }}</div>
                   </div>
                   <div class="completed-details">
-                    <span class="completed-requester">{{ approval.requester }}</span>
-                    <span class="completed-type">{{ approval.type }}</span>
-                    <span class="completed-amount" v-if="approval.amount">{{ approval.amount.toLocaleString() }}원</span>
+                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
-                  <div class="completed-description">{{ approval.description }}</div>
                 </div>
                 <div class="completed-meta-actions">
                   <div class="completed-meta-actions-row">
@@ -228,16 +197,12 @@
                       <el-tag :type="getStatusType(approval.status)" size="small">
                         {{ approval.status }}
                       </el-tag>
-                      <span class="completed-date">{{ approval.completedDate }}</span>
+                      <span class="completed-date">{{ approval.createAt }}</span>
                     </div>
                     <div class="completed-actions">
                       <el-button size="small" @click="viewCompletedDetails(approval)">
                         <el-icon><View /></el-icon>
                         상세
-                      </el-button>
-                      <el-button size="small" @click="downloadApproval(approval)">
-                        <el-icon><Download /></el-icon>
-                        다운로드
                       </el-button>
                     </div>
                   </div>
@@ -298,13 +263,13 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
-import { Plus, Document, Clock, Check, Timer, Minus, Close, View, Download, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Document, Clock, Check, Timer, Close, View, Edit, Delete } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalPage',
   components: {
     ApprovalTemplateSelectorModal,
-    Plus, Document, Clock, Check, Timer, Minus, Close, View, Download, Edit, Delete
+    Plus, Document, Clock, Check, Timer, Close, View, Edit, Delete
   },
   setup() {
     const { success, error, warning, info } = useSnackbar();
@@ -359,6 +324,16 @@ export default {
         },
     ]);
 
+    const fetchPendingApprovals = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/approval/find-pending-list');
+        pendingApprovalsList.value = response.data;
+      } catch (err) {
+        error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
     const fetchMyRequests = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/find-approval-list');
@@ -379,9 +354,21 @@ export default {
       }
     };
 
+    const fetchCompletedApprovals = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/approval/find-complete-list');
+        completedList.value = response.data;
+      } catch (err) {
+        error('완료된 결재 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
     const handleTabChange = (tabName) => {
       activeTab.value = tabName;
-      if (tabName === 'my-requests') {
+      if (tabName === 'pending') {
+        fetchPendingApprovals();
+      } else if (tabName === 'my-requests') {
         showMyRequestsTable.value = false;
         fetchMyRequests();
         nextTick(() => {
@@ -389,15 +376,14 @@ export default {
         });
       } else if (tabName === 'temporary') {
         fetchTemporarySaves();
+      } else if (tabName === 'completed') {
+        fetchCompletedApprovals();
       }
     };
 
     onMounted(() => {
-      // Fetch initial data for the default tab if necessary
-      if (activeTab.value === 'my-requests') {
-          fetchMyRequests();
-      }
-      // You can also fetch data for other tabs here e.g. pendingApprovals
+      // Fetch initial data for the default tab
+      fetchPendingApprovals();
     });
 
     const openTemplateSelector = () => {
@@ -428,15 +414,17 @@ export default {
     };
 
     const approveItem = (item) => {
+        // TODO: Implement approve API call
         info(`승인 처리: ${item.title}`);
     };
 
     const rejectItem = (item) => {
+        // TODO: Implement reject API call
         info(`반려 처리: ${item.title}`);
     };
 
     const viewDetails = (item) => {
-        info(`상세보기: ${item.title}`);
+        router.push(`/approval/detail/${item.approvalId}`);
     };
 
     const viewRequestDetails = (request) => {
@@ -448,7 +436,7 @@ export default {
     };
 
     const viewCompletedDetails = (approval) => {
-        info(`${approval.title} 상세보기`);
+        router.push(`/approval/detail/${approval.approvalId}`);
     };
 
     const downloadApproval = (approval) => {
@@ -474,14 +462,8 @@ export default {
     };
 
     const filteredPendingApprovals = computed(() => {
-      let filtered = pendingApprovalsList.value;
-      if (selectedType.value) {
-        filtered = filtered.filter(approval => approval.type === selectedType.value);
-      }
-      if (selectedPriority.value) {
-        filtered = filtered.filter(approval => approval.priority === selectedPriority.value);
-      }
-      return filtered;
+      // TODO: Re-implement filtering based on new data structure
+      return pendingApprovalsList.value;
     });
 
     return {
