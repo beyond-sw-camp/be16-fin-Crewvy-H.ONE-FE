@@ -222,19 +222,19 @@ const employees = ref([]);
 
 // Permissions State
 const canCreate = ref(false);
+const canRead = ref(false);
 const canUpdate = ref(false);
 const canDelete = ref(false);
 
 // API 호출
 const fetchEmployees = async () => {
   try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (!userInfo) {
-      error('인증 정보가 없습니다. 다시 로그인해주세요.');
-      return;
+    const token = localStorage.getItem('accessToken');
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
-
-    const response = await axios.get('/api/member-service/member/list');
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/list`, { headers });
 
     if (response.data && response.data.success) {
       employees.value = response.data.data.map(emp => ({
@@ -264,6 +264,7 @@ onMounted(async () => {
   await fetchEmployees();
   // 권한 확인
   canCreate.value = await checkPermission('member', 'CREATE');
+  canRead.value = await checkPermission('member', 'READ'); // READ 권한 확인 추가
   canUpdate.value = await checkPermission('member', 'UPDATE');
   canDelete.value = await checkPermission('member', 'DELETE');
 });

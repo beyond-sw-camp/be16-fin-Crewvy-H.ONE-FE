@@ -89,7 +89,7 @@ export default {
       });
 
       this.$message.success('역할이 성공적으로 수정되었습니다.');
-      this.$router.push('/employee/roles'); // Redirect to a relevant page after saving
+      this.$router.push('/employee/role'); // Redirect to a relevant page after saving
     },
     handleCancel() {
       this.$router.back();

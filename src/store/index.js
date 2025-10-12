@@ -1,23 +1,8 @@
 import { createStore } from 'vuex'
 
-// localStorage에서 사용자 정보 가져오기
-const getUserFromLocalStorage = () => {
-  const userInfo = localStorage.getItem('userInfo');
-  if (userInfo) {
-    try {
-      return JSON.parse(userInfo);
-    } catch (e) {
-      console.error("Error parsing user info from localStorage", e);
-      localStorage.removeItem('userInfo'); // 손상된 데이터 삭제
-      return null;
-    }
-  }
-  return null;
-};
-
 export default createStore({
   state: {
-    user: getUserFromLocalStorage(),
+    user: null,
     company: {
       name: 'H.ONE 테크',
       domain: 'company.com'
@@ -45,7 +30,11 @@ export default createStore({
     },
     LOGOUT(state) {
       state.user = null;
-      localStorage.removeItem('userInfo');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('memberId');
+      localStorage.removeItem('memberPositionId');
     },
     ADD_NOTIFICATION(state, notification) {
       state.notifications.unshift(notification);
@@ -69,7 +58,10 @@ export default createStore({
     }
   },
   getters: {
-    isAuthenticated: state => !!state.user,
-    userName: state => state.user ? state.user.name : ''
+    isAuthenticated: (state) => !!state.user,
+    currentUser: (state) => state.user,
+    userName: (state) => (state.user ? state.user.userName : ''),
+    memberId: (state) => (state.user ? state.user.memberId : null),
+    memberPositionId: (state) => (state.user ? state.user.memberPositionId : null)
   }
 })

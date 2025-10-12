@@ -97,7 +97,7 @@ const rules = reactive({
 });
 
 const verifyBusinessNumber = () => {
-  // TODO: 추후 국세청 API 연동
+  // 추후 국세청 API 연동
   if (form.businessNumber) {
     success('정상적인 사업자번호입니다.');
   } else {
@@ -118,9 +118,9 @@ const checkEmailDuplicate = async () => {
   }
 
   try {
-    const response = await axios.get('/api/member-service/member/check-email', {
-      params: { email: form.email }
-    });
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/check-email`, {
+        params: { email: form.email }
+      });
     // response.data.data에 boolean 값이 담겨 옴
     if (response.data.data) { // true이면 이미 존재
       error('이미 사용 중인 이메일입니다.');
@@ -157,7 +157,7 @@ const handleSignUp = async () => {
       formData.append('checkPw', form.checkPw);
 
       try {
-        const response = await axios.post('/api/member-service/member/create-admin', formData, {
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/create-admin`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }

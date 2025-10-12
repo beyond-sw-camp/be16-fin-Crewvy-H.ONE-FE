@@ -15,7 +15,7 @@
           <div class="goal-meta">
             <div class="user-info">
               <div>
-                <span class="user-name">{{ goal.user.name }}</span>
+                <span class="user-name">{{ goal.userName }}</span>
                 <span class="user-position">{{ goal.user.position }}</span>
               </div>
               <div class="user-department">{{ goal.user.department }}</div>

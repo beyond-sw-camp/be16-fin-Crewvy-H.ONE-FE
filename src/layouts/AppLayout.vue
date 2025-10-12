@@ -51,20 +51,20 @@
           <el-menu-item index="/organization">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/titles">
+          <el-menu-item index="/employee/title">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grades">
+          <el-menu-item index="/employee/grade">
             <span>직급 관리</span>
           </el-menu-item>
-          <el-sub-menu index="roles">
+          <el-sub-menu index="role">
             <template #title>
               <span>역할 관리</span>
             </template>
-            <el-menu-item index="/employee/roles">
+            <el-menu-item index="/employee/role">
               <span>역할 목록</span>
             </el-menu-item>
-            <el-menu-item index="/employee/roles/create">
+            <el-menu-item index="/employee/role/create">
               <span>역할 생성</span>
             </el-menu-item>
           </el-sub-menu>
@@ -263,7 +263,7 @@
           <el-dropdown v-if="user" @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="user.avatar" :size="32" />
-              <span class="user-name">{{ user.name }}</span>
+              <span class="user-name">{{ userName }}</span>
               <el-icon>
                 <ArrowDown />
               </el-icon>
@@ -437,7 +437,7 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState, mapMutations, mapGetters } from 'vuex'
 
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
@@ -689,6 +689,7 @@ export default {
   },
   computed: {
     ...mapState(['user', 'notifications']),
+    ...mapGetters(['userName']),
     activeMenuIndex() {
       const path = this.$route.path
 
@@ -780,14 +781,14 @@ export default {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
     getPageTitle() {
-      const titles = {
+      const title = {
         '/': '대시보드',
         '/organization': '조직/사원',
         '/employee': '직원 관리',
-        '/employee/titles': '직책 관리',
-        '/employee/grades': '직급 관리',
-        '/employee/roles': '역할 목록',
-        '/employee/roles/create': '역할 생성',
+        '/employee/title': '직책 관리',
+        '/employee/grade': '직급 관리',
+        '/employee/role': '역할 목록',
+        '/employee/role/create': '역할 생성',
         '/attendance': '내 근태 현황',
         '/leave-request': '휴가/출장 신청',
         '/shared-calendar': '공유 캘린더',
@@ -812,7 +813,7 @@ export default {
         '/resource/reservation': '예약하기',
         '/resource/management': '자원 관리'
       }
-      return titles[this.$route.path] || 'H.ONE'
+      return title[this.$route.path] || 'H.ONE'
     },
     handleUserCommand(command) {
       switch (command) {

@@ -3,7 +3,7 @@
     <!-- 환영 메시지 -->
     <div v-if="user" class="welcome-section">
       <div class="welcome-content">
-        <h2>안녕하세요, {{ user.name }}님!</h2>
+        <h2>안녕하세요, {{ userName }}님!</h2>
         <p>오늘도 좋은 하루 되세요. H.ONE에서 효율적인 업무를 시작해보세요.</p>
       </div>
       <div class="welcome-actions">
@@ -190,7 +190,7 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapState, mapGetters } from 'vuex'
 import AttendanceChart from '@/components/AttendanceChart.vue'
 
 export default {
@@ -258,7 +258,8 @@ export default {
     }
   },
   computed: {
-    ...mapState(['user'])
+    ...mapState(['user']),
+    ...mapGetters(['userName'])
   },
   methods: {
     handleQuickAction(route) {

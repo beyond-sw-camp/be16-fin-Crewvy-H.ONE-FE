@@ -13,7 +13,7 @@
         </div>
         <div class="detail-item">
           <label>담당자</label>
-          <p>{{ goal.user.name }} ({{ goal.user.position }})</p>
+          <p>{{ goal.userName }} ({{ goal.user.position }})</p>
         </div>
         <div class="detail-item">
           <label>기간</label>

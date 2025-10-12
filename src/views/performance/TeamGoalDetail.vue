@@ -8,7 +8,7 @@
     <div class="goal-summary">
       <p>{{ goal.description }}</p>
       <div class="meta">
-        <span>{{ goal.user.name }} {{ goal.user.position }} ({{ goal.user.department }})</span>
+        <span>{{ goal.userName }} {{ goal.user.position }} ({{ goal.user.department }})</span>
         <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
       </div>
     </div>
@@ -24,7 +24,7 @@
               <h4 class="sub-goal-title">{{ subGoal.title }}</h4>
               <p class="sub-goal-description">{{ subGoal.description }}</p>
               <p class="sub-goal-period">기간: {{ subGoal.startDate }} ~ {{ subGoal.endDate }}</p>
-              <p class="sub-goal-user">담당자: {{ subGoal.user.name }}</p>
+              <p class="sub-goal-user">담당자: {{ subGoal.userName }}</p>
             </div>
             <div class="sub-goal-meta">
               <el-tag :type="getStatusType(subGoal.status)" class="sub-goal-status" effect="dark">{{ subGoal.status }}</el-tag>

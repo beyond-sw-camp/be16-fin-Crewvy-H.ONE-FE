@@ -42,11 +42,9 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
-import { useSnackbar } from '@/composables/useSnackbar';
-
 import { useStore } from 'vuex';
+import axios from 'axios';
+import { useSnackbar } from '@/composables/useSnackbar';
 
 const router = useRouter();
 const store = useStore();
@@ -70,30 +68,24 @@ const handleLogin = async () => {
     if (valid) {
       loading.value = true;
       try {
-        const response = await axios.post('/api/member-service/member/login', {
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/login`, {
           email: form.value.email,
           password: form.value.password
         });
 
         if (response.data && response.data.success) {
-          const { accessToken } = response.data.data;
+          const { accessToken, refreshToken, userName, memberId, memberPositionId } = response.data.data;
           
-          // 토큰 디코딩
-          const decodedToken = jwtDecode(accessToken);
-          
-          // 사용자 정보 localStorage에 저장
-          const userInfo = {
-            accessToken,
-            uuid: decodedToken.uuid,
-            memberPositionId: decodedToken.memberPositionId,
-            name: decodedToken.name,
-            exp: decodedToken.exp, // 만료 시간
-          };
-          localStorage.setItem('userInfo', JSON.stringify(userInfo));
-          store.dispatch('setUser', userInfo);
+          // 로컬 스토리지에 사용자 정보 저장
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          localStorage.setItem("userName", userName);
+          localStorage.setItem("memberId", memberId);
+          localStorage.setItem("memberPositionId", memberPositionId);
 
-          // axios의 기본 헤더에 인증 토큰 설정
-          axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+          // Vuex 스토어에 사용자 정보 저장
+          const user = { userName, memberId, memberPositionId };
+          store.dispatch('setUser', user);
 
           success('로그인 성공!');
           router.push('/'); // 대시보드로 리디렉션

@@ -1,31 +1,29 @@
 import { ref } from 'vue';
 import axios from 'axios';
-
-// 간단한 클라이언트 사이드 캐시
-const permissionCache = new Map();
+import { getAuthHeadersFromToken } from '../utils/authUtils';
 
 export function usePermissions() {
   const checkedPermissions = ref({});
 
-  const checkPermission = async (resource, action) => {
-    const key = `${resource}:${action}`;
-
-    // 클라이언트 캐시 확인
-    if (permissionCache.has(key)) {
-      return permissionCache.get(key);
-    }
+  const checkPermission = async (resource, action, range = 'COMPANY') => {
+    const key = `${resource}:${action}:${range}`;
 
     try {
-      const response = await axios.get('/api/member-service/member/check-permission', {
-        params: { resource, action },
+      const headers = getAuthHeadersFromToken();
+      if (!headers) {
+        // Handle case where token is missing or invalid
+        return false;
+      }
+
+      const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/check-permission`, {
+        params: { resource, action, range },
+        headers: headers
       });
 
       const hasPermission = response.data?.data || false;
-      permissionCache.set(key, hasPermission); // 캐시에 저장
       return hasPermission;
     } catch (error) {
       console.error(`Permission check failed for ${key}:`, error);
-      permissionCache.set(key, false); // 오류 발생 시 false로 캐시하여 반복 요청 방지
       return false;
     }
   };
@@ -34,7 +32,8 @@ export function usePermissions() {
   const checkPermissions = async (permissionsToCheck) => {
     const results = {};
     for (const p of permissionsToCheck) {
-      results[`${p.resource}_${p.action}`] = await checkPermission(p.resource, p.action);
+      const range = p.range || 'COMPANY';
+      results[`${p.resource}_${p.action}_${range}`] = await checkPermission(p.resource, p.action, range);
     }
     checkedPermissions.value = results;
   };

@@ -1,6 +1,8 @@
 <template>
   <div id="app">
-    <component :is="layout" />
+    <template v-if="!isLoading">
+      <component :is="layout" />
+    </template>
     <SnackbarContainer />
   </div>
 </template>
@@ -17,11 +19,33 @@ export default {
     BlankLayout,
     SnackbarContainer
   },
+  data() {
+    return {
+      isLoading: true, // Initially true, to prevent rendering until user data is loaded
+    };
+  },
   computed: {
     layout() {
       // Use a default layout if the route doesn't specify one
       return this.$route.meta.layout || 'AppLayout';
     }
+  },
+  async created() {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      const userName = localStorage.getItem('userName');
+      const memberId = localStorage.getItem('memberId');
+      const memberPositionId = localStorage.getItem('memberPositionId');
+      
+      const user = {
+        userName,
+        memberId,
+        memberPositionId
+      };
+      
+      await this.$store.dispatch('setUser', user); // Wait for the action to complete
+    }
+    this.isLoading = false; // Set to false after user data is loaded or not found
   }
 }
 </script>
