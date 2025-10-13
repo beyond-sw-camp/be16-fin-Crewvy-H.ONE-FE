@@ -2,13 +2,7 @@ import { createStore } from 'vuex'
 
 export default createStore({
   state: {
-    user: {
-      name: '김철수',
-      email: 'kim@company.com',
-      department: '개발팀',
-      position: '팀장',
-      avatar: 'https://via.placeholder.com/40'
-    },
+    user: null,
     company: {
       name: 'H.ONE 테크',
       domain: 'company.com'
@@ -32,24 +26,42 @@ export default createStore({
   },
   mutations: {
     SET_USER(state, user) {
-      state.user = user
+      state.user = user;
+    },
+    LOGOUT(state) {
+      state.user = null;
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('memberId');
+      localStorage.removeItem('memberPositionId');
     },
     ADD_NOTIFICATION(state, notification) {
-      state.notifications.unshift(notification)
+      state.notifications.unshift(notification);
     },
     REMOVE_NOTIFICATION(state, id) {
-      state.notifications = state.notifications.filter(n => n.id !== id)
+      state.notifications = state.notifications.filter(n => n.id !== id);
     }
   },
   actions: {
     setUser({ commit }, user) {
-      commit('SET_USER', user)
+      commit('SET_USER', user);
+    },
+    logout({ commit }) {
+      commit('LOGOUT');
     },
     addNotification({ commit }, notification) {
-      commit('ADD_NOTIFICATION', notification)
+      commit('ADD_NOTIFICATION', notification);
     },
     removeNotification({ commit }, id) {
-      commit('REMOVE_NOTIFICATION', id)
+      commit('REMOVE_NOTIFICATION', id);
     }
+  },
+  getters: {
+    isAuthenticated: (state) => !!state.user,
+    currentUser: (state) => state.user,
+    userName: (state) => (state.user ? state.user.userName : ''),
+    memberId: (state) => (state.user ? state.user.memberId : null),
+    memberPositionId: (state) => (state.user ? state.user.memberPositionId : null)
   }
 })

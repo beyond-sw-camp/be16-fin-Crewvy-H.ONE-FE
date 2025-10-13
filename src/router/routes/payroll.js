@@ -14,57 +14,68 @@ const routes = [
   {
     path: '/payroll',
     name: 'Payroll',
-    component: Payroll
+    component: Payroll,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/item-management',
     name: 'PayrollItemManagement',
-    component: PayrollItemManagement
+    component: PayrollItemManagement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/basic-info',
     name: 'PayrollBasicInfo',
-    component: PayrollBasicInfo
+    component: PayrollBasicInfo,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/calculation',
     name: 'PayrollCalculation',
-    component: PayrollCalculation
+    component: PayrollCalculation,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/transfer-output',
     name: 'PayrollTransferOutput',
-    component: PayrollTransferOutput
+    component: PayrollTransferOutput,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/statement-output',
     name: 'PayrollStatementOutput',
-    component: PayrollStatementOutput
+    component: PayrollStatementOutput,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/item-inquiry',
     name: 'PayrollItemInquiry',
-    component: PayrollItemInquiry
+    component: PayrollItemInquiry,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/insurance-deduction',
     name: 'PayrollInsuranceDeduction',
-    component: PayrollInsuranceDeduction
+    component: PayrollInsuranceDeduction,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/status-output',
     name: 'PayrollStatusOutput',
-    component: PayrollStatusOutput
+    component: PayrollStatusOutput,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/withholding-report',
     name: 'PayrollWithholdingReport',
-    component: PayrollWithholdingReport
+    component: PayrollWithholdingReport,
+    meta: { requiresAuth: true }
   },
   {
     path: '/payroll/elderly-incentive',
     name: 'PayrollElderlyIncentive',
-    component: PayrollElderlyIncentive
+    component: PayrollElderlyIncentive,
+    meta: { requiresAuth: true }
   },
 ];
 
