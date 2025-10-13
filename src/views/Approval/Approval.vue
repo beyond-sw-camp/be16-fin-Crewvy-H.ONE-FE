@@ -125,10 +125,6 @@
           <div class="my-requests">
             <div class="section-header">
               <h3>내 결재 신청</h3>
-              <el-button type="primary" @click="openTemplateSelector">
-                <el-icon><Plus /></el-icon>
-                새 결재 신청
-              </el-button>
             </div>
             
             <div v-if="showMyRequestsTable" class="request-list">
@@ -327,7 +323,7 @@ export default {
     const fetchPendingApprovals = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/find-pending-list');
-        pendingApprovalsList.value = response.data;
+        pendingApprovalsList.value = response.data.data;
       } catch (err) {
         error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);
@@ -337,7 +333,7 @@ export default {
     const fetchMyRequests = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/find-approval-list');
-        myRequests.value = response.data;
+        myRequests.value = response.data.data;
       } catch (err) {
         error('결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);
@@ -347,7 +343,7 @@ export default {
     const fetchTemporarySaves = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/find-draft-list');
-        temporarySaves.value = response.data;
+        temporarySaves.value = response.data.data;
       } catch (err) {
         error('임시저장 내역을 불러오는 데 실패했습니다.');
         console.error(err);
@@ -357,7 +353,7 @@ export default {
     const fetchCompletedApprovals = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/find-complete-list');
-        completedList.value = response.data;
+        completedList.value = response.data.data;
       } catch (err) {
         error('완료된 결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);

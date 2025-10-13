@@ -69,7 +69,7 @@ export default {
       try {
         // In a real environment, you would uncomment the following lines:
         const response = await axios.get('http://localhost:8080/performance/team-goal');
-        this.teamGoals = response.data;
+        this.teamGoals = response.data.data;
 
         // Using mock data provided by the user:
         // this.teamGoals = [

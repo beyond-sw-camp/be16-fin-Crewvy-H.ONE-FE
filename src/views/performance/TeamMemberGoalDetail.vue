@@ -140,10 +140,10 @@ export default {
       const goalId = this.$route.params.memberGoalId;
       try {
         const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
-        this.goalDetail = response.data;
+        this.goalDetail = response.data.data;
 
-        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
-          this.fileList = response.data.evidenceList.map(evidence => {
+        if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
+          this.fileList = response.data.data.evidenceList.map(evidence => {
             const url = evidence.evidenceUrl;
             const firstUnderscoreIndex = url.indexOf('_');
             const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
@@ -251,9 +251,9 @@ export default {
         };
         const response = await axios.get('http://localhost:8080/performance/find-evaluation', { params });
 
-        if (response.data) {
-          this.evaluateForm.rating = response.data.grade;
-          this.evaluateForm.comment = response.data.comment;
+        if (response.data.data) {
+          this.evaluateForm.rating = response.data.data.grade;
+          this.evaluateForm.comment = response.data.data.comment;
         }
 
       } catch (error) {

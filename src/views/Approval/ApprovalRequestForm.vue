@@ -175,7 +175,7 @@ export default {
     const fetchFormSchema = async (id) => {
       try {
         const response = await axios.get(`http://localhost:8080/approval/get-document/${id}`);
-        const doc = response.data;
+        const doc = response.data.data;
         formTitle.value = doc.documentName;
         if (doc.metadata) {
           formSchema.value = doc.metadata.schema;
@@ -189,7 +189,7 @@ export default {
     const fetchDraftData = async (id) => {
       try {
         const response = await axios.get(`http://localhost:8080/approval/find-approval/${id}`);
-        const draftData = response.data;
+        const draftData = response.data.data;
 
         approvalTitle.value = draftData.title;
         formData.value = draftData.contents;
@@ -307,7 +307,7 @@ export default {
 
       try {
         const response = await axios.post('http://localhost:8080/approval/create-approval', approvalData);
-        const newApprovalId = response.data.approvalId;
+        const newApprovalId = response.data.data.approvalId;
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
         }
@@ -338,7 +338,7 @@ export default {
 
       try {
         const response = await axios.post('http://localhost:8080/approval/draft-approval', approvalData);
-        const newApprovalId = response.data;
+        const newApprovalId = response.data.data;
         console.log(newApprovalId);
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);

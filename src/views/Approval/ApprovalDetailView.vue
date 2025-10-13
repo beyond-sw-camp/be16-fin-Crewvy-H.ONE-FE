@@ -138,7 +138,7 @@ export default {
     const fetchApprovalDetails = async (id) => {
       try {
         const response = await axios.get(`http://localhost:8080/approval/find-approval/${id}`);
-        const details = response.data;
+        const details = response.data.data;
 
         approvalTitle.value = details.title;
         formData.value = details.contents;
@@ -176,7 +176,7 @@ export default {
     const fetchComments = async (id) => {
       try {
         const response = await axios.get(`http://localhost:8080/approval/find-reply/${id}`);
-        comments.value = response.data.map(comment => ({
+        comments.value = response.data.data.map(comment => ({
           id: comment.memberId + comment.contents, // Simple key
           author: comment.memberId || 'Unknown User',
           content: comment.contents,

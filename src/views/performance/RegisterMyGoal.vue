@@ -135,7 +135,7 @@ export default {
       try {
         // In a real environment, use the actual API call:
         const response = await axios.get(`http://localhost:8080/performance/team-goal/${teamGoalId}`);
-        this.teamGoal = response.data;
+        this.teamGoal = response.data.data;
 
         // Using mock data for demonstration:
         // this.teamGoal = {
