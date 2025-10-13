@@ -68,7 +68,7 @@ export default {
     async fetchTeamGoals() {
       try {
         // In a real environment, you would uncomment the following lines:
-        const response = await axios.get('http://localhost:8080/performance/team-goal');
+        const response = await axios.get('http://localhost:8080/workforce-service/performance/team-goal');
         this.teamGoals = response.data.data;
 
         // Using mock data provided by the user:
@@ -116,7 +116,7 @@ export default {
       };
 
       try {
-        await axios.post('http://localhost:8080/performance/create-team-goal', payload);
+        await axios.post('http://localhost:8080/workforce-service/performance/create-team-goal', payload);
         this.$message.success('팀 목표가 성공적으로 추가되었습니다.');
         this.dialogVisible = false;
         await this.fetchTeamGoals(); // Refresh the list

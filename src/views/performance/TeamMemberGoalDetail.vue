@@ -139,7 +139,7 @@ export default {
     async fetchGoalDetail() {
       const goalId = this.$route.params.memberGoalId;
       try {
-        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data.data;
 
         if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
@@ -197,7 +197,7 @@ export default {
           goalId: this.goalDetail.goalId,
           status: 'APPROVED'
         };
-        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+        await axios.patch('http://localhost:8080/workforce-service/performance/update-status', null, { params: payload });
 
         this.goalDetail.status = 'APPROVED';
         this.$message({
@@ -228,7 +228,7 @@ export default {
           status: 'REJECTED',
           comment: this.rejectForm.reason
         };
-        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+        await axios.patch('http://localhost:8080/workforce-service/performance/update-status', null, { params: payload });
 
         this.goalDetail.status = 'REJECTED';
         this.rejectDialogVisible = false;
@@ -249,7 +249,7 @@ export default {
           goalId: this.goalDetail.goalId,
           type: 'SUPERVISOR'
         };
-        const response = await axios.get('http://localhost:8080/performance/find-evaluation', { params });
+        const response = await axios.get('http://localhost:8080/workforce-service/performance/find-evaluation', { params });
 
         if (response.data.data) {
           this.evaluateForm.rating = response.data.data.grade;
@@ -278,7 +278,7 @@ export default {
           comment: this.evaluateForm.comment
         };
 
-        await axios.post('http://localhost:8080/performance/create-evaluation', null, { params: payload });
+        await axios.post('http://localhost:8080/workforce-service/performance/create-evaluation', null, { params: payload });
 
         this.evaluateDialogVisible = false;
         this.$message.success('평가가 저장되었습니다.');

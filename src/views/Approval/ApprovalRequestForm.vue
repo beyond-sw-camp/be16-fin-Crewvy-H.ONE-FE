@@ -174,7 +174,7 @@ export default {
 
     const fetchFormSchema = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/approval/get-document/${id}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/approval/get-document/${id}`);
         const doc = response.data.data;
         formTitle.value = doc.documentName;
         if (doc.metadata) {
@@ -188,7 +188,7 @@ export default {
 
     const fetchDraftData = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/approval/find-approval/${id}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-approval/${id}`);
         const draftData = response.data.data;
 
         approvalTitle.value = draftData.title;
@@ -277,7 +277,7 @@ export default {
       }
 
       try {
-        await axios.patch(`http://localhost:8080/approval/attachment/${approvalId}`, formData, {
+        await axios.patch(`http://localhost:8080/workforce-service/approval/attachment/${approvalId}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -306,7 +306,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('http://localhost:8080/approval/create-approval', approvalData);
+        const response = await axios.post('http://localhost:8080/workforce-service/approval/create-approval', approvalData);
         const newApprovalId = response.data.data.approvalId;
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
@@ -337,7 +337,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('http://localhost:8080/approval/draft-approval', approvalData);
+        const response = await axios.post('http://localhost:8080/workforce-service/approval/draft-approval', approvalData);
         const newApprovalId = response.data.data;
         console.log(newApprovalId);
         if (newApprovalId) {
@@ -356,7 +356,7 @@ export default {
 
       if (confirm('이 임시저장 문서를 삭제하시겠습니까?')) {
         try {
-          await axios.delete(`http://localhost:8080/approval/discard-approval/${draftApprovalId.value}`);
+          await axios.delete(`http://localhost:8080/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
           alert('문서가 삭제되었습니다.');
           router.push('/approval');
         } catch (error) {

@@ -322,7 +322,7 @@ export default {
 
     const fetchApprovalStats = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/approval/stats');
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/stats');
         const stats = response.data.data;
         pendingApprovals.value = stats.pendingCount;
         inProgressApprovals.value = stats.requestCount;
@@ -336,7 +336,7 @@ export default {
 
     const fetchPendingApprovals = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/approval/find-pending-list');
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-pending-list');
         pendingApprovalsList.value = response.data.data;
       } catch (err) {
         error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
@@ -346,7 +346,7 @@ export default {
 
     const fetchMyRequests = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/approval/find-approval-list');
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-approval-list');
         myRequests.value = response.data.data;
       } catch (err) {
         error('결재 내역을 불러오는 데 실패했습니다.');
@@ -356,7 +356,7 @@ export default {
 
     const fetchTemporarySaves = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/approval/find-draft-list');
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-draft-list');
         temporarySaves.value = response.data.data;
       } catch (err) {
         error('임시저장 내역을 불러오는 데 실패했습니다.');
@@ -366,7 +366,7 @@ export default {
 
     const fetchCompletedApprovals = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/approval/find-complete-list');
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-complete-list');
         completedList.value = response.data.data;
       } catch (err) {
         error('완료된 결재 내역을 불러오는 데 실패했습니다.');
@@ -461,7 +461,7 @@ export default {
     const deleteTemporary = async (request) => {
       if (confirm(`'${request.title}' 문서를 삭제하시겠습니까?`)) {
         try {
-          await axios.delete(`http://localhost:8080/approval/discard-approval/${request.approvalId}`);
+          await axios.delete(`http://localhost:8080/workforce-service/approval/discard-approval/${request.approvalId}`);
           success('임시저장된 문서가 삭제되었습니다.');
           // Refresh the list
           fetchTemporarySaves();

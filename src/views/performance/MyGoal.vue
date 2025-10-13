@@ -127,7 +127,7 @@ export default {
     async fetchMyGoals() {
       try {
         // In a real environment, you would use the actual API call:
-        const response = await axios.get('http://localhost:8080/performance/get-my-goal');
+        const response = await axios.get('http://localhost:8080/workforce-service/performance/get-my-goal');
         this.myGoals = response.data.data;
 
         // Using mock data provided by the user for demonstration:
@@ -163,7 +163,7 @@ export default {
       if (this.teamGoalsForSelection.length === 0) {
         try {
           // For demonstration, using mock data. In real environment, use axios call.
-          const response = await axios.get('http://localhost:8080/performance/team-goal');
+          const response = await axios.get('http://localhost:8080/workforce-service/performance/team-goal');
           this.teamGoalsForSelection = response.data.data;
           // this.teamGoalsForSelection = [
           //   {
@@ -213,7 +213,7 @@ export default {
           comment: this.selfEvaluateForm.comment
         };
 
-        await axios.post('http://localhost:8080/performance/create-evaluation', payload);
+        await axios.post('http://localhost:8080/workforce-service/performance/create-evaluation', payload);
 
         this.$message.success('본인 평가가 저장되었습니다.');
         this.selfEvaluateDialogVisible = false;

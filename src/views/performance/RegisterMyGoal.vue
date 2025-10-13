@@ -116,7 +116,7 @@ export default {
             gradingSystem: gradingSystemAsMap
         }
         
-        await axios.post('http://localhost:8080/performance/create-my-goal', payload);
+        await axios.post('http://localhost:8080/workforce-service/performance/create-my-goal', payload);
         
         this.$message.success('새로운 목표가 등록되었습니다.');
         this.goBack();
@@ -134,7 +134,7 @@ export default {
       const teamGoalId = this.$route.params.teamGoalId; // 이전 페이지에서 넘겨준 파라미터
       try {
         // In a real environment, use the actual API call:
-        const response = await axios.get(`http://localhost:8080/performance/team-goal/${teamGoalId}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/performance/team-goal/${teamGoalId}`);
         this.teamGoal = response.data.data;
 
         // Using mock data for demonstration:

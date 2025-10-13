@@ -137,7 +137,7 @@ export default {
 
     const fetchApprovalDetails = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/approval/find-approval/${id}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-approval/${id}`);
         const details = response.data.data;
 
         approvalTitle.value = details.title;
@@ -175,7 +175,7 @@ export default {
 
     const fetchComments = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/approval/find-reply/${id}`);
+        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-reply/${id}`);
         comments.value = response.data.data.map(comment => ({
           id: comment.memberId + comment.contents, // Simple key
           author: comment.memberId || 'Unknown User',
@@ -204,7 +204,7 @@ export default {
       };
 
       try {
-        await axios.post(`http://localhost:8080/approval/create-reply/${approvalId.value}`, replyRequestDto);
+        await axios.post(`http://localhost:8080/workforce-service/approval/create-reply/${approvalId.value}`, replyRequestDto);
         newComment.value = '';
         // Re-fetch comments to get the updated list
         await fetchComments(approvalId.value); 
