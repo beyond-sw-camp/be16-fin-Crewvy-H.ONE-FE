@@ -42,11 +42,13 @@
 
           <div class="details-section">
             <h4>권한</h4>
-            <div class="permissions-list">
-              <el-tag v-for="permission in selectedRole.permissionList" :key="permission" class="permission-tag">
-                {{ permission }}
-              </el-tag>
-            </div>
+            <el-scrollbar max-height="140px">
+              <div class="permissions-list">
+                <el-tag v-for="permission in selectedRole.permissionList" :key="permission" class="permission-tag">
+                  {{ permission }}
+                </el-tag>
+              </div>
+            </el-scrollbar>
           </div>
 
           <div class="details-section">
@@ -115,7 +117,7 @@ const deleteRole = (role) => {
     try {
       const token = localStorage.getItem('accessToken');
       const headers = { 'Authorization': token ? `Bearer ${token}` : null };
-      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member/role/${role.id}`, { headers });
+      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role/${role.id}`, { headers });
       success('삭제되었습니다.');
       selectedRole.value = null;
       fetchRole();
@@ -172,6 +174,7 @@ onMounted(() => {
 .role-card {
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+    border-radius: 8px;
 }
 
 .role-card.active {
@@ -209,6 +212,7 @@ onMounted(() => {
 
 .details-card {
     height: calc(60vh + 32px);
+    border-radius: 8px;
 }
 
 .details-header {

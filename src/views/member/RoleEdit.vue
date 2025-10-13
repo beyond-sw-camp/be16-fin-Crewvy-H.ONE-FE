@@ -12,8 +12,8 @@
 
         <el-form-item label="권한 설정">
           <el-table :data="permissions" style="width: 100%">
-            <el-table-column prop="name" label="권한명"></el-table-column>
-            <el-table-column prop="description" label="설명"></el-table-column>
+            <el-table-column prop="namePart1" label="리소스"></el-table-column>
+            <el-table-column prop="namePart2" label="액션"></el-table-column>
             <el-table-column label="범위" width="350">
               <template #default="scope">
                 <el-radio-group v-model="scope.row.selectedRange">
@@ -27,7 +27,7 @@
 
       <div class="form-actions">
         <el-button @click="handleCancel">취소</el-button>
-        <el-button type="primary" @rclick="updateRole">저장</el-button>
+        <el-button type="primary" @click="updateRole">저장</el-button>
       </div>
     </div>
   </div>
@@ -49,29 +49,52 @@ export default {
     async fetchRoleData(id) {
       try {
         const response = await roleService.fetchRole(id);
-        const roleData = response.data.data; // Assuming ApiResponse structure
-
+        const roleData = response.data.data;
         this.roleName = roleData.name;
-        // Initialize permissions with all possible permissions and then update selectedRange
-        // This assumes backend provides all possible permissions or we fetch them separately.
-        // For now, let's assume roleData.permissions contains all permissions for this role.
+
+        const rangeMapping = {
+          NONE: '없음',
+          INDIVIDUAL: '본인',
+          DEPARTMENT: '부서',
+          COMPANY: '전사',
+        };
+
         this.permissions = roleData.permissions.map(p => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          selectedRange: p.permissionRange, // Map backend permissionRange to frontend selectedRange
+          // namePart1, namePart2는 테이블 표시에 사용됩니다.
+          namePart1: p.resource,
+          namePart2: p.action,
+          // selectedRange는 라디오 버튼 v-model에 사용됩니다.
+          selectedRange: rangeMapping[p.currentRange],
+          // rangeToIdMap은 저장 시 올바른 ID를 보내기 위해 필요합니다.
+          rangeToIdMap: p.rangeToIdMap,
         }));
+
+        // 리소스 기준으로 오름차순 정렬
+        this.permissions.sort((a, b) => a.namePart1.localeCompare(b.namePart1));
+
       } catch (error) {
         console.error('Failed to fetch role data:', error);
         this.$message.error('역할 데이터를 불러오는데 실패했습니다.');
       }
     },
     async updateRole() {
+      const rangeReverseMapping = {
+        '본인': 'INDIVIDUAL',
+        '부서': 'DEPARTMENT',
+        '전사': 'COMPANY',
+        '없음': 'NONE', // 코드 명확성을 위해 유지
+      };
+
       const selectedPermissions = this.permissions
-        .map(p => ({
-          permissionId: p.id,
-          selectedRange: p.selectedRange,
-        }));
+        .filter(p => p.selectedRange !== '없음') // '없음'으로 설정된 권한은 저장하지 않음
+        .map(p => {
+          const rangeEnum = rangeReverseMapping[p.selectedRange];
+          const permissionId = p.rangeToIdMap[rangeEnum]; // 맵에서 올바른 ID 조회
+          return {
+            permissionId: permissionId,
+            selectedRange: rangeEnum,
+          };
+        });
 
       const roleId = this.$route.params.id;
       const roleData = {
@@ -82,7 +105,7 @@ export default {
       try {
         await roleService.updateRole(roleId, roleData);
         this.$message.success('역할이 성공적으로 수정되었습니다.');
-        this.$router.push('/employee/role'); // Redirect to a relevant page after saving
+        this.$router.push('/employee/role');
       } catch (error) {
         console.error('Failed to update role:', error);
         this.$message.error('역할 수정에 실패했습니다.');

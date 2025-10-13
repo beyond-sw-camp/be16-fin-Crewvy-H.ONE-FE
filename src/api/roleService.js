@@ -1,6 +1,6 @@
 import axios from './index'; // Assuming index.js exports an axios instance
 
-const API_URL = '/member'; // Base URL for member-service
+const API_URL = 'member-service/member'; // Base URL for member-service
 
 export default {
   fetchRole(roleId) {
