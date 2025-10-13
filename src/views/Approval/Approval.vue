@@ -54,12 +54,12 @@
       
       <div class="approval-card">
         <div class="card-icon">
-          <el-icon><Timer /></el-icon>
+          <el-icon><Edit /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">평균 처리 시간</div>
-          <div class="card-value">{{ averageProcessTime }}</div>
-          <div class="card-subtitle">시간</div>
+          <div class="card-title">임시저장된 결재</div>
+          <div class="card-value">{{ draftApprovals }}</div>
+          <div class="card-subtitle"></div>
         </div>
       </div>
     </div>
@@ -259,13 +259,13 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
-import { Plus, Document, Clock, Check, Timer, Close, View, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Document, Clock, Check, Close, View, Edit, Delete } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalPage',
   components: {
     ApprovalTemplateSelectorModal,
-    Plus, Document, Clock, Check, Timer, Close, View, Edit, Delete
+    Plus, Document, Clock, Check, Close, View, Edit, Delete
   },
   setup() {
     const { success, error, warning, info } = useSnackbar();
@@ -284,7 +284,7 @@ export default {
     const pendingApprovals = ref(0);
     const inProgressApprovals = ref(0);
     const completedApprovals = ref(0);
-    const averageProcessTime = ref(0);
+    const draftApprovals = ref(0);
 
     // Hardcoded data for demonstration (can be replaced with API calls)
     const pendingApprovalsList = ref([
@@ -319,6 +319,20 @@ export default {
           description: '대회의실 예약 신청입니다.'
         },
     ]);
+
+    const fetchApprovalStats = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/approval/stats');
+        const stats = response.data.data;
+        pendingApprovals.value = stats.pendingCount;
+        inProgressApprovals.value = stats.requestCount;
+        completedApprovals.value = stats.completeCount;
+        draftApprovals.value = stats.draftCount;
+      } catch (err) {
+        error('통계 정보를 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
 
     const fetchPendingApprovals = async () => {
       try {
@@ -380,6 +394,7 @@ export default {
     onMounted(() => {
       // Fetch initial data for the default tab
       fetchPendingApprovals();
+      fetchApprovalStats();
     });
 
     const openTemplateSelector = () => {
@@ -474,7 +489,7 @@ export default {
       pendingApprovals,
       inProgressApprovals,
       completedApprovals,
-      averageProcessTime,
+      draftApprovals,
       pendingApprovalsList,
       myRequests,
       completedList,

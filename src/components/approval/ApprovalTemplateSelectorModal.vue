@@ -57,7 +57,7 @@ export default {
     const fetchTemplates = async () => {
       try {
         const response = await axios.get('http://localhost:8080/approval/get-document-list');
-        templates.value = response.data.map(item => ({
+        templates.value = response.data.data.map(item => ({
           id: item.documentId,
           title: item.documentName,
         }));
