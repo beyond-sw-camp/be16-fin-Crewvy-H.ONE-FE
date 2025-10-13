@@ -6,8 +6,8 @@ const routes = [
   },
   {
     path: '/approval',
-    name: 'Approval',
-    component: () => import('@/views/Approval/Approval.vue')
+    name: 'ApprovalView',
+    component: () => import('@/views/Approval/ApprovalView.vue')
   },
   {
     path: '/board',
