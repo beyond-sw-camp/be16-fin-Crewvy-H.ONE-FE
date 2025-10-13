@@ -438,9 +438,9 @@
 
 <script>
 import { mapState, mapMutations, mapGetters } from 'vuex'
-
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
+import organizationService from '@/api/organizationService';
 
 export default {
   name: 'MainLayout',
@@ -467,63 +467,7 @@ export default {
         management: false,
         sales: true
       },
-      orgTreeData: [
-        {
-          id: 1,
-          label: 'H.ONE',
-          type: 'company',
-          members: [],
-          children: [
-            {
-              id: 2,
-              label: '경영팀',
-              type: 'department',
-              members: [
-                { id: 101, name: '김경영', position: '팀장', email: 'ky.kim@h.one' },
-                { id: 102, name: '이경영', position: '사원', email: 'ky.lee@h.one' },
-              ],
-              children: [],
-            },
-            {
-              id: 3,
-              label: '개발팀',
-              type: 'department',
-              members: [],
-              children: [
-                {
-                  id: 5,
-                  label: '프론트엔드',
-                  type: 'team',
-                  members: [
-                    { id: 201, name: '박프론', position: '과장', email: 'front.park@h.one' },
-                    { id: 202, name: '최프론', position: '대리', email: 'front.choi@h.one' },
-                  ],
-                  children: []
-                },
-                {
-                  id: 6,
-                  label: '백엔드',
-                  type: 'team',
-                  members: [
-                    { id: 301, name: '정보백', position: '차장', email: 'back.jung@h.one' },
-                    { id: 302, name: '강백엔', position: '주임', email: 'back.kang@h.one' },
-                  ],
-                  children: []
-                },
-              ],
-            },
-            {
-              id: 4,
-              label: '디자인팀',
-              type: 'department',
-              members: [
-                { id: 401, name: '오디자인', position: '팀장', email: 'design.oh@h.one' },
-              ],
-              children: [],
-            },
-          ],
-        },
-      ],
+      orgTreeData: [], // Initialize as empty, will be populated by API
       defaultProps: {
         children: 'children',
         label: 'label',
@@ -689,7 +633,7 @@ export default {
   },
   computed: {
     ...mapState(['user', 'notifications']),
-    ...mapGetters(['userName']),
+    ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
 
@@ -777,6 +721,21 @@ export default {
   },
   methods: {
     ...mapMutations(['removeNotification']),
+    async fetchOrganizationTree() {
+      try {
+        if (!this.memberId) {
+          console.error('User UUID not found in store.');
+          return;
+        }
+        const response = await organizationService.getOrganizationTreeWithMembers(this.memberId);
+        this.orgTreeData = response.data.data;
+        this.allEmployees = this.flattenOrgTree(this.orgTreeData);
+        this.searchedEmployees = this.allEmployees;
+      } catch (error) {
+        console.error('Failed to fetch organization tree:', error);
+        this.$message.error('조직도 데이터를 불러오는데 실패했습니다.');
+      }
+    },
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
@@ -828,8 +787,8 @@ export default {
     },
     showOrganizationModal() {
       this.showOrgModal = true
-      this.activeOrgTab = 'org'
-      this.orgSearch = ''
+      this.activeOrgTab = 'org',
+        this.orgSearch = ''
       this.employeeSearch = ''
       this.searchedEmployees = this.allEmployees
     },
@@ -1043,9 +1002,10 @@ export default {
       })
     }
   },
-  created() {
-    this.allEmployees = this.flattenOrgTree(this.orgTreeData);
-    this.searchedEmployees = this.allEmployees;
+  async created() {
+    await this.fetchOrganizationTree();
+    this.initSessionTimer();
+    this.updatePayrollMenuState();
   },
   mounted() {
     this.initSessionTimer()

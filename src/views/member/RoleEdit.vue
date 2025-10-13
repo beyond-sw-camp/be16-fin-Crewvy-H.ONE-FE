@@ -27,69 +27,66 @@
 
       <div class="form-actions">
         <el-button @click="handleCancel">취소</el-button>
-        <el-button type="primary" @click="updateRole">저장</el-button>
+        <el-button type="primary" @rclick="updateRole">저장</el-button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import roleService from '@/api/roleService';
+
 export default {
   name: 'RoleEdit',
   data() {
     return {
       roleName: '',
-      permissions: [
-        { id: 1, name: '멤버 조회', description: '멤버 목록을 조회합니다.', selectedRange: '없음' },
-        { id: 2, name: '멤버 상세정보', description: '멤버의 상세 정보를 봅니다.', selectedRange: '없음' },
-        { id: 3, name: '멤버 추가', description: '새로운 멤버를 추가합니다.', selectedRange: '없음' },
-        { id: 4, name: '멤버 수정', description: '멤버 정보를 수정합니다.', selectedRange: '없음' },
-        { id: 5, name: '급여 정보 조회', description: '급여 정보를 조회합니다.', selectedRange: '없음' },
-        { id: 6, name: '인사 평가 수행', description: '인사 평가를 수행합니다.', selectedRange: '없음' },
-      ],
+      permissions: [], // Initialize as empty, will be populated by API
       rangeOptions: ['없음', '본인', '부서', '전사'],
     };
   },
   methods: {
-    fetchRoleData(/* id */) {
-      // Mock data for a role being edited. In a real app, this would be an API call.
-      const mockRole = {
-        id: 1,
-        name: 'HR Manager',
-        permissions: [
-          { permissionId: 1, range: '전사' },
-          { permissionId: 2, range: '전사' },
-          { permissionId: 3, range: '부서' },
-          { permissionId: 4, range: '부서' },
-          { permissionId: 5, range: '본인' },
-        ]
+    async fetchRoleData(id) {
+      try {
+        const response = await roleService.fetchRole(id);
+        const roleData = response.data.data; // Assuming ApiResponse structure
+
+        this.roleName = roleData.name;
+        // Initialize permissions with all possible permissions and then update selectedRange
+        // This assumes backend provides all possible permissions or we fetch them separately.
+        // For now, let's assume roleData.permissions contains all permissions for this role.
+        this.permissions = roleData.permissions.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          selectedRange: p.permissionRange, // Map backend permissionRange to frontend selectedRange
+        }));
+      } catch (error) {
+        console.error('Failed to fetch role data:', error);
+        this.$message.error('역할 데이터를 불러오는데 실패했습니다.');
+      }
+    },
+    async updateRole() {
+      const selectedPermissions = this.permissions
+        .map(p => ({
+          permissionId: p.id,
+          selectedRange: p.selectedRange,
+        }));
+
+      const roleId = this.$route.params.id;
+      const roleData = {
+        name: this.roleName,
+        permissions: selectedPermissions,
       };
 
-      this.roleName = mockRole.name;
-      
-      // Update the permissions table based on the fetched role data
-      this.permissions.forEach(p => {
-        const foundPermission = mockRole.permissions.find(rp => rp.permissionId === p.id);
-        if (foundPermission) {
-          p.selectedRange = foundPermission.range;
-        } else {
-          p.selectedRange = '없음';
-        }
-      });
-    },
-    updateRole() {
-      const selectedPermissions = this.permissions
-        .filter(p => p.selectedRange !== '없음')
-        .map(p => ({ permissionId: p.id, range: p.selectedRange }));
-
-      console.log('Updating Role:', {
-        roleId: this.$route.params.id,
-        roleName: this.roleName,
-        permissions: selectedPermissions,
-      });
-
-      this.$message.success('역할이 성공적으로 수정되었습니다.');
-      this.$router.push('/employee/role'); // Redirect to a relevant page after saving
+      try {
+        await roleService.updateRole(roleId, roleData);
+        this.$message.success('역할이 성공적으로 수정되었습니다.');
+        this.$router.push('/employee/role'); // Redirect to a relevant page after saving
+      } catch (error) {
+        console.error('Failed to update role:', error);
+        this.$message.error('역할 수정에 실패했습니다.');
+      }
     },
     handleCancel() {
       this.$router.back();
