@@ -10,6 +10,16 @@
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
+            <p class="goal-description">{{ goal.description }}</p>
+          </div>
+          <div class="goal-meta">
+            <div class="user-info">
+              <div>
+                <span class="user-name">{{ goal.userName }}</span>
+                <span class="user-position">{{ goal.user.position }}</span>
+              </div>
+              <div class="user-department">{{ goal.user.department }}</div>
+            </div>
             <p class="goal-description">{{ goal.contents }}</p>
             <div class="goal-period">
               <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
@@ -25,16 +35,12 @@
           <el-input v-model="form.title" placeholder="예: 2024년 하반기 매출 20% 증대"></el-input>
         </el-form-item>
         <el-form-item label="목표에 대한 설명">
-          <el-input v-model="form.contents" type="textarea" :rows="6" placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
+          <el-input v-model="form.contents" type="textarea" :rows="6"
+            placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
         </el-form-item>
         <el-form-item label="목표 설정 기간">
-          <el-date-picker
-            v-model="form.dateRange"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="Start date"
-            end-placeholder="End date"
-          >
+          <el-date-picker v-model="form.dateRange" type="daterange" range-separator="-" start-placeholder="Start date"
+            end-placeholder="End date">
           </el-date-picker>
         </el-form-item>
       </el-form>
@@ -100,10 +106,10 @@ export default {
         let day = '' + d.getDate();
         const year = d.getFullYear();
 
-        if (month.length < 2) 
-            month = '0' + month;
-        if (day.length < 2) 
-            day = '0' + day;
+        if (month.length < 2)
+          month = '0' + month;
+        if (day.length < 2)
+          day = '0' + day;
 
         return [year, month, day].join('-');
       }
