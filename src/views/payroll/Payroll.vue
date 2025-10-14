@@ -6,9 +6,13 @@
         <p>직원 급여 계산과 관리 시스템입니다.</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="calculatePayroll">
+        <el-button type="primary" @click="goToActualCalculation">
           <el-icon><Calculator /></el-icon>
           급여 계산
+        </el-button>
+        <el-button @click="goToMockCalculation">
+          <el-icon><Setting /></el-icon>
+          급여 모의 계산
         </el-button>
         <el-button @click="exportPayroll">
           <el-icon><Download /></el-icon>
@@ -324,11 +328,11 @@ export default {
     editPayroll(payroll) {
       this.info(`${payroll.employee}님의 급여 정보를 수정합니다.`)
     },
-    calculatePayroll() {
-      this.success('급여 계산이 완료되었습니다.', {
-        title: '계산 완료',
-        duration: 3000
-      })
+    goToActualCalculation() {
+      this.$router.push('/payroll/actual-calculation')
+    },
+    goToMockCalculation() {
+      this.$router.push('/payroll/calculation')
     },
     exportPayroll() {
       this.success('급여 내보내기가 완료되었습니다.', {
