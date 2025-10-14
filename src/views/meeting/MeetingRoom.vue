@@ -47,9 +47,9 @@
         <div class="chat-header">채팅</div>
         <div class="chat-body" ref="chatBody">
           <div class="msg" v-for="(m, i) in messages" :key="i">
-            <div class="author">{{ m.author }}</div>
-            <div class="text">{{ m.text }}</div>
-            <div class="time">{{ m.time }}</div>
+            <div class="name">{{ m.name }}</div>
+            <div class="content">{{ m.content }}</div>
+            <div class="createdAt">{{ m.createdAt }}</div>
           </div>
         </div>
         <div class="chat-input">
@@ -67,6 +67,7 @@
 <script>
 import { OpenVidu } from 'openvidu-browser'
 import * as icons from '@element-plus/icons-vue'
+import { sendChatMessage, getChatMessages } from '@/api/videoConference'
 
 export default {
   name: 'MeetingRoom',
@@ -79,6 +80,7 @@ export default {
       screenPublisher: null,
       subscribers: [],
       title: '',
+      videoConferenceId: null,
       audioEnabled: true,
       videoEnabled: true,
       screenShareActive: false,
@@ -87,8 +89,8 @@ export default {
       chatText: '',
       icons,
       userInfo: {
-        id: '00000000-0000-007b-0000-00000000007b',
-        name: '김민수' // 임시 유저명
+        id: localStorage.getItem('memberId'),
+        name: localStorage.getItem('userName')
       }
     }
   },
@@ -103,6 +105,7 @@ export default {
     const sessionId = q.get('sid')
     const token = q.get('token')
     this.title = q.get('title') || ''
+    this.videoConferenceId = q.get('vcid')
     if (!sessionId || !token) {
       this.$message?.error?.('세션 정보가 없습니다.')
       return
@@ -135,10 +138,39 @@ export default {
         this.subscribers = this.subscribers.filter((s) => s.stream.streamId !== stream.streamId)
       })
 
+      this.session.on('chat', (event) => {
+        const chatData = JSON.parse(event.data)
+        const now = new Date()
+        const isMe = chatData.senderId === this.userInfo.id
+        this.messages.push({
+          name: isMe ? '나' : chatData.name,
+          content: chatData.content,
+          createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+        })
+        this.$nextTick(() => {
+          const el = this.$refs.chatBody
+          if (el) el.scrollTop = el.scrollHeight
+        })
+      })
+
       try {
         // 사용자 정보를 포함한 연결
         const userName = `${this.userInfo.id}:${this.userInfo.name}`
         await this.session.connect(token, userName)
+
+        if (this.videoConferenceId) {
+          getChatMessages(this.videoConferenceId)
+            .then((messages) => {
+              this.messages = messages
+                .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .map(m => ({ ...m, createdAt: m.createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+            })
+            .catch((err) => {
+              console.error('채팅 기록을 불러오는데 실패했습니다.', err)
+              this.$message?.error?.('채팅 기록을 불러오지 못했습니다.')
+            })
+        }
 
         // 퍼블리셔를 컨테이너에 직접 생성해 부착
         const container = this.$refs.videoContainer
@@ -239,16 +271,27 @@ export default {
         if (el) el.scrollTop = el.scrollHeight
       })
     },
-    sendMessage() {
+    async sendMessage() {
       const text = (this.chatText || '').trim()
       if (!text) return
-      const now = new Date()
-      this.messages.push({ author: '나', text, time: now.toTimeString().slice(0, 5) })
-      this.chatText = ''
-      this.$nextTick(() => {
-        const el = this.$refs.chatBody
-        if (el) el.scrollTop = el.scrollHeight
-      })
+
+      if (!this.videoConferenceId) {
+        this.$message?.error?.('화상회의 ID를 찾을 수 없어 메시지를 전송할 수 없습니다.');
+        return;
+      }
+      
+      const message = {
+        senderId: this.userInfo.id,
+        name: this.userInfo.name,
+        content: text
+      };
+
+      try {
+        await sendChatMessage(this.videoConferenceId, message);
+        this.chatText = ''
+      } catch (error) {
+        this.$message?.error?.('메시지 전송에 실패했습니다.');
+      }
     },
     openSettings() {
       this.$message?.info?.('설정은 추후 제공됩니다.')
@@ -349,14 +392,14 @@ export default {
   border-radius: 8px;
   padding: 8px 10px;
 }
-.msg .author {
+.msg .name {
   font-size: 12px;
   color: #93c5fd;
 }
-.msg .text {
+.msg .content {
   font-size: 13px;
 }
-.msg .time {
+.msg .createdAt {
   font-size: 11px;
   color: #a3a3a3;
   text-align: right;
