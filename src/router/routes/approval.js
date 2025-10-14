@@ -1,4 +1,4 @@
-import Approval from "@/views/Approval/Approval.vue";
+import Approval from "@/views/Approval/ApprovalView.vue";
 import ApprovalTemplateManagement from '../../views/Approval/ApprovalTemplateManagement.vue';
 import ApprovalRequestForm from "@/views/Approval/ApprovalRequestForm.vue";
 import ApprovalDetailView from "@/views/Approval/ApprovalDetailView.vue";
