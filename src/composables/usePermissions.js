@@ -11,7 +11,6 @@ export function usePermissions() {
     try {
       const headers = getAuthHeadersFromToken();
       if (!headers) {
-        // Handle case where token is missing or invalid
         return false;
       }
 
