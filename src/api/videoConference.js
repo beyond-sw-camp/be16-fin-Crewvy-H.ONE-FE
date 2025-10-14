@@ -51,4 +51,9 @@ export const sendChatMessage = async (videoConferenceId, message) => {
   await api.post(`${VC_BASE}/${videoConferenceId}/messages`, message)
 }
 
+export const getChatMessages = async (videoConferenceId) => {
+  const { data } = await api.get(`${VC_BASE}/${videoConferenceId}/messages`)
+  return data.data.content
+}
+
 
