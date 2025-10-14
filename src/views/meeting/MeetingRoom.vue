@@ -67,6 +67,7 @@
 <script>
 import { OpenVidu } from 'openvidu-browser'
 import * as icons from '@element-plus/icons-vue'
+import { sendChatMessage } from '@/api/videoConference'
 
 export default {
   name: 'MeetingRoom',
@@ -87,8 +88,8 @@ export default {
       chatText: '',
       icons,
       userInfo: {
-        id: '00000000-0000-007b-0000-00000000007b',
-        name: '김민수' // 임시 유저명
+        id: localStorage.getItem('memberId'),
+        name: localStorage.getItem('userName')
       }
     }
   },
@@ -133,6 +134,21 @@ export default {
 
       this.session.on('streamDestroyed', ({ stream }) => {
         this.subscribers = this.subscribers.filter((s) => s.stream.streamId !== stream.streamId)
+      })
+
+      this.session.on('chat', (event) => {
+        const chatData = JSON.parse(event.data)
+        const now = new Date()
+        const isMe = chatData.senderId === this.userInfo.id
+        this.messages.push({
+          author: isMe ? '나' : chatData.name,
+          text: chatData.content,
+          time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+        })
+        this.$nextTick(() => {
+          const el = this.$refs.chatBody
+          if (el) el.scrollTop = el.scrollHeight
+        })
       })
 
       try {
@@ -239,16 +255,28 @@ export default {
         if (el) el.scrollTop = el.scrollHeight
       })
     },
-    sendMessage() {
+    async sendMessage() {
       const text = (this.chatText || '').trim()
       if (!text) return
-      const now = new Date()
-      this.messages.push({ author: '나', text, time: now.toTimeString().slice(0, 5) })
-      this.chatText = ''
-      this.$nextTick(() => {
-        const el = this.$refs.chatBody
-        if (el) el.scrollTop = el.scrollHeight
-      })
+
+      const videoConferenceId = new URLSearchParams(window.location.search).get('vcid');
+      if (!videoConferenceId) {
+        this.$message?.error?.('화상회의 ID를 찾을 수 없어 메시지를 전송할 수 없습니다.');
+        return;
+      }
+      
+      const message = {
+        senderId: this.userInfo.id,
+        name: this.userInfo.name,
+        content: text
+      };
+
+      try {
+        await sendChatMessage(videoConferenceId, message);
+        this.chatText = ''
+      } catch (error) {
+        this.$message?.error?.('메시지 전송에 실패했습니다.');
+      }
     },
     openSettings() {
       this.$message?.info?.('설정은 추후 제공됩니다.')
