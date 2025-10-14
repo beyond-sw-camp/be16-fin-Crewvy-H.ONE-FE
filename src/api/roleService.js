@@ -6,7 +6,13 @@ export default {
   fetchRole(roleId) {
     return axios.get(`${API_URL}/role/${roleId}`);
   },
+  fetchAllPermissions() {
+    return axios.get(`${API_URL}/permission`);
+  },
   updateRole(roleId, roleData) {
-    return axios.put(`${API_URL}/role/${roleId}`, roleData);
+    return axios.put(`${API_URL}/role/${roleId}/update`, roleData);
+  },
+  createRole(roleData) {
+    return axios.post(`${API_URL}/role-create`, roleData);
   },
 };

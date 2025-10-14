@@ -87,11 +87,11 @@
     <section class="social-proof-section" v-scroll-animate>
       <h2>신뢰할 수 있는 기업들이 H.ONE과 함께합니다</h2>
       <div class="logo-cloud">
-        <img src="https://via.placeholder.com/150x50?text=Company+A" alt="Company A Logo">
-        <img src="https://via.placeholder.com/150x50?text=Company+B" alt="Company B Logo">
-        <img src="https://via.placeholder.com/150x50?text=Company+C" alt="Company C Logo">
-        <img src="https://via.placeholder.com/150x50?text=Company+D" alt="Company D Logo">
-        <img src="https://via.placeholder.com/150x50?text=Company+E" alt="Company E Logo">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20150%2050'%20fill='%23ccc'%3E%3Crect%20width='150'%20height='50'/%3E%3C/svg%3E" alt="Company A Logo">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20150%2050'%20fill='%23ccc'%3E%3Crect%20width='150'%20height='50'/%3E%3C/svg%3E" alt="Company B Logo">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20150%2050'%20fill='%23ccc'%3E%3Crect%20width='150'%20height='50'/%3E%3C/svg%3E" alt="Company C Logo">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20150%2050'%20fill='%23ccc'%3E%3Crect%20width='150'%20height='50'/%3E%3C/svg%3E" alt="Company D Logo">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20150%2050'%20fill='%23ccc'%3E%3Crect%20width='150'%20height='50'/%3E%3C/svg%3E" alt="Company E Logo">
       </div>
     </section>
 

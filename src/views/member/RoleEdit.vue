@@ -4,32 +4,51 @@
       <h1>역할 수정</h1>
     </div>
 
-    <div class="form-container">
+    <el-card class="form-card">
       <el-form label-position="top">
         <el-form-item label="역할명">
           <el-input v-model="roleName" placeholder="역할의 이름을 입력하세요"></el-input>
         </el-form-item>
 
-        <el-form-item label="권한 설정">
-          <el-table :data="permissions" style="width: 100%">
-            <el-table-column prop="namePart1" label="리소스"></el-table-column>
-            <el-table-column prop="namePart2" label="액션"></el-table-column>
-            <el-table-column label="범위" width="350">
+        <el-form-item label="설명">
+          <el-input v-model="description" type="textarea" placeholder="역할에 대한 설명을 입력하세요"></el-input>
+        </el-form-item>
+
+        <div class="permission-section-header">
+          <span class="section-title">권한 설정</span>
+          <div class="bulk-actions">
+            <span style="font-size: 14px; font-weight: 600; color: #606266; margin-right: 10px;">일괄 적용:</span>
+            <el-button size="small" @click="setAllPermissions('없음')">없음</el-button>
+            <el-button size="small" @click="setAllPermissions('본인')">본인</el-button>
+            <el-button size="small" @click="setAllPermissions('부서')">부서</el-button>
+            <el-button size="small" @click="setAllPermissions('전사')">전사</el-button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <el-table :data="permissions" style="width: 100%" stripe border>
+            <el-table-column prop="resource" label="리소스" min-width="150" header-align="center" align="center"></el-table-column>
+            <el-table-column prop="action" label="액션" min-width="150" header-align="center" align="center"></el-table-column>
+            <el-table-column label="범위" min-width="600" header-align="center">
               <template #default="scope">
                 <el-radio-group v-model="scope.row.selectedRange">
-                  <el-radio v-for="option in rangeOptions" :key="option" :label="option">{{ option }}</el-radio>
+                  <el-radio
+                    v-for="option in rangeOptions"
+                    :key="option"
+                    :label="option"
+                    :disabled="!scope.row.availableRanges.includes(option)"
+                  >{{ option }}</el-radio>
                 </el-radio-group>
               </template>
             </el-table-column>
           </el-table>
-        </el-form-item>
+        </div>
       </el-form>
 
       <div class="form-actions">
         <el-button @click="handleCancel">취소</el-button>
         <el-button type="primary" @click="updateRole">저장</el-button>
       </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
@@ -41,16 +60,24 @@ export default {
   data() {
     return {
       roleName: '',
-      permissions: [], // Initialize as empty, will be populated by API
+      description: '',
+      permissions: [],
       rangeOptions: ['없음', '본인', '부서', '전사'],
     };
   },
   methods: {
+    setAllPermissions(range) {
+      this.permissions.forEach(p => {
+        p.selectedRange = range;
+      });
+      this.$message.success(`모든 권한 범위를 '${range}'(으)로 설정했습니다.`);
+    },
     async fetchRoleData(id) {
       try {
         const response = await roleService.fetchRole(id);
         const roleData = response.data.data;
         this.roleName = roleData.name;
+        this.description = roleData.description;
 
         const rangeMapping = {
           NONE: '없음',
@@ -59,18 +86,18 @@ export default {
           COMPANY: '전사',
         };
 
-        this.permissions = roleData.permissions.map(p => ({
-          // namePart1, namePart2는 테이블 표시에 사용됩니다.
-          namePart1: p.resource,
-          namePart2: p.action,
-          // selectedRange는 라디오 버튼 v-model에 사용됩니다.
-          selectedRange: rangeMapping[p.currentRange],
-          // rangeToIdMap은 저장 시 올바른 ID를 보내기 위해 필요합니다.
-          rangeToIdMap: p.rangeToIdMap,
-        }));
+        this.permissions = roleData.permissionResList.map(p => {
+          const availableRanges = Object.keys(p.rangeToIdMap).map(key => rangeMapping[key]);
+          return {
+            resource: p.resource,
+            action: p.action,
+            selectedRange: rangeMapping[p.permissionRange],
+            rangeToIdMap: p.rangeToIdMap,
+            availableRanges: availableRanges,
+          };
+        });
 
-        // 리소스 기준으로 오름차순 정렬
-        this.permissions.sort((a, b) => a.namePart1.localeCompare(b.namePart1));
+        this.permissions.sort((a, b) => a.resource.localeCompare(b.resource));
 
       } catch (error) {
         console.error('Failed to fetch role data:', error);
@@ -82,23 +109,29 @@ export default {
         '본인': 'INDIVIDUAL',
         '부서': 'DEPARTMENT',
         '전사': 'COMPANY',
-        '없음': 'NONE', // 코드 명확성을 위해 유지
+        '없음': 'NONE',
       };
 
       const selectedPermissions = this.permissions
-        .filter(p => p.selectedRange !== '없음') // '없음'으로 설정된 권한은 저장하지 않음
+        .filter(p => p.selectedRange !== '없음')
         .map(p => {
           const rangeEnum = rangeReverseMapping[p.selectedRange];
-          const permissionId = p.rangeToIdMap[rangeEnum]; // 맵에서 올바른 ID 조회
-          return {
-            permissionId: permissionId,
-            selectedRange: rangeEnum,
-          };
-        });
+          const permissionId = p.rangeToIdMap[rangeEnum];
+          if (permissionId !== null && permissionId !== undefined) {
+            return {
+              permissionId: permissionId,
+              selectedRange: rangeEnum,
+            };
+          } else {
+            return null;
+          }
+        })
+        .filter(p => p !== null);
 
       const roleId = this.$route.params.id;
       const roleData = {
         name: this.roleName,
+        description: this.description,
         permissions: selectedPermissions,
       };
 
@@ -112,7 +145,7 @@ export default {
       }
     },
     handleCancel() {
-      this.$router.back();
+      this.$router.push('/employee/role');
     }
   },
   created() {
@@ -136,11 +169,56 @@ export default {
   margin-bottom: 24px;
 }
 
-.form-container {
-  background: #fff;
-  padding: 24px;
+.form-card {
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.form-card :deep(.el-form-item__label) {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 700;
+}
+
+.permission-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 700;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-wrapper {
+  border-radius: 4px;
+  overflow: hidden; /* Ensures border-radius is applied to the table */
+  margin-bottom: 24px; /* Add margin to separate from form actions */
+}
+
+.table-wrapper :deep(.el-table__header-wrapper th) {
+  background-color: #f5f7fa;
+  color: #303133;
+  font-weight: 600;
+}
+
+.table-wrapper :deep(.el-table td, .el-table th) {
+  padding: 16px 0;
+  text-align: center;
+}
+
+.table-wrapper :deep(.el-radio-group) {
+  display: flex;
+  justify-content: space-evenly;
+  width: 100%;
 }
 
 .form-actions {

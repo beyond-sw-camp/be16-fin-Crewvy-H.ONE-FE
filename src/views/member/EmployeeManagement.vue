@@ -66,12 +66,12 @@
           @click="selectEmployee(employee)"
         >
           <div class="card-header">
-            <el-avatar :src="employee.avatar || 'https://via.placeholder.com/60'" :size="60" />
+            <el-avatar :src="employee.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="60" />
             <div class="employee-basic">
               <h3>{{ employee.name }}</h3>
               <p>{{ employee.position }} • {{ employee.department }}</p>
               <el-tag 
-                :type="employee.status === 'WORKING' ? 'success' : 'info'" 
+                :type="employee.status === 'WORKING' ? 'success' : 'info'"
                 size="small"
               >
                 {{ employee.status === 'WORKING' ? '재직' : '휴직' }}
@@ -114,7 +114,7 @@
           <el-table-column prop="name" label="이름" width="180">
             <template #default="scope">
               <div class="table-employee">
-                <el-avatar :src="scope.row.avatar || 'https://via.placeholder.com/32'" :size="32" />
+                <el-avatar :src="scope.row.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="32" />
                 <span>{{ scope.row.name }}</span>
               </div>
             </template>
@@ -128,7 +128,7 @@
           <el-table-column prop="status" label="상태" width="100">
             <template #default="scope">
               <el-tag 
-                :type="scope.row.status === 'WORKING' ? 'success' : 'info'" 
+                :type="scope.row.status === 'WORKING' ? 'success' : 'info'"
                 size="small"
               >
                 {{ scope.row.status === 'WORKING' ? '재직' : '휴직' }}
@@ -159,7 +159,7 @@
     >
       <div v-if="selectedEmployee" class="employee-detail">
         <div class="detail-header">
-          <el-avatar :src="selectedEmployee.avatar || 'https://via.placeholder.com/80'" :size="80" />
+          <el-avatar :src="selectedEmployee.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="80" />
           <div class="detail-info">
             <h3>{{ selectedEmployee.name }}</h3>
             <p>{{ selectedEmployee.position }} • {{ selectedEmployee.department }}</p>

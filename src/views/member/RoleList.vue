@@ -117,7 +117,7 @@ const deleteRole = (role) => {
     try {
       const token = localStorage.getItem('accessToken');
       const headers = { 'Authorization': token ? `Bearer ${token}` : null };
-      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role/${role.id}`, { headers });
+      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role/${role.id}/delete`, { headers });
       success('삭제되었습니다.');
       selectedRole.value = null;
       fetchRole();
