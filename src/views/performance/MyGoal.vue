@@ -119,15 +119,16 @@ export default {
         comment: ''
       },
       rejectionReasonDialogVisible: false,
-      selectedRejectedGoal: {}
+      selectedRejectedGoal: {},
+      evaluatingGoalId: null
     };
   },
   methods: {
     async fetchMyGoals() {
       try {
         // In a real environment, you would use the actual API call:
-        const response = await axios.get('http://localhost:8080/performance/get-my-goal');
-        this.myGoals = response.data;
+        const response = await axios.get('http://localhost:8080/workforce-service/performance/get-my-goal');
+        this.myGoals = response.data.data;
 
         // Using mock data provided by the user for demonstration:
         // this.myGoals = [
@@ -162,8 +163,8 @@ export default {
       if (this.teamGoalsForSelection.length === 0) {
         try {
           // For demonstration, using mock data. In real environment, use axios call.
-          const response = await axios.get('http://localhost:8080/performance/team-goal');
-          this.teamGoalsForSelection = response.data;
+          const response = await axios.get('http://localhost:8080/workforce-service/performance/team-goal');
+          this.teamGoalsForSelection = response.data.data;
           // this.teamGoalsForSelection = [
           //   {
           //       "teamGoalId": "36e7c5a6-8df6-4c0a-9efa-c5f66377b431",
@@ -194,12 +195,34 @@ export default {
       return '';
     },
     selfEvaluate(id) {
+      this.evaluatingGoalId = id;
       this.selfEvaluateDialogVisible = true;
       console.log('Evaluating goal:', id);
     },
-    handleSelfEvaluate() {
-      console.log('Self Evaluation:', this.selfEvaluateForm);
-      this.selfEvaluateDialogVisible = false;
+    async handleSelfEvaluate() {
+      if (!this.selfEvaluateForm.rating) {
+        this.$message.warning('등급을 선택해주세요.');
+        return;
+      }
+
+      try {
+        const payload = {
+          goalId: this.evaluatingGoalId, 
+          grade: this.selfEvaluateForm.rating,
+          type: 'SELF',
+          comment: this.selfEvaluateForm.comment
+        };
+
+        await axios.post('http://localhost:8080/workforce-service/performance/create-evaluation', payload);
+
+        this.$message.success('본인 평가가 저장되었습니다.');
+        this.selfEvaluateDialogVisible = false;
+        await this.fetchMyGoals();
+
+      } catch (error) {
+        console.error('Error saving self evaluation:', error);
+        this.$message.error('평가 저장에 실패했습니다.');
+      }
     },
     viewRejectionReason(goal) {
       this.selectedRejectedGoal = goal;

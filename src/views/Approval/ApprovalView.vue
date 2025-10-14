@@ -6,7 +6,7 @@
         <p>사내 결재 워크플로우를 디지털로 관리하세요.</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="openApprovalTemplateSelector">
+        <el-button type="primary" @click="openTemplateSelector">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
@@ -54,12 +54,12 @@
       
       <div class="approval-card">
         <div class="card-icon">
-          <el-icon><Timer /></el-icon>
+          <el-icon><Edit /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">평균 처리 시간</div>
-          <div class="card-value">{{ averageProcessTime }}</div>
-          <div class="card-subtitle">시간</div>
+          <div class="card-title">임시저장된 결재</div>
+          <div class="card-value">{{ draftApprovals }}</div>
+          <div class="card-subtitle"></div>
         </div>
       </div>
     </div>
@@ -87,48 +87,19 @@
             </div>
             
             <div class="approval-list">
-              <div class="approval-item" v-for="approval in filteredPendingApprovals" :key="approval.id">
+              <div class="approval-item" v-for="approval in filteredPendingApprovals" :key="approval.approvalId">
                 <div class="approval-info">
                   <div class="approval-header">
                     <div class="approval-title">{{ approval.title }}</div>
                   </div>
                   <div class="approval-details">
-                    <span class="approval-requester">{{ approval.requester }}</span>
-                    <span class="approval-type">{{ approval.type }}</span>
-                    <span class="approval-amount" v-if="approval.amount">{{ approval.amount.toLocaleString() }}원</span>
-                  </div>
-                  <div class="approval-description">{{ approval.description }}</div>
-                  <div class="approval-progress">
-                    <div class="progress-steps">
-                      <div 
-                        class="progress-step" 
-                        v-for="(step, index) in approval.steps" 
-                        :key="index"
-                        :class="{ 
-                          'completed': step.status === 'completed',
-                          'current': step.status === 'current',
-                          'pending': step.status === 'pending'
-                        }"
-                      >
-                        <div class="step-icon">
-                          <el-icon v-if="step.status === 'completed'"><Check /></el-icon>
-                          <el-icon v-else-if="step.status === 'current'"><Clock /></el-icon>
-                          <el-icon v-else><Minus /></el-icon>
-                        </div>
-                        <div class="step-info">
-                          <div class="step-name">{{ step.name }}</div>
-                          <div class="step-status">{{ step.statusText }}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <span class="approval-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="approval-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
                 </div>
                 <div class="approval-right-section">
                   <div class="approval-top-row">
-                    <el-tag :type="getPriorityType(approval.priority)" size="small">
-                      {{ approval.priority === 'high' ? '긴급' : '일반' }}
-                    </el-tag>
-                    <div class="approval-date">{{ approval.date }}</div>
+                    <div class="approval-date">{{ approval.createAt }}</div>
                   </div>
                   <div class="approval-actions">
                     <el-button type="success" size="small" @click="approveItem(approval)">
@@ -154,68 +125,30 @@
           <div class="my-requests">
             <div class="section-header">
               <h3>내 결재 신청</h3>
-              <el-button type="primary" @click="createApproval">
-                <el-icon><Plus /></el-icon>
-                새 결재 신청
-              </el-button>
             </div>
             
-            <div class="request-list">
-              <div class="request-item" v-for="request in myRequests" :key="request.id">
+            <div v-if="showMyRequestsTable" class="request-list">
+              <div class="request-item" v-for="request in myRequests" :key="request.approvalId">
                 <div class="request-info">
                   <div class="request-header">
                     <div class="request-title">{{ request.title }}</div>
                   </div>
                   <div class="request-details">
-                    <span class="request-type">{{ request.type }}</span>
-                    <span class="request-amount" v-if="request.amount">{{ request.amount.toLocaleString() }}원</span>
-                  </div>
-                  <div class="request-description">{{ request.description }}</div>
-                  <div class="request-progress">
-                    <div class="progress-steps">
-                      <div 
-                        class="progress-step" 
-                        v-for="(step, index) in request.steps" 
-                        :key="index"
-                        :class="{ 
-                          'completed': step.status === 'completed',
-                          'current': step.status === 'current',
-                          'pending': step.status === 'pending'
-                        }"
-                      >
-                        <div class="step-icon">
-                          <el-icon v-if="step.status === 'completed'"><Check /></el-icon>
-                          <el-icon v-else-if="step.status === 'current'"><Clock /></el-icon>
-                          <el-icon v-else><Minus /></el-icon>
-                        </div>
-                        <div class="step-info">
-                          <div class="step-name">{{ step.name }}</div>
-                          <div class="step-status">{{ step.statusText }}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <span class="request-requester"><strong>기안자:</strong> {{ request.requesterId }}</span>
+                    <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
+                    <span class="request-status"><strong>상태:</strong> {{ request.status }}</span>
+                    <span class="request-date"><strong>생성일:</strong> {{ request.createAt }}</span>
                   </div>
                 </div>
-                <div class="request-meta-actions">
-                  <div class="request-meta-actions-row">
-                    <div class="request-meta">
-                      <el-tag :type="getStatusType(request.status)" size="small">
-                        {{ request.status }}
-                      </el-tag>
-                      <span class="request-date">{{ request.date }}</span>
-                    </div>
-                    <div class="request-actions">
-                      <el-button size="small" @click="viewRequestDetails(request)">
-                        <el-icon><View /></el-icon>
-                        상세
-                      </el-button>
-                      <el-button v-if="request.status === '진행중'" size="small" @click="cancelRequest(request)">
-                        <el-icon><Close /></el-icon>
-                        취소
-                      </el-button>
-                    </div>
-                  </div>
+                <div class="request-actions" style="margin-left: 16px;">
+                  <el-button size="small" @click="viewRequestDetails(request)">
+                    <el-icon><View /></el-icon>
+                    상세
+                  </el-button>
                 </div>
+              </div>
+              <div v-if="myRequests.length === 0" class="empty-state">
+                <p>결재 내역이 없습니다.</p>
               </div>
             </div>
           </div>
@@ -244,17 +177,15 @@
             </div>
             
             <div class="completed-list">
-              <div class="completed-item" v-for="approval in completedList" :key="approval.id">
+              <div class="completed-item" v-for="approval in completedList" :key="approval.approvalId">
                 <div class="completed-info">
                   <div class="completed-header">
                     <div class="completed-title">{{ approval.title }}</div>
                   </div>
                   <div class="completed-details">
-                    <span class="completed-requester">{{ approval.requester }}</span>
-                    <span class="completed-type">{{ approval.type }}</span>
-                    <span class="completed-amount" v-if="approval.amount">{{ approval.amount.toLocaleString() }}원</span>
+                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
-                  <div class="completed-description">{{ approval.description }}</div>
                 </div>
                 <div class="completed-meta-actions">
                   <div class="completed-meta-actions-row">
@@ -262,16 +193,12 @@
                       <el-tag :type="getStatusType(approval.status)" size="small">
                         {{ approval.status }}
                       </el-tag>
-                      <span class="completed-date">{{ approval.completedDate }}</span>
+                      <span class="completed-date">{{ approval.createAt }}</span>
                     </div>
                     <div class="completed-actions">
                       <el-button size="small" @click="viewCompletedDetails(approval)">
                         <el-icon><View /></el-icon>
                         상세
-                      </el-button>
-                      <el-button size="small" @click="downloadApproval(approval)">
-                        <el-icon><Download /></el-icon>
-                        다운로드
                       </el-button>
                     </div>
                   </div>
@@ -280,352 +207,312 @@
             </div>
           </div>
         </el-tab-pane>
+        <el-tab-pane label="임시저장" name="temporary">
+          <div class="temporary-saves">
+            <div class="section-header">
+              <h3>임시저장된 결재</h3>
+            </div>
+            <div v-if="temporarySaves && temporarySaves.length > 0" class="request-list">
+              <div class="request-item" v-for="request in temporarySaves" :key="request.approvalId">
+                <div class="request-info">
+                  <div class="request-header">
+                    <div class="request-title">{{ request.title }}</div>
+                  </div>
+                   <div class="request-details">
+                    <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
+                    <span class="request-status"><strong>상태:</strong> 임시저장</span>
+                    <span class="request-date"><strong>저장일:</strong> {{ request.createAt }}</span>
+                  </div>
+                </div>
+                <div class="request-actions" style="margin-left: 16px;">
+                  <el-button size="small" @click="continueWriting(request)">
+                    <el-icon><Edit /></el-icon>
+                    이어쓰기
+                  </el-button>
+                   <el-button size="small" type="danger" @click="deleteTemporary(request)">
+                    <el-icon><Delete /></el-icon>
+                    삭제
+                  </el-button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <p>임시저장된 결재가 없습니다.</p>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </div>
 
-    <!-- 결재 신청 모달 -->
-    <el-dialog
-      v-model="showCreateApproval"
-      title="결재 신청"
-      width="700px"
-    >
-      <el-form :model="approvalForm" label-width="100px">
-        <el-form-item label="결재 유형">
-          <el-select v-model="approvalForm.type" placeholder="결재 유형을 선택하세요">
-            <el-option label="휴가 신청" value="vacation" />
-            <el-option label="비용 정산" value="expense" />
-            <el-option label="보고서" value="report" />
-            <el-option label="자원 예약" value="resource_booking" />
-            <el-option label="기타" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="제목">
-          <el-input v-model="approvalForm.title" placeholder="결재 제목을 입력하세요" />
-        </el-form-item>
-        <el-form-item label="금액" v-if="approvalForm.type === 'expense'">
-          <el-input-number v-model="approvalForm.amount" placeholder="금액을 입력하세요" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="승인자">
-          <el-select
-            v-model="approvalForm.approvers"
-            multiple
-            placeholder="승인자를 선택하세요"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="employee in employees"
-              :key="employee.id"
-              :label="employee.name"
-              :value="employee.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="설명">
-          <el-input
-            v-model="approvalForm.description"
-            type="textarea"
-            placeholder="결재 사유를 입력하세요"
-            :rows="4"
-          />
-        </el-form-item>
-        <el-form-item label="첨부파일">
-          <el-upload
-            class="upload-demo"
-            drag
-            action="#"
-            multiple
-          >
-            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-            <div class="el-upload__text">
-              파일을 드래그하거나 <em>클릭하여 업로드</em>
-            </div>
-          </el-upload>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateApproval = false">취소</el-button>
-        <el-button type="primary" @click="submitApproval">신청</el-button>
-      </template>
-    </el-dialog>
+    <!-- 결재 양식 선택 모달 -->
+    <ApprovalTemplateSelectorModal
+      :visible="showTemplateSelector"
+      @update:visible="showTemplateSelector = $event"
+      @select="handleTemplateSelect"
+    />
   </div>
-  <ApprovalTemplateSelectorModal
-    :visible="isApprovalTemplateSelectorModalOpen"
-    @update:visible="isApprovalTemplateSelectorModalOpen = $event"
-    @select="handleTemplateSelected"
-  />
 </template>
 
-<script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
-import { useRouter } from 'vue-router'; // Add this import
+<script>
+import { ref, onMounted, computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
+import { Plus, Document, Clock, Check, Close, View, Edit, Delete } from '@element-plus/icons-vue';
 
-const store = useStore();
-const router = useRouter(); // Initialize router
-
-// Data properties
-const activeTab = ref('pending');
-const showCreateApproval = ref(false);
-const showTemplate = ref(false);
-const selectedType = ref('');
-const selectedPriority = ref('');
-const selectedStatus = ref('');
-const dateRange = ref([]);
-const approvalForm = reactive({
-  type: '',
-  title: '',
-  amount: 0,
-  approvers: [],
-  description: ''
-});
-const pendingApprovals = ref(5);
-const inProgressApprovals = ref(3);
-const completedApprovals = ref(12);
-const averageProcessTime = ref(2.5);
-const pendingApprovalsList = ref([
-  {
-    id: 1,
-    title: '월간 보고서',
-    type: '보고서',
-    requester: '김영희',
-    date: '2024-01-15',
-    priority: 'high',
-    amount: 0,
-    description: '1월 월간 성과 보고서입니다.',
-    steps: [
-      { name: '신청자', status: 'completed', statusText: '완료' },
-      { name: '팀장', status: 'current', statusText: '검토 중' },
-      { name: '부장', status: 'pending', statusText: '대기' },
-      { name: '임원', status: 'pending', statusText: '대기' }
-    ]
+export default {
+  name: 'ApprovalPage',
+  components: {
+    ApprovalTemplateSelectorModal,
+    Plus, Document, Clock, Check, Close, View, Edit, Delete
   },
-  {
-    id: 2,
-    title: '휴가 신청',
-    type: '휴가 신청',
-    requester: '박민수',
-    date: '2024-01-14',
-    priority: 'normal',
-    amount: 0,
-    description: '개인 사정으로 인한 휴가 신청입니다.',
-    steps: [
-      { name: '신청자', status: 'completed', statusText: '완료' },
-      { name: '팀장', status: 'current', statusText: '검토 중' },
-      { name: '부장', status: 'pending', statusText: '대기' }
-    ]
+  setup() {
+    const { success, error, warning, info } = useSnackbar();
+    const router = useRouter();
+
+    const activeTab = ref('pending');
+    const showTemplateSelector = ref(false);
+    const showTemplate = ref(false);
+    const selectedType = ref('');
+    const selectedPriority = ref('');
+    const selectedStatus = ref('');
+    const dateRange = ref([]);
+    const showMyRequestsTable = ref(true);
+
+    // Summary card data
+    const pendingApprovals = ref(0);
+    const inProgressApprovals = ref(0);
+    const completedApprovals = ref(0);
+    const draftApprovals = ref(0);
+
+    // Hardcoded data for demonstration (can be replaced with API calls)
+    const pendingApprovalsList = ref([
+        {
+          id: 1,
+          title: '월간 보고서',
+          type: '보고서',
+          requester: '김영희',
+          date: '2024-01-15',
+          priority: 'high',
+          amount: 0,
+          description: '1월 월간 성과 보고서입니다.',
+          steps: [
+            { name: '신청자', status: 'completed', statusText: '완료' },
+            { name: '팀장', status: 'current', statusText: '검토 중' },
+            { name: '부장', status: 'pending', statusText: '대기' },
+            { name: '임원', status: 'pending', statusText: '대기' }
+          ]
+        },
+    ]);
+    const myRequests = ref([]); // This will be filled by the API call
+    const temporarySaves = ref([]);
+    const completedList = ref([
+        {
+          id: 1,
+          title: '회의실 예약 신청',
+          type: '기타',
+          requester: '김철수',
+          completedDate: '2024-01-12',
+          status: '승인',
+          amount: 0,
+          description: '대회의실 예약 신청입니다.'
+        },
+    ]);
+
+    const fetchApprovalStats = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/stats');
+        const stats = response.data.data;
+        pendingApprovals.value = stats.pendingCount;
+        inProgressApprovals.value = stats.requestCount;
+        completedApprovals.value = stats.completeCount;
+        draftApprovals.value = stats.draftCount;
+      } catch (err) {
+        error('통계 정보를 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const fetchPendingApprovals = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-pending-list');
+        pendingApprovalsList.value = response.data.data;
+      } catch (err) {
+        error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const fetchMyRequests = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-approval-list');
+        myRequests.value = response.data.data;
+      } catch (err) {
+        error('결재 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const fetchTemporarySaves = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-draft-list');
+        temporarySaves.value = response.data.data;
+      } catch (err) {
+        error('임시저장 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const fetchCompletedApprovals = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-complete-list');
+        completedList.value = response.data.data;
+      } catch (err) {
+        error('완료된 결재 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const handleTabChange = (tabName) => {
+      activeTab.value = tabName;
+      if (tabName === 'pending') {
+        fetchPendingApprovals();
+      } else if (tabName === 'my-requests') {
+        showMyRequestsTable.value = false;
+        fetchMyRequests();
+        nextTick(() => {
+          showMyRequestsTable.value = true;
+        });
+      } else if (tabName === 'temporary') {
+        fetchTemporarySaves();
+      } else if (tabName === 'completed') {
+        fetchCompletedApprovals();
+      }
+    };
+
+    onMounted(() => {
+      // Fetch initial data for the default tab
+      fetchPendingApprovals();
+      fetchApprovalStats();
+    });
+
+    const openTemplateSelector = () => {
+      showTemplateSelector.value = true;
+    };
+
+    const handleTemplateSelect = (templateId) => {
+      showTemplateSelector.value = false;
+      const path = `/approval/form/${templateId}`;
+      router.push(path).catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          error('해당 양식을 찾을 수 없습니다.');
+          console.error(err);
+        }
+      });
+    };
+
+    const getPriorityType = (priority) => (priority === 'high' ? 'danger' : 'warning');
+
+    const getStatusType = (status) => {
+      const statusMap = {
+        '승인': 'success',
+        '반려': 'danger',
+        '진행중': 'warning',
+        '대기': 'info'
+      };
+      return statusMap[status] || 'info';
+    };
+
+    const approveItem = (item) => {
+        // TODO: Implement approve API call
+        info(`승인 처리: ${item.title}`);
+    };
+
+    const rejectItem = (item) => {
+        // TODO: Implement reject API call
+        info(`반려 처리: ${item.title}`);
+    };
+
+    const viewDetails = (item) => {
+        router.push(`/approval/detail/${item.approvalId}`);
+    };
+
+    const viewRequestDetails = (request) => {
+        router.push(`/approval/detail/${request.approvalId}`);
+    };
+
+    const cancelRequest = (request) => {
+        info(`취소 처리: ${request.title}`);
+    };
+
+    const viewCompletedDetails = (approval) => {
+        router.push(`/approval/detail/${approval.approvalId}`);
+    };
+
+    const downloadApproval = (approval) => {
+        success(`${approval.title} 다운로드`);
+    };
+
+    const continueWriting = (request) => {
+      router.push(`/approval/form/draft/${request.approvalId}`);
+    };
+
+    const deleteTemporary = async (request) => {
+      if (confirm(`'${request.title}' 문서를 삭제하시겠습니까?`)) {
+        try {
+          await axios.delete(`http://localhost:8080/workforce-service/approval/discard-approval/${request.approvalId}`);
+          success('임시저장된 문서가 삭제되었습니다.');
+          // Refresh the list
+          fetchTemporarySaves();
+        } catch (err) {
+          error('삭제에 실패했습니다.');
+          console.error(err);
+        }
+      }
+    };
+
+    const filteredPendingApprovals = computed(() => {
+      // TODO: Re-implement filtering based on new data structure
+      return pendingApprovalsList.value;
+    });
+
+    return {
+      success, error, warning, info, router,
+      activeTab,
+      showTemplateSelector,
+      showTemplate,
+      selectedType,
+      selectedPriority,
+      selectedStatus,
+      dateRange,
+      pendingApprovals,
+      inProgressApprovals,
+      completedApprovals,
+      draftApprovals,
+      pendingApprovalsList,
+      myRequests,
+      completedList,
+      handleTabChange,
+      openTemplateSelector,
+      handleTemplateSelect,
+      getPriorityType,
+      getStatusType,
+      approveItem,
+      rejectItem,
+      viewDetails,
+      viewRequestDetails,
+      cancelRequest,
+      viewCompletedDetails,
+      downloadApproval,
+      filteredPendingApprovals,
+      showMyRequestsTable,
+      temporarySaves,
+      continueWriting,
+      deleteTemporary
+    };
   },
-  {
-    id: 3,
-    title: '비용 정산',
-    type: '비용 정산',
-    requester: '이지은',
-    date: '2024-01-13',
-    priority: 'normal',
-    amount: 150000,
-    description: '출장비 정산 신청입니다.',
-    steps: [
-      { name: '신청자', status: 'completed', statusText: '완료' },
-      { name: '팀장', status: 'current', statusText: '검토 중' },
-      { name: '부장', status: 'pending', statusText: '대기' },
-      { name: '임원', status: 'pending', statusText: '대기' }
-    ]
-  }
-]);
-const myRequests = ref([
-  {
-    id: 1,
-    title: '프로젝트 비용 신청',
-    type: '비용 정산',
-    date: '2024-01-10',
-    status: '진행중',
-    amount: 500000,
-    description: '신규 프로젝트 관련 비용 신청입니다.',
-    steps: [
-      { name: '신청자', status: 'completed', statusText: '완료' },
-      { name: '팀장', status: 'completed', statusText: '승인' },
-      { name: '부장', status: 'current', statusText: '검토 중' },
-      { name: '임원', status: 'pending', statusText: '대기' }
-    ]
-  },
-  {
-    id: 2,
-    title: '연차 휴가 신청',
-    type: '휴가 신청',
-    date: '2024-01-08',
-    status: '승인',
-    amount: 0,
-    description: '연차 휴가 신청입니다.',
-    steps: [
-      { name: '신청자', status: 'completed', statusText: '완료' },
-      { name: '팀장', status: 'completed', statusText: '승인' },
-      { name: '부장', status: 'completed', statusText: '승인' }
-    ]
-  }
-]);
-const completedList = ref([
-  {
-    id: 1,
-    title: '회의실 예약 신청',
-    type: '기타',
-    requester: '김철수',
-    completedDate: '2024-01-12',
-    status: '승인',
-    amount: 0,
-    description: '대회의실 예약 신청입니다.'
-  },
-  {
-    id: 2,
-    title: '교육비 신청',
-    type: '비용 정산',
-    requester: '박민수',
-    completedDate: '2024-01-10',
-    status: '승인',
-    amount: 300000,
-    description: '외부 교육 참가비 신청입니다.'
-  }
-]);
-const employees = ref([
-  { id: 1, name: '김철수' },
-  { id: 2, name: '박민수' },
-  { id: 3, name: '이지은' },
-  { id: 4, name: '김영희' },
-  { id: 5, name: '정수진' }
-]);
-
-const isApprovalTemplateSelectorModalOpen = ref(false);
-
-// Computed properties
-const getApprovalRequests = computed(() => store.getters['approval/getApprovalRequests']);
-
-const filteredPendingApprovals = computed(() => {
-  let filtered = pendingApprovalsList.value;
-
-  if (selectedType.value) {
-    filtered = filtered.filter(approval => approval.type === selectedType.value);
-  }
-
-  if (selectedPriority.value) {
-    filtered = filtered.filter(approval => approval.priority === selectedPriority.value);
-  }
-
-  return filtered;
-});
-
-// Methods
-const handleTabChange = (tab) => {
-  activeTab.value = tab;
-};
-
-const fetchApprovalRequests = async () => {
-  return store.dispatch('approval/fetchApprovalRequests');
-};
-
-const approvalRequests = ref([]); // New ref for approval requests
-const loading = ref(false); // New ref for loading state
-const error = ref(null); // New ref for error state
-
-const loadApprovalRequests = async () => {
-  try {
-    loading.value = true;
-    await fetchApprovalRequests();
-    approvalRequests.value = getApprovalRequests.value; // Assign to ref's value
-  } catch (err) {
-    error.value = '결재 요청 목록을 불러오는 데 실패했습니다.';
-    console.error(err);
-  } finally {
-    loading.value = false;
-  }
-};
-
-const createApproval = () => {
-  showCreateApproval.value = true;
-};
-
-const getPriorityType = (priority) => {
-  return priority === 'high' ? 'danger' : 'warning';
-};
-
-const getStatusType = (status) => {
-  const statusMap = {
-    '승인': 'success',
-    '반려': 'danger',
-    '진행중': 'warning',
-    '대기': 'info'
-  };
-  return statusMap[status] || 'info';
-};
-
-const approveItem = () => {
-  // Assuming $confirm and $success are globally available or provided by Element Plus
-  // For Vue 3 Composition API, you'd typically use ElMessageBox.confirm and ElMessage.success
-  console.log('승인되었습니다.'); // Placeholder
-};
-
-const rejectItem = () => {
-  // Assuming $confirm and $info are globally available or provided by Element Plus
-  console.log('반려되었습니다.'); // Placeholder
-};
-
-const viewDetails = () => {
-  console.log('상세보기'); // Placeholder
-};
-
-const viewRequestDetails = () => {
-  console.log('상세보기'); // Placeholder
-};
-
-const cancelRequest = () => {
-  // Assuming $confirm and $success are globally available or provided by Element Plus
-  console.log('취소되었습니다.'); // Placeholder
-};
-
-const viewCompletedDetails = (approval) => {
-  console.log(`${approval.title} 상세보기`); // Placeholder
-};
-
-const downloadApproval = (approval) => {
-  console.log(`${approval.title} 다운로드`); // Placeholder
-};
-
-const submitApproval = () => {
-  // Assuming $success is globally available or provided by Element Plus
-  console.log('결재 신청이 완료되었습니다.'); // Placeholder
-  showCreateApproval.value = false;
-  approvalForm.type = '';
-  approvalForm.title = '';
-  approvalForm.amount = 0;
-  approvalForm.approvers = [];
-  approvalForm.description = '';
-};
-
-const openApprovalTemplateSelector = () => {
-  isApprovalTemplateSelectorModalOpen.value = true;
-};
-
-const handleTemplateSelected = (templateId) => {
-  isApprovalTemplateSelectorModalOpen.value = false;
-  const routeMap = {
-    'expense_report': 'ApprovalExpenseReport',
-    'overtime_request': 'ApprovalOvertimeRequest',
-    'vacation_request': 'ApprovalVacationRequest',
-    'business_trip': 'ApprovalBusinessTripRequest',
-    'resource_booking': 'ApprovalResourceBooking',
-    'other': 'ApprovalOtherForm',
-  };
-  const routeName = routeMap[templateId];
-  if (routeName) {
-    router.push({ name: routeName, params: { templateId } });
-  } else {
-    console.warn('Unknown template ID selected:', templateId);
-    // Optionally, navigate to a default form or show an error
-  }
-};
-
-// Lifecycle hooks
-onMounted(() => {
-  loadApprovalRequests();
-});
+}
 </script>
 
 <style scoped>
@@ -725,7 +612,7 @@ onMounted(() => {
   padding-left: 20px;
 }
 
-.pending-approvals, .my-requests, .completed-approvals {
+.pending-approvals, .my-requests, .completed-approvals, .temporary-saves{
   padding: 24px;
 }
 

@@ -145,7 +145,7 @@ export default {
           }, {}),
         };
 
-        await axios.patch(`http://localhost:8080/performance/update-my-goal`, textUpdateDto);
+        await axios.patch(`http://localhost:8080/workforce-service/performance/update-my-goal`, textUpdateDto);
         this.$message.success('목표 정보가 성공적으로 수정되었습니다.');
 
         // --- 2. API 2 호출: 파일 정보 동기화 (조건부 실행) ---
@@ -164,7 +164,7 @@ export default {
             formData.append('newFiles', file);
           });
 
-          await axios.patch(`http://localhost:8080/performance/evidence/${goalId}`, formData);
+          await axios.patch(`http://localhost:8080/workforce-service/performance/evidence/${goalId}`, formData);
           this.$message.success('증적 자료가 성공적으로 업데이트되었습니다.');
 
           this.filesToDelete = [];
@@ -187,11 +187,11 @@ export default {
     async fetchGoalDetail() {
       const goalId = this.$route.params.goalId;
       try {
-        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
-        this.goalDetail = response.data;
+        const response = await axios.get(`http://localhost:8080/workforce-service/performance/get-goal-detail/${goalId}`);
+        this.goalDetail = response.data.data;
 
-        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
-          this.fileList = response.data.evidenceList.map(evidence => {
+        if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
+          this.fileList = response.data.data.evidenceList.map(evidence => {
             const url = evidence.evidenceUrl;
             const firstUnderscoreIndex = url.indexOf('_');
             const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
