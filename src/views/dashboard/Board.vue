@@ -348,14 +348,14 @@ export default {
               author: '박민수',
               date: '2024-01-15',
               text: '확인했습니다.',
-              avatar: 'https://via.placeholder.com/32'
+              avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%20/%3E%3C/svg%3E'
             },
             {
               id: 2,
               author: '이지은',
               date: '2024-01-15',
               text: '네, 알겠습니다.',
-              avatar: 'https://via.placeholder.com/32'
+              avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%20/%3E%3C/svg%3E'
             }
           ]
         },
@@ -471,7 +471,7 @@ export default {
         author: '현재 사용자',
         date: new Date().toISOString().slice(0, 10),
         text: this.newComment,
-        avatar: 'https://via.placeholder.com/32'
+        avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%20/%3E%3C/svg%3E'
       }
       
       this.selectedPost.commentList.push(comment)
