@@ -10,17 +10,12 @@
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
-            <p class="goal-description">{{ goal.description }}</p>
+            <p class="goal-description">{{ goal.contents }}</p>
           </div>
           <div class="goal-meta">
-            <div class="user-info">
-              <div>
-                <span class="user-name">{{ goal.userName }}</span>
-                <span class="user-position">{{ goal.user.position }}</span>
-              </div>
-              <div class="user-department">{{ goal.user.department }}</div>
+            <div class="goal-author">
+              <span>{{ goal.memberName }} ({{ goal.memberPosition }})</span>
             </div>
-            <p class="goal-description">{{ goal.contents }}</p>
             <div class="goal-period">
               <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
             </div>
@@ -55,7 +50,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'TeamGoal',
@@ -74,7 +69,7 @@ export default {
     async fetchTeamGoals() {
       try {
         // In a real environment, you would uncomment the following lines:
-        const response = await axios.get('http://localhost:8080/workforce-service/performance/team-goal');
+        const response = await apiClient.get('/workforce-service/performance/team-goal');
         this.teamGoals = response.data.data;
 
         // Using mock data provided by the user:
@@ -122,7 +117,7 @@ export default {
       };
 
       try {
-        await axios.post('http://localhost:8080/workforce-service/performance/create-team-goal', payload);
+        await apiClient.post('/workforce-service/performance/create-team-goal', payload);
         this.$message.success('팀 목표가 성공적으로 추가되었습니다.');
         this.dialogVisible = false;
         await this.fetchTeamGoals(); // Refresh the list
@@ -184,13 +179,13 @@ export default {
 }
 
 .goal-title {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .goal-description {
-  font-size: 14px;
+  font-size: 16px;
   color: #606266;
 }
 
@@ -200,6 +195,13 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.goal-author {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
 }
 
 .user-info {
@@ -225,7 +227,7 @@ export default {
 }
 
 .goal-period {
-  font-size: 12px;
+  font-size: 14px;
   color: #909399;
 }
 </style>
