@@ -99,7 +99,7 @@
                 </div>
                 <div class="approval-right-section">
                   <div class="approval-top-row">
-                    <div class="approval-date">{{ approval.createAt }}</div>
+                    <div class="approval-date">{{ approval.createAt ? approval.createAt.split('T')[0] : '' }}</div>
                   </div>
                   <div class="approval-actions">
                     <el-button type="success" size="small" @click="approveItem(approval)">
@@ -137,7 +137,7 @@
                     <span class="request-requester"><strong>기안자:</strong> {{ request.requesterId }}</span>
                     <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
                     <span class="request-status"><strong>상태:</strong> {{ request.status }}</span>
-                    <span class="request-date"><strong>생성일:</strong> {{ request.createAt }}</span>
+                    <span class="request-date"><strong>생성일:</strong> {{ request.createAt ? request.createAt.split('T')[0] : '' }}</span>
                   </div>
                 </div>
                 <div class="request-actions" style="margin-left: 16px;">
@@ -193,7 +193,7 @@
                       <el-tag :type="getStatusType(approval.status)" size="small">
                         {{ approval.status }}
                       </el-tag>
-                      <span class="completed-date">{{ approval.createAt }}</span>
+                      <span class="completed-date">{{ approval.createAt ? approval.createAt.split('T')[0] : '' }}</span>
                     </div>
                     <div class="completed-actions">
                       <el-button size="small" @click="viewCompletedDetails(approval)">
@@ -221,7 +221,7 @@
                    <div class="request-details">
                     <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
                     <span class="request-status"><strong>상태:</strong> 임시저장</span>
-                    <span class="request-date"><strong>저장일:</strong> {{ request.createAt }}</span>
+                    <span class="request-date"><strong>저장일:</strong> {{ request.createAt ? request.createAt.split('T')[0] : '' }}</span>
                   </div>
                 </div>
                 <div class="request-actions" style="margin-left: 16px;">
@@ -712,7 +712,6 @@ export default {
 
 .approval-date, .request-date, .completed-date {
   font-size: 12px;
-  color: #909399;
 }
 
 .approval-details, .request-details, .completed-details {

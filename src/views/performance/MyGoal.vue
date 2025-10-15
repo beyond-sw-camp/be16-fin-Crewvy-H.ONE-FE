@@ -10,6 +10,7 @@
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
+            <p class="team-goal-title"><strong>팀 목표:</strong> {{ goal.teamGoalTitle }}</p>
             <p class="goal-description">{{ goal.contents }}</p>
             <p class="goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
             <p v-if="goal.grade" class="goal-grade">평가 등급: {{ goal.grade }}</p>
@@ -103,7 +104,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'MyGoal',
@@ -127,7 +128,7 @@ export default {
     async fetchMyGoals() {
       try {
         // In a real environment, you would use the actual API call:
-        const response = await axios.get('http://localhost:8080/workforce-service/performance/get-my-goal');
+        const response = await apiClient.get('/workforce-service/performance/get-my-goal');
         this.myGoals = response.data.data;
 
         // Using mock data provided by the user for demonstration:
@@ -163,7 +164,7 @@ export default {
       if (this.teamGoalsForSelection.length === 0) {
         try {
           // For demonstration, using mock data. In real environment, use axios call.
-          const response = await axios.get('http://localhost:8080/workforce-service/performance/team-goal');
+          const response = await apiClient.get('/workforce-service/performance/team-goal');
           this.teamGoalsForSelection = response.data.data;
           // this.teamGoalsForSelection = [
           //   {
@@ -213,7 +214,7 @@ export default {
           comment: this.selfEvaluateForm.comment
         };
 
-        await axios.post('http://localhost:8080/workforce-service/performance/create-evaluation', payload);
+        await apiClient.post('/workforce-service/performance/create-evaluation', payload);
 
         this.$message.success('본인 평가가 저장되었습니다.');
         this.selfEvaluateDialogVisible = false;
@@ -235,9 +236,8 @@ export default {
   created() {
     this.fetchMyGoals();
   },
-};
+}; 
 </script>
-
 <style scoped>
 .my-goal-container {
   padding: 24px;
@@ -288,6 +288,13 @@ export default {
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.team-goal-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 12px;
+  font-weight: 500;
 }
 
 .goal-description {

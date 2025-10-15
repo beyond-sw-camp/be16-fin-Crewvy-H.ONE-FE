@@ -78,7 +78,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 import { UploadFilled } from '@element-plus/icons-vue';
 
 export default {
@@ -145,7 +145,7 @@ export default {
           }, {}),
         };
 
-        await axios.patch(`http://localhost:8080/workforce-service/performance/update-my-goal`, textUpdateDto);
+        await apiClient.patch(`/workforce-service/performance/update-my-goal`, textUpdateDto);
         this.$message.success('목표 정보가 성공적으로 수정되었습니다.');
 
         // --- 2. API 2 호출: 파일 정보 동기화 (조건부 실행) ---
@@ -164,7 +164,11 @@ export default {
             formData.append('newFiles', file);
           });
 
-          await axios.patch(`http://localhost:8080/workforce-service/performance/evidence/${goalId}`, formData);
+          await apiClient.patch(`/workforce-service/performance/evidence/${goalId}`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
           this.$message.success('증적 자료가 성공적으로 업데이트되었습니다.');
 
           this.filesToDelete = [];
@@ -187,7 +191,7 @@ export default {
     async fetchGoalDetail() {
       const goalId = this.$route.params.goalId;
       try {
-        const response = await axios.get(`http://localhost:8080/workforce-service/performance/get-goal-detail/${goalId}`);
+        const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data.data;
 
         if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
