@@ -15,7 +15,7 @@
               <span>조직도 (더블클릭하여 추가)</span>
             </div>
           </template>
-          <div class="tree-content">
+          <div>
             <el-tree
               :data="orgChartData"
               :props="defaultProps"
@@ -40,23 +40,33 @@
               <span>결재 라인 (드래그하여 순서 변경)</span>
             </div>
           </template>
-          <div class="tree-content">
+          <div>
+            <!-- Static First Approver -->
+            <div v-if="firstApprover" class="approver-item locked">
+              <div class="approver-info">
+                <el-icon><User /></el-icon>
+                <span>1. {{ firstApprover.name }} ({{ firstApprover.department }} / {{ firstApprover.position }})</span>
+              </div>
+            </div>
+
+            <!-- Draggable List for the rest -->
             <draggable
-              v-model="approvalLine"
+              v-model="draggableApprovers"
               item-key="id"
               class="drag-area"
-              handle=".handle"
+              handle=".approver-info"
             >
               <template #item="{ element, index }">
                 <div class="approver-item">
                   <div class="approver-info">
-                    <el-icon class="handle"><Rank /></el-icon>
-                    <span>{{ index + 1 }}. {{ element.label }}</span>
+                    <el-icon><Rank /></el-icon>
+                    <span>{{ index + 2 }}. {{ element.name }} ({{ element.department }} / {{ element.position }})</span>
                   </div>
                   <el-button type="danger" size="small" plain @click="removeApprover(index)">삭제</el-button>
                 </div>
               </template>
             </draggable>
+            
             <div v-if="approvalLine.length === 0" class="empty-state">
               <p>조직도에서 결재자를 더블클릭하여 추가하세요.</p>
             </div>
@@ -72,75 +82,143 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import draggable from 'vuedraggable';
-import { Rank } from '@element-plus/icons-vue';
+import { Rank, User } from '@element-plus/icons-vue';
+import apiClient from '@/api/http';
 
 export default {
   name: 'ApprovalLineEditorModal',
   components: {
     draggable,
     Rank,
+    User,
   },
   props: {
     visible: Boolean,
   },
   emits: ['update:visible', 'save'],
   setup(props, { emit }) {
-    const orgChartData = ref([
-      {
-        id: 'dept1', label: '경영지원본부',
-        children: [
-          { id: 'dept1-1', label: '인사팀', children: [{ id: 'user1', label: '김인사 (팀장)' }] },
-          { id: 'dept1-2', label: '총무팀', children: [{ id: 'user2', label: '박총무 (사원)' }] },
-        ],
-      },
-      {
-        id: 'dept2', label: '개발본부',
-        children: [
-          {
-            id: 'dept2-1', label: 'FE개발팀',
-            children: [
-              { id: 'user3', label: '최개발 (팀장)' },
-              { id: 'user4', label: '이코딩 (대리)' },
-            ],
-          },
-          {
-            id: 'dept2-2', label: 'BE개발팀',
-            children: [{ id: 'user5', label: '강서버 (과장)' }],
-          },
-        ],
-      },
-    ]);
+    const orgChartData = ref([]);
 
     const defaultProps = {
       children: 'children',
       label: 'label',
+      isLeaf: 'isLeaf',
     };
 
-    const approvalLine = ref([
-      { id: 'user3', label: '최개발 (팀장)' },
-    ]);
+    const approvalLine = ref([]);
 
-    const addApprover = (data) => {
-      // Only add if it's a user node (no children) and not already in the list
-      if (data.id && !data.children && !approvalLine.value.some(a => a.id === data.id)) {
-        approvalLine.value.push({ id: data.id, label: data.label });
+    const firstApprover = computed(() => approvalLine.value[0]);
+
+    const draggableApprovers = computed({
+      get() {
+        return approvalLine.value.slice(1);
+      },
+      set(newValue) {
+        approvalLine.value = [firstApprover.value, ...newValue];
+      }
+    });
+
+    const transformOrgData = (nodes) => {
+      if (!nodes) return [];
+      return nodes.map(node => {
+        const childDepartments = transformOrgData(node.children);
+
+        let memberNodes = [];
+        if (node.members && node.members.length > 0) {
+          memberNodes = node.members.map(member => ({
+            id: member.id,
+            label: `${member.name} (${member.position})`,
+            isLeaf: true,
+            memberData: member,
+          }));
+        }
+
+        const combinedChildren = [...memberNodes, ...childDepartments];
+
+        return {
+          id: node.id,
+          label: node.label,
+          children: combinedChildren,
+        };
+      });
+    };
+
+    const findMemberNodeById = (nodes, userId) => {
+      for (const node of nodes) {
+        if (node.isLeaf && node.id === userId) {
+          return node;
+        }
+        if (node.children) {
+          const found = findMemberNodeById(node.children, userId);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const fetchOrgChartData = async () => {
+      try {
+        const response = await apiClient.get('/member-service/organization/tree-with-members');
+        const transformedData = transformOrgData(response.data.data);
+        orgChartData.value = transformedData;
+      } catch (error) {
+        console.error("Failed to fetch organization chart data:", error);
       }
     };
 
+    const resetApprovalLine = () => {
+      approvalLine.value = [];
+      const currentUserId = localStorage.getItem('memberId');
+      if (currentUserId) {
+        const userNode = findMemberNodeById(orgChartData.value, currentUserId);
+        if (userNode) {
+          approvalLine.value.push({
+            id: userNode.id,
+            name: userNode.memberData.name,
+            department: userNode.memberData.department,
+            position: userNode.memberData.position,
+            memberPositionId: userNode.memberData.memberPositionId,
+          });
+        }
+      }
+    };
+
+    onMounted(async () => {
+      await fetchOrgChartData();
+      resetApprovalLine();
+    });
+
+    watch(() => props.visible, (newValue) => {
+      if (newValue) {
+        resetApprovalLine();
+      }
+    });
+
     const handleNodeDoubleClick = (data) => {
-      addApprover(data);
+      if (data.isLeaf && !approvalLine.value.some(a => a.id === data.id)) {
+        approvalLine.value.push({
+          id: data.id,
+          name: data.memberData.name,
+          department: data.memberData.department,
+          position: data.memberData.position,
+          memberPositionId: data.memberData.memberPositionId,
+        });
+      }
     };
 
     const removeApprover = (index) => {
-      approvalLine.value.splice(index, 1);
+      approvalLine.value.splice(index + 1, 1);
     };
 
     const saveApprovalLine = () => {
-      const lineToSave = approvalLine.value.map(item => ({ 
-        id: item.id, 
-        name: item.label.split(' (')[0] 
+      const lineToSave = approvalLine.value.map(item => ({
+        id: item.id,
+        name: item.name,
+        department: item.department,
+        position: item.position,
+        memberPositionId: item.memberPositionId,
       }));
       emit('save', lineToSave);
       emit('update:visible', false);
@@ -150,6 +228,8 @@ export default {
       orgChartData,
       defaultProps,
       approvalLine,
+      firstApprover,
+      draggableApprovers,
       handleNodeDoubleClick,
       removeApprover,
       saveApprovalLine,
@@ -157,7 +237,6 @@ export default {
   },
 };
 </script>
-
 <style scoped>
 .editor-layout {
   display: flex;
@@ -166,20 +245,24 @@ export default {
 }
 .org-chart-section, .approval-line-section {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 .box-card {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
+.org-chart-section :deep(.el-card__body),
+.approval-line-section :deep(.el-card__body) {
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-.tree-content {
-  flex-grow: 1;
-  overflow-y: auto;
 }
 .custom-tree-node {
   flex: 1;
@@ -190,7 +273,7 @@ export default {
   padding-right: 8px;
 }
 .drag-area {
-  height: 100%;
+  min-height: 100px; /* Ensure drop area is available */
 }
 .approver-item {
   display: flex;
@@ -200,12 +283,14 @@ export default {
   border-bottom: 1px solid #f0f0f0;
   background-color: #fff;
 }
+.approver-item.locked {
+  background-color: #f5f7fa;
+  cursor: not-allowed;
+}
 .approver-info {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.handle {
   cursor: grab;
 }
 .empty-state {

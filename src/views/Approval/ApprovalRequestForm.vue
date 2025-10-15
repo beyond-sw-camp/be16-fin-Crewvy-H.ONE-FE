@@ -110,7 +110,7 @@
           </template>
           <div class="approval-line-display">
              <div v-for="(approver, index) in currentApprovalLine" :key="approver.id" class="approver-display-item">
-              <span>{{ index + 1 }}. {{ approver.name }} ({{ approver.department }})</span>
+              <span>{{ index + 1 }}. {{ approver.name }} ({{ approver.department }} / {{ approver.position }})</span>
             </div>
             <div v-if="currentApprovalLine.length === 0" class="empty-state">
               <p>결재라인을 추가해 주세요.</p>
@@ -137,7 +137,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import axios from 'axios';
+import apiClient from '@/api/http';
 import ApprovalLineEditorModal from '@/components/approval/ApprovalLineEditorModal.vue';
 import { UploadFilled } from '@element-plus/icons-vue';
 
@@ -174,7 +174,7 @@ export default {
 
     const fetchFormSchema = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/workforce-service/approval/get-document/${id}`);
+        const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`);
         const doc = response.data.data;
         formTitle.value = doc.documentName;
         if (doc.metadata) {
@@ -188,7 +188,7 @@ export default {
 
     const fetchDraftData = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-approval/${id}`);
+        const response = await apiClient.get(`/workforce-service/approval/find-approval/${id}`);
         const draftData = response.data.data;
 
         approvalTitle.value = draftData.title;
@@ -256,14 +256,6 @@ export default {
         }
       });
 
-      // Do not send request if there are no changes in files
-      if (newFiles.length === 0 && existingFileIds.length === fileList.value.length) {
-          // This condition can be more robust by checking initial state
-          // For now, we assume if no new files, no changes needed.
-          // A better check would be to compare initial existingFileIds with current.
-          // return;
-      }
-
       const attachmentInfoDto = {
         existingFileIds: existingFileIds,
       };
@@ -277,7 +269,7 @@ export default {
       }
 
       try {
-        await axios.patch(`http://localhost:8080/workforce-service/approval/attachment/${approvalId}`, formData, {
+        await apiClient.patch(`/workforce-service/approval/attachment/${approvalId}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -289,9 +281,10 @@ export default {
     };
 
     const submitApproval = async () => {
+      console.log('Submitting with documentId:', documentId.value);
       const lineDtoList = currentApprovalLine.value.map((approver, index) => ({
-        memberId: approver.id,
-        lineIndex: index,
+        memberPositionId: approver.memberPositionId,
+        lineIndex: index + 1,
       }));
 
       const approvalData = {
@@ -306,7 +299,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('http://localhost:8080/workforce-service/approval/create-approval', approvalData);
+        const response = await apiClient.post('/workforce-service/approval/create-approval', approvalData);
         const newApprovalId = response.data.data.approvalId;
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
@@ -337,7 +330,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('http://localhost:8080/workforce-service/approval/draft-approval', approvalData);
+        const response = await apiClient.post('/workforce-service/approval/draft-approval', approvalData);
         const newApprovalId = response.data.data;
         console.log(newApprovalId);
         if (newApprovalId) {
@@ -356,7 +349,7 @@ export default {
 
       if (confirm('이 임시저장 문서를 삭제하시겠습니까?')) {
         try {
-          await axios.delete(`http://localhost:8080/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
+          await apiClient.delete(`/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
           alert('문서가 삭제되었습니다.');
           router.push('/approval');
         } catch (error) {

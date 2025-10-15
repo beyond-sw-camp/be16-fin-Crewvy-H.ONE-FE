@@ -46,8 +46,8 @@
             </div>
           </template>
           <div class="approval-line-display">
-             <div v-for="(approver, index) in currentApprovalLine" :key="approver.id" class="approver-display-item">
-              <span>{{ index + 1 }}. {{ approver.name }} ({{ approver.department }}) - {{ approver.status }}</span>
+             <div v-for="approver in currentApprovalLine" :key="approver.approverId" class="approver-display-item">
+              <span>{{ approver.index }}. {{ approver.approverName }} ({{ approver.approverOrganization }} / {{ approver.approverPosition }}) - <strong>{{ getKoreanStatus(approver.status) }}</strong></span>
             </div>
             <div v-if="currentApprovalLine.length === 0" class="empty-state">
               <p>결재라인 정보가 없습니다.</p>
@@ -117,7 +117,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'ApprovalDetailView',
@@ -135,9 +135,20 @@ export default {
     const newComment = ref('');
     const attachments = ref([]); // For attachment list
 
+    const getKoreanStatus = (status) => {
+      const statusMap = {
+        'PENDING': '진행중',
+        'DRAFT': '임시저장',
+        'APPROVED': '승인',
+        'REJECTED': '반려',
+        'WAITING': '대기',
+      };
+      return statusMap[status] || status;
+    };
+
     const fetchApprovalDetails = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-approval/${id}`);
+        const response = await apiClient.get(`/workforce-service/approval/find-approval/${id}`);
         const details = response.data.data;
 
         approvalTitle.value = details.title;
@@ -165,8 +176,9 @@ export default {
           });
         }
         
-        // approvalLine is not in this response, so it will be empty for now.
-        currentApprovalLine.value = [];
+        if (details.lineList) {
+          currentApprovalLine.value = details.lineList;
+        }
 
       } catch (error) {
         console.error('Failed to fetch approval details:', error);
@@ -175,13 +187,16 @@ export default {
 
     const fetchComments = async (id) => {
       try {
-        const response = await axios.get(`http://localhost:8080/workforce-service/approval/find-reply/${id}`);
-        comments.value = response.data.data.map(comment => ({
-          id: comment.memberId + comment.contents, // Simple key
-          author: comment.memberId || 'Unknown User',
-          content: comment.contents,
-          date: '' // Date is not provided in the response
-        }));
+        const response = await apiClient.get(`/workforce-service/approval/find-reply/${id}`);
+        comments.value = response.data.data.map(comment => {
+          const formattedDate = comment.createdAt ? comment.createdAt.substring(0, 16).replace('T', ' ') : '';
+          return {
+            id: comment.memberPositionId + comment.createdAt,
+            author: `${comment.memberName} (${comment.memberOrganization} / ${comment.memberPosition})`,
+            content: comment.contents,
+            date: formattedDate
+          };
+        });
       } catch (error) {
         console.error('Failed to fetch comments:', error);
         comments.value = [];
@@ -204,7 +219,7 @@ export default {
       };
 
       try {
-        await axios.post(`http://localhost:8080/workforce-service/approval/create-reply/${approvalId.value}`, replyRequestDto);
+        await apiClient.post(`/workforce-service/approval/create-reply/${approvalId.value}`, replyRequestDto);
         newComment.value = '';
         // Re-fetch comments to get the updated list
         await fetchComments(approvalId.value); 
@@ -230,6 +245,7 @@ export default {
       addComment,
       goBack,
       attachments,
+      getKoreanStatus,
     };
   },
 };
