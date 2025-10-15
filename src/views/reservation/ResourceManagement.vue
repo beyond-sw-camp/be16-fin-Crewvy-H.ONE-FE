@@ -382,7 +382,7 @@ export default {
       this.loading = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -644,7 +644,7 @@ export default {
       this.categorySaving = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -653,8 +653,6 @@ export default {
           value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
         }))
         
-        // 카테고리 데이터 로깅 (개발용)
-        console.log('로드된 카테고리 목록:', this.categories)
       } catch (e) {
         this.error('카테고리 조회 실패')
         // eslint-disable-next-line no-console
@@ -682,7 +680,7 @@ export default {
           // 추가: POST /register
           await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
             name: this.categoryForm.name,
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e'
+            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9'
           })
           this.success('카테고리가 추가되었습니다.')
         }
