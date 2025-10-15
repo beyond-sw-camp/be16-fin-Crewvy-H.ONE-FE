@@ -92,6 +92,15 @@
           <el-menu-item index="/admin/leave-management">
             <span>관리자 연차 현황</span>
           </el-menu-item>
+          <el-menu-item index="/admin/policy-management">
+            <span>근태 정책 관리</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/work-location-management">
+            <span>근무지 관리</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/audit-log">
+            <span>감사 로그</span>
+          </el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="performance">
