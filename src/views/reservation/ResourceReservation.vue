@@ -78,9 +78,12 @@
         <div class="filter-options">
           <el-select v-model="selectedType" placeholder="자원 유형" style="width: 150px">
             <el-option label="전체" value="" />
-            <el-option label="회의실" value="meeting" />
-            <el-option label="차량" value="vehicle" />
-            <el-option label="기타" value="other" />
+            <el-option 
+              v-for="category in categories" 
+              :key="category.id" 
+              :label="category.name" 
+              :value="category.name" 
+            />
           </el-select>
           <el-date-picker
             v-model="selectedDate"
@@ -101,16 +104,16 @@
                 <el-icon><User /></el-icon>
                 <span>{{ resource.capacity }}명</span>
               </div>
-              <div class="resource-equipment" v-if="resource.equipment">
+              <div class="resource-equipment">
                 <el-icon><Setting /></el-icon>
-                <span>{{ resource.equipment }}</span>
+                <span>{{ resource.equipment || '시설 정보 없음' }}</span>
               </div>
             </div>
-            <div class="resource-description">{{ resource.description }}</div>
+            <div class="resource-description">{{ resource.description || '자세한 설명이 없습니다.' }}</div>
           </div>
           <div class="resource-location">
             <el-tag :type="getResourceType(resource.type)" size="small">
-              {{ getResourceTypeName(resource.type) }}
+              {{ resource.categoryName || '기타' }}
             </el-tag>
             <span class="location-text">{{ resource.location }}</span>
           </div>
@@ -198,20 +201,30 @@
                   <div class="day-text">{{ date.day }}</div>
                 </div>
                 <div class="time-row">
-                  <div 
+                  <el-tooltip
                     v-for="hour in timeSlots" 
                     :key="`${date.date}-${hour.value}`"
-                    class="time-cell"
-                    :class="{
-                      'selected': isTimeCellSelected(date.date, hour.value),
-                      'reserved': isTimeCellReserved(date.date, hour.value),
-                      'selecting': isTimeCellInSelection(date.date, hour.value)
-                    }"
-                    @mousedown="startTimeCellSelection(date.date, hour.value)"
-                    @mouseenter="updateTimeCellSelection(date.date, hour.value)"
-                    @mouseup="endTimeCellSelection"
+                    :content="getReservationTooltip(date.date, hour.value)"
+                    placement="top"
+                    :disabled="!getReservationTooltip(date.date, hour.value)"
+                    effect="dark"
+                    :show-after="300"
                   >
-                  </div>
+                    <div 
+                      class="time-cell"
+                      :class="[
+                        {
+                          'selected': isTimeCellSelected(date.date, hour.value),
+                          'selecting': isTimeCellInSelection(date.date, hour.value)
+                        },
+                        getTimeCellClass(date.date, hour.value)
+                      ]"
+                      @mousedown="startTimeCellSelection(date.date, hour.value)"
+                      @mouseenter="updateTimeCellSelection(date.date, hour.value)"
+                      @mouseup="endTimeCellSelection"
+                    >
+                    </div>
+                  </el-tooltip>
                 </div>
               </div>
             </div>
@@ -221,9 +234,12 @@
               <div class="selected-info">
                 <span v-if="reservationForm.startTime && reservationForm.endTime && reservationForm.date">
                   선택된 예약: {{ reservationForm.date }} {{ reservationForm.startTime }} - {{ reservationForm.endTime }}
+                  <span v-if="reservationForm.resourceId">
+                    ({{ getResourceName(reservationForm.resourceId) }})
+                  </span>
                 </span>
                 <span v-else-if="!reservationForm.resourceId" class="selection-hint">
-                  먼저 자원을 선택하면 예약 현황을 확인할 수 있습니다
+                  모든 자원의 예약 현황을 확인할 수 있습니다. 자원을 선택하거나 드래그하여 날짜와 시간을 선택하세요
                 </span>
                 <span v-else class="selection-hint">드래그하여 날짜와 시간을 선택하세요</span>
               </div>
@@ -241,6 +257,7 @@
                   <span>선택됨</span>
                 </div>
               </div>
+              
             </div>
           </div>
         </div>
@@ -299,6 +316,62 @@
                 </div>
               </el-form-item>
             </div>
+            
+            <!-- 반복 설정 섹션 -->
+            <div class="recurrence-section">
+              <el-form-item label="반복 설정">
+                <div class="recurrence-container">
+                  <el-checkbox v-model="reservationForm.isRecurring" @change="onRecurrenceToggle">
+                    정기 예약으로 설정
+                  </el-checkbox>
+                  
+                  <div v-if="reservationForm.isRecurring" class="recurrence-options">
+                    <div class="recurrence-type-row">
+                      <span class="recurrence-label">반복 주기:</span>
+                      <el-select v-model="reservationForm.recurrenceType" style="width: 120px; margin-right: 12px;">
+                        <el-option label="매일" value="daily" />
+                        <el-option label="매주" value="weekly" />
+                        <el-option label="매월" value="monthly" />
+                      </el-select>
+                      <span class="recurrence-label">간격:</span>
+                      <el-input-number
+                        v-model="reservationForm.recurrenceInterval"
+                        :min="1"
+                        :max="12"
+                        style="width: 80px; margin-right: 12px;"
+                      />
+                      <span class="recurrence-label">{{ getRecurrenceIntervalText() }}</span>
+                    </div>
+                    
+                    <!-- 매주 반복시 요일 선택 -->
+                    <div v-if="reservationForm.recurrenceType === 'weekly'" class="recurrence-days">
+                      <span class="recurrence-label">반복 요일:</span>
+                      <el-checkbox-group v-model="reservationForm.recurrenceDays">
+                        <el-checkbox label="0">일</el-checkbox>
+                        <el-checkbox label="1">월</el-checkbox>
+                        <el-checkbox label="2">화</el-checkbox>
+                        <el-checkbox label="3">수</el-checkbox>
+                        <el-checkbox label="4">목</el-checkbox>
+                        <el-checkbox label="5">금</el-checkbox>
+                        <el-checkbox label="6">토</el-checkbox>
+                      </el-checkbox-group>
+                    </div>
+                    
+                    <div class="recurrence-end">
+                      <span class="recurrence-label">종료일:</span>
+                      <el-date-picker
+                        v-model="reservationForm.recurrenceEndDate"
+                        type="date"
+                        placeholder="종료일 선택"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                        style="width: 200px;"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </el-form-item>
+            </div>
           </el-form>
         </div>
       </div>
@@ -339,7 +412,7 @@
                 </div>
                 <div class="reservation-status">
                   <el-tag :type="getReservationStatusType(reservation.status)" size="small">
-                    {{ reservation.status }}
+                    {{ getReservationStatusLabel(reservation.status) }}
                   </el-tag>
                 </div>
               </div>
@@ -362,7 +435,6 @@
         </div>
       </div>
     </el-dialog>
-
 
     <!-- 통계 모달 -->
     <el-dialog
@@ -475,6 +547,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import Chart from 'chart.js/auto'
+import axios from 'axios'
 
 export default {
   name: 'ResourceReservation',
@@ -486,11 +559,13 @@ export default {
     return {
       selectedType: '',
       selectedDate: '',
+      categories: [],
       showReservation: false,
       showMyReservations: false,
       showStatistics: false,
       showUsageCompletion: false,
       isEditingMode: false,
+      editingReservationId: null,
       monthlyChartInstance: null,
       resourceChartInstance: null,
       reservationForm: {
@@ -502,7 +577,12 @@ export default {
         attendees: 1,
         notes: '',
         sharedUsers: [],
-        sharedUserInput: ''
+        sharedUserInput: '',
+        isRecurring: false,
+        recurrenceType: 'weekly', // daily, weekly, monthly
+        recurrenceInterval: 1, // 매주, 매월 등
+        recurrenceEndDate: '',
+        recurrenceDays: [] // 요일 선택 (매주 반복시)
       },
 
       timeSlots: [],
@@ -512,465 +592,25 @@ export default {
       selectionStartHour: null,
       selectionEndDate: null,
       selectionEndHour: null,
-      reservations: [
-        {
-          id: 1,
-          resourceId: 1,
-          date: '2024-01-20',
-          startTime: '09:00',
-          endTime: '11:00',
-          purpose: '팀 미팅',
-          attendees: 5,
-          userId: 'user1'
-        },
-        {
-          id: 2,
-          resourceId: 1,
-          date: '2024-01-20',
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '프레젠테이션',
-          attendees: 8,
-          userId: 'user2'
-        },
-        {
-          id: 3,
-          resourceId: 1,
-          date: '2024-01-21',
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '고객 미팅',
-          attendees: 12,
-          userId: 'user3'
-        },
-        {
-          id: 4,
-          resourceId: 1,
-          date: '2024-01-21',
-          startTime: '15:00',
-          endTime: '17:00',
-          purpose: '월간 보고서 검토',
-          attendees: 6,
-          userId: 'user4'
-        },
-        {
-          id: 5,
-          resourceId: 1,
-          date: '2024-01-22',
-          startTime: '09:00',
-          endTime: '10:00',
-          purpose: '일일 스탠드업',
-          attendees: 15,
-          userId: 'user5'
-        },
-        {
-          id: 6,
-          resourceId: 1,
-          date: '2024-01-22',
-          startTime: '11:00',
-          endTime: '13:00',
-          purpose: '신제품 기획 회의',
-          attendees: 8,
-          userId: 'user6'
-        },
-        
-        {
-          id: 7,
-          resourceId: 2,
-          date: '2024-01-20',
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '개발팀 미팅',
-          attendees: 4,
-          userId: 'user7'
-        },
-        {
-          id: 8,
-          resourceId: 2,
-          date: '2024-01-20',
-          startTime: '16:00',
-          endTime: '18:00',
-          purpose: '코드 리뷰',
-          attendees: 3,
-          userId: 'user8'
-        },
-        {
-          id: 9,
-          resourceId: 2,
-          date: '2024-01-21',
-          startTime: '09:00',
-          endTime: '11:00',
-          purpose: '디자인 검토',
-          attendees: 5,
-          userId: 'user9'
-        },
-        {
-          id: 10,
-          resourceId: 2,
-          date: '2024-01-22',
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '마케팅 전략 회의',
-          attendees: 6,
-          userId: 'user10'
-        },
-        
-        {
-          id: 11,
-          resourceId: 3,
-          date: '2024-01-20',
-          startTime: '13:00',
-          endTime: '15:00',
-          purpose: 'HR 미팅',
-          attendees: 4,
-          userId: 'user11'
-        },
-        {
-          id: 12,
-          resourceId: 3,
-          date: '2024-01-21',
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '재무 보고서 검토',
-          attendees: 3,
-          userId: 'user12'
-        },
-        {
-          id: 13,
-          resourceId: 3,
-          date: '2024-01-22',
-          startTime: '09:00',
-          endTime: '10:30',
-          purpose: '프로젝트 킥오프',
-          attendees: 5,
-          userId: 'user13'
-        },
-        
-        {
-          id: 14,
-          resourceId: 4,
-          date: '2024-01-20',
-          startTime: '09:00',
-          endTime: '18:00',
-          purpose: '고객사 방문',
-          attendees: 2,
-          userId: 'user14'
-        },
-        {
-          id: 15,
-          resourceId: 4,
-          date: '2024-01-21',
-          startTime: '10:00',
-          endTime: '16:00',
-          purpose: '출장',
-          attendees: 3,
-          userId: 'user15'
-        },
-        {
-          id: 16,
-          resourceId: 4,
-          date: '2024-01-22',
-          startTime: '14:00',
-          endTime: '17:00',
-          purpose: '공급업체 미팅',
-          attendees: 2,
-          userId: 'user16'
-        },
-        
-        {
-          id: 17,
-          resourceId: 5,
-          date: '2024-01-20',
-          startTime: '08:00',
-          endTime: '20:00',
-          purpose: '단체 출장',
-          attendees: 6,
-          userId: 'user17'
-        },
-        {
-          id: 18,
-          resourceId: 5,
-          date: '2024-01-21',
-          startTime: '11:00',
-          endTime: '15:00',
-          purpose: '현장 점검',
-          attendees: 4,
-          userId: 'user18'
-        },
-        
-        {
-          id: 19,
-          resourceId: 1,
-          date: this.formatDate(new Date()),
-          startTime: '09:00',
-          endTime: '10:00',
-          purpose: '오늘 일일 미팅',
-          attendees: 8,
-          userId: 'user19'
-        },
-        {
-          id: 20,
-          resourceId: 2,
-          date: this.formatDate(new Date()),
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '오늘 프로젝트 검토',
-          attendees: 5,
-          userId: 'user20'
-        },
-        {
-          id: 21,
-          resourceId: 4,
-          date: this.formatDate(new Date()),
-          startTime: '10:00',
-          endTime: '17:00',
-          purpose: '오늘 고객사 방문',
-          attendees: 2,
-          userId: 'user21'
-        },
-        
-        {
-          id: 22,
-          resourceId: 1,
-          date: this.formatDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '내일 주간 계획 회의',
-          attendees: 10,
-          userId: 'user22'
-        },
-        {
-          id: 23,
-          resourceId: 3,
-          date: this.formatDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '내일 예산 검토',
-          attendees: 4,
-          userId: 'user23'
-        },
-        {
-          id: 24,
-          resourceId: 5,
-          date: this.formatDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-          startTime: '09:00',
-          endTime: '18:00',
-          purpose: '내일 현장 점검',
-          attendees: 5,
-          userId: 'user24'
-        },
-        
-        {
-          id: 25,
-          resourceId: 2,
-          date: this.formatDate(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)),
-          startTime: '09:00',
-          endTime: '11:00',
-          purpose: '모레 기술 세미나',
-          attendees: 6,
-          userId: 'user25'
-        },
-        {
-          id: 26,
-          resourceId: 4,
-          date: this.formatDate(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)),
-          startTime: '13:00',
-          endTime: '17:00',
-          purpose: '모레 협력사 방문',
-          attendees: 3,
-          userId: 'user26'
-        },
-        
-        {
-          id: 27,
-          resourceId: 1,
-          date: this.formatDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)),
-          startTime: '15:00',
-          endTime: '17:00',
-          purpose: '3일 후 전체 회의',
-          attendees: 18,
-          userId: 'user27'
-        },
-        {
-          id: 28,
-          resourceId: 3,
-          date: this.formatDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)),
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '3일 후 인사 평가',
-          attendees: 3,
-          userId: 'user28'
-        },
-        
-        {
-          id: 29,
-          resourceId: 2,
-          date: this.formatDate(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
-          startTime: '11:00',
-          endTime: '13:00',
-          purpose: '4일 후 마케팅 브레인스토밍',
-          attendees: 7,
-          userId: 'user29'
-        },
-        {
-          id: 30,
-          resourceId: 5,
-          date: this.formatDate(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
-          startTime: '08:00',
-          endTime: '20:00',
-          purpose: '4일 후 장거리 출장',
-          attendees: 6,
-          userId: 'user30'
-        },
-        
-        {
-          id: 31,
-          resourceId: 1,
-          date: this.formatDate(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)),
-          startTime: '09:00',
-          endTime: '10:30',
-          purpose: '5일 후 주간 리뷰',
-          attendees: 12,
-          userId: 'user31'
-        },
-        {
-          id: 32,
-          resourceId: 4,
-          date: this.formatDate(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)),
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '5일 후 고객 만족도 조사',
-          attendees: 2,
-          userId: 'user32'
-        },
-        
-        {
-          id: 33,
-          resourceId: 3,
-          date: this.formatDate(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)),
-          startTime: '10:00',
-          endTime: '12:00',
-          purpose: '6일 후 팀 빌딩',
-          attendees: 5,
-          userId: 'user33'
-        },
-        {
-          id: 34,
-          resourceId: 2,
-          date: this.formatDate(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)),
-          startTime: '15:00',
-          endTime: '17:00',
-          purpose: '6일 후 프로젝트 마일스톤',
-          attendees: 8,
-          userId: 'user34'
-        }
-      ],
-      todayReservations: 8,
-      activeUsers: 15,
-      meetingRooms: [
-        { id: 1, name: '대회의실', capacity: 20, location: '3층' },
-        { id: 2, name: '소회의실 A', capacity: 8, location: '2층' },
-        { id: 3, name: '소회의실 B', capacity: 6, location: '2층' }
-      ],
-      vehicles: [
-        { id: 4, name: '법인 차량 1', capacity: 4, location: '지하주차장' },
-        { id: 5, name: '법인 차량 2', capacity: 7, location: '지하주차장' }
-      ],
-      resources: [
-        {
-          id: 1,
-          name: '대회의실',
-          type: 'meeting',
-          location: '3층',
-          capacity: 20,
-          equipment: '프로젝터, 화이트보드, 음향시설',
-          status: 'available',
-          description: '대규모 회의 및 프레젠테이션용 회의실',
-          maxHours: 8,
-          requiresApproval: false
-        },
-        {
-          id: 2,
-          name: '소회의실 A',
-          type: 'meeting',
-          location: '2층',
-          capacity: 8,
-          equipment: '프로젝터, 화이트보드',
-          status: 'available',
-          description: '소규모 팀 미팅용 회의실',
-          maxHours: 4,
-          requiresApproval: false
-        },
-        {
-          id: 3,
-          name: '소회의실 B',
-          type: 'meeting',
-          location: '2층',
-          capacity: 6,
-          equipment: '화이트보드',
-          status: 'available',
-          description: '소규모 팀 미팅용 회의실',
-          maxHours: 4,
-          requiresApproval: false
-        },
-        {
-          id: 4,
-          name: '법인 차량 1',
-          type: 'vehicle',
-          location: '지하주차장',
-          capacity: 4,
-          equipment: 'GPS, 블랙박스',
-          status: 'available',
-          description: '출장 및 외부 미팅용 법인 차량',
-          maxHours: 12,
-          requiresApproval: true
-        },
-        {
-          id: 5,
-          name: '법인 차량 2',
-          type: 'vehicle',
-          location: '지하주차장',
-          capacity: 7,
-          equipment: 'GPS, 블랙박스',
-          status: 'available',
-          description: '단체 출장용 법인 차량',
-          maxHours: 12,
-          requiresApproval: true
-        }
-      ],
-      myReservations: [
-        {
-          id: 1,
-          resourceName: '대회의실',
-          date: '2025-09-25',
-          startTime: '14:00',
-          endTime: '16:00',
-          purpose: '월간 보고서 검토',
-          attendees: 8,
-          status: '이용 중'
-        },
-        {
-          id: 2,
-          resourceName: '법인 차량 1',
-          date: '2025-09-26',
-          startTime: '09:00',
-          endTime: '18:00',
-          purpose: '고객사 방문',
-          attendees: 2,
-          status: '이용 중'
-        }
-      ],
+      reservations: [],
+      todayReservations: 0,
+      activeUsers: 0,
+      meetingRooms: [],
+      vehicles: [],
+      resources: [],
+      myReservations: [],
+      allReservations: [], // 전체 예약 목록 (예약 가능 시간 확인용)
       statistics: {
-        usageRate: 75,
-        peakTime: '14:00-16:00',
-        noShow: 3,
-        totalReservations: 156
+        usageRate: 0,
+        peakTime: '',
+        noShow: 0,
+        totalReservations: 0
       },
       monthlyData: {
         labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
         datasets: [{
           label: '예약 건수',
-          data: [12, 19, 15, 25, 22, 18, 30, 28, 35, 32, 28, 24],
+          data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           backgroundColor: 'rgba(79, 70, 229, 0.2)',
           borderColor: 'rgba(79, 70, 229, 1)',
           borderWidth: 2,
@@ -978,24 +618,12 @@ export default {
         }]
       },
       resourceData: {
-        labels: ['대회의실', '소회의실 A', '소회의실 B', '법인 차량 1', '법인 차량 2'],
+        labels: [],
         datasets: [{
           label: '이용률 (%)',
-          data: [85, 72, 68, 45, 38],
-          backgroundColor: [
-            'rgba(34, 197, 94, 0.8)',
-            'rgba(59, 130, 246, 0.8)',
-            'rgba(168, 85, 247, 0.8)',
-            'rgba(245, 158, 11, 0.8)',
-            'rgba(239, 68, 68, 0.8)'
-          ],
-          borderColor: [
-            'rgba(34, 197, 94, 1)',
-            'rgba(59, 130, 246, 1)',
-            'rgba(168, 85, 247, 1)',
-            'rgba(245, 158, 11, 1)',
-            'rgba(239, 68, 68, 1)'
-          ],
+          data: [],
+          backgroundColor: [],
+          borderColor: [],
           borderWidth: 2
         }]
       },
@@ -1010,6 +638,13 @@ export default {
         notes: ''
       }
     }
+  },
+  async mounted() {
+    // 컴포넌트 마운트 시 데이터 로드
+    await this.loadCategories()
+    await this.loadResources()
+    await this.loadMyReservations()
+    await this.loadAllReservations()
   },
   beforeUnmount() {
     if (this.monthlyChartInstance) {
@@ -1026,11 +661,12 @@ export default {
       let filtered = this.resources
       
       if (this.selectedType) {
-        filtered = filtered.filter(resource => resource.type === this.selectedType)
+        filtered = filtered.filter(resource => resource.categoryName === this.selectedType)
       }
       
       return filtered
     },
+    
     availableResources() {
       return this.resources.filter(resource => resource.status === 'available')
     },
@@ -1049,6 +685,161 @@ export default {
     }
   },
   methods: {
+    async loadResources() {
+      try {
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
+          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        // 응답을 화면 테이블 스키마로 매핑
+        this.resources = list.map(item => ({
+          id: item.id || item.uuid || item.reservationTypeId,
+          name: item.name || item.resourceName,
+          type: this.getResourceTypeFromCategory(item.reservationCategory?.name || item.categoryName || ''),
+          categoryName: item.reservationCategory?.name || item.categoryName || '',
+          location: item.location || '',
+          capacity: item.capacity ?? 1,
+          equipment: item.facilities || '',
+          status: item.status || 'available',
+          description: item.description || '',
+          maxHours: 8, // 기본값 설정
+          requiresApproval: false // 기본값 설정
+        }))
+      } catch (error) {
+        console.error('자원 목록 로드 실패:', error)
+        this.error('자원 목록을 불러오는데 실패했습니다.')
+      }
+    },
+    
+    // 카테고리 목록 로드
+    async loadCategories() {
+      try {
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
+          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        this.categories = list.map(cat => ({
+          id: cat.id || cat.categoryId || cat.uuid,
+          name: cat.name,
+          value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
+        }))
+      } catch (error) {
+        console.error('카테고리 조회 실패:', error)
+        this.error('카테고리 목록을 불러오는데 실패했습니다.')
+      }
+    },
+    
+    // 카테고리 이름을 기반으로 자원 타입 결정
+    getResourceTypeFromCategory(categoryName) {
+      if (!categoryName) return 'other'
+      
+      const name = categoryName.toLowerCase()
+      if (name.includes('회의실') || name.includes('meeting') || name.includes('conference')) {
+        return 'meeting'
+      } else if (name.includes('차량') || name.includes('vehicle') || name.includes('car')) {
+        return 'vehicle'
+      } else if (name.includes('장비') || name.includes('equipment') || name.includes('device')) {
+        return 'equipment'
+      } else {
+        return 'other'
+      }
+    },
+    
+    async loadMyReservations() {
+      try {
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/myList`, {
+          params: { 
+            memberId: 'c4998317-a9a3-4856-981f-366f07c29367',
+            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' 
+          }
+        })
+        const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
+        
+        this.myReservations = list.map(item => {
+          const startDateTime = new Date(item.startDateTime)
+          const endDateTime = new Date(item.endDateTime)
+          
+          // 자원 정보 찾기
+          const resource = this.resources.find(r => r.id === item.reservationTypeId)
+          
+          return {
+            id: item.id,
+            reservationTypeId: item.reservationTypeId,
+            memberId: item.memberId,
+            companyId: item.companyId,
+            status: item.status,
+            startDateTime: item.startDateTime,
+            endDateTime: item.endDateTime,
+            // [check] 이후 추가
+            resourceName: resource ? resource.name : '알 수 없는 자원',
+            date: startDateTime.toISOString().split('T')[0],
+            startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            purpose: '사용 목적 없음',
+            attendees: 1 
+          }
+        })
+      } catch (error) {
+        console.error('내 예약 목록 로드 실패:', error)
+        this.error('예약 목록을 불러오는데 실패했습니다.')
+      }
+    },
+    
+    async loadAllReservations() {
+      try {
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
+          params: { 
+            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' 
+          }
+        })
+        const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
+        
+        // 전체 예약 목록을 저장 (예약 가능 시간 확인용)
+        this.allReservations = list.map(item => {
+          const startDateTime = new Date(item.startDateTime)
+          const endDateTime = new Date(item.endDateTime)
+          
+          return {
+            id: item.id,
+            reservationTypeId: item.reservationTypeId,
+            memberId: item.memberId,
+            companyId: item.companyId,
+            status: item.status,
+            startDateTime: item.startDateTime,
+            endDateTime: item.endDateTime,
+            date: startDateTime.toISOString().split('T')[0],
+            startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+          }
+        })
+      } catch (error) {
+        console.error('전체 예약 목록 로드 실패:', error)
+        this.error('예약 현황을 불러오는데 실패했습니다.')
+      }
+    },
+    
+    async submitReservationToServer(reservationData, reservationId = null) {
+      try {
+        const requestData = {
+          reservationTypeId: reservationData.resourceId,
+          memberId: 'c4998317-a9a3-4856-981f-366f07c29367',
+          companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
+          startDateTime: `${reservationData.date}T${reservationData.startTime}:00`,
+          endDateTime: `${reservationData.date}T${reservationData.endTime}:00`
+        }
+        
+        let response
+        if (reservationId) {
+          response = await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/${reservationId}`, requestData)
+        } else {
+          response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/register`, requestData)
+        }
+        return response.data
+      } catch (error) {
+        console.error(reservationId ? '예약 수정 실패:' : '예약 생성 실패:', error)
+        throw error
+      }
+    },
     getResourceType(type) {
       const typeMap = {
         'meeting': 'primary',
@@ -1058,9 +849,11 @@ export default {
       return typeMap[type] || 'info'
     },
     getResourceTypeName(type) {
+      // 기본 타입 매핑 (하위 호환성을 위해 유지)
       const typeMap = {
         'meeting': '회의실',
         'vehicle': '차량',
+        'equipment': '장비',
         'other': '기타'
       }
       return typeMap[type] || '기타'
@@ -1075,41 +868,23 @@ export default {
     },
     getReservationStatusType(status) {
       const statusMap = {
-        '이용 중': 'danger',
-        '취소됨': 'danger',
-        '완료됨': 'info'
+        'ACTIVE': 'success',      // 활성 상태
+        'CANCELLED': 'danger',    // 취소됨
+        'COMPLETED': 'info',      // 완료됨
+        'PENDING': 'warning',     // 대기 중
+        'CONFIRMED': 'primary'    // 확인됨
       }
       return statusMap[status] || 'info'
     },
-    openReservationModal() {
-      this.isEditingMode = false
-      this.reservationForm.resourceId = ''
-      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
-      this.reservationForm.startTime = ''
-      this.reservationForm.endTime = ''
-      this.reservationForm.purpose = ''
-      this.reservationForm.attendees = 1
-      this.reservationForm.notes = ''
-      this.reservationForm.sharedUsers = []
-      this.reservationForm.sharedUserInput = ''
-      this.showReservation = true
-      this.generateTimeSlots()
-      this.generateWeekDates()
-    },
-    reserveResource(resource) {
-      this.isEditingMode = false
-      this.reservationForm.resourceId = resource.id
-      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
-      this.reservationForm.startTime = ''
-      this.reservationForm.endTime = ''
-      this.reservationForm.purpose = ''
-      this.reservationForm.attendees = 1
-      this.reservationForm.notes = ''
-      this.reservationForm.sharedUsers = []
-      this.reservationForm.sharedUserInput = ''
-      this.showReservation = true
-      this.generateTimeSlots()
-      this.generateWeekDates()
+    getReservationStatusLabel(status) {
+      const statusMap = {
+        'ACTIVE': '이용 중',
+        'CANCELLED': '취소됨',
+        'COMPLETED': '완료됨',
+        'PENDING': '대기 중',
+        'CONFIRMED': '확인됨'
+      }
+      return statusMap[status] || status
     },
     // 캘린더 관련 메서드들
     generateTimeSlots() {
@@ -1184,6 +959,11 @@ export default {
     },
     // 새로운 시간 셀 선택 메서드들
     startTimeCellSelection(date, hour) {
+      // 자원이 선택되지 않은 상태에서는 예약된 시간대도 선택할 수 있음 (자원 선택을 위해)
+      if (this.reservationForm.resourceId && this.isTimeCellReserved(date, hour)) {
+        return
+      }
+      
       this.isSelecting = true
       this.selectionStartDate = date
       this.selectionStartHour = hour
@@ -1193,6 +973,13 @@ export default {
     },
     updateTimeCellSelection(date, hour) {
       if (this.isSelecting) {
+        // 자원이 선택된 상태에서만 예약된 시간대 선택을 제한
+        if (this.reservationForm.resourceId && this.isTimeCellReserved(date, hour)) {
+          this.endTimeCellSelection()
+          this.error('예약된 시간대는 선택할 수 없습니다.')
+          return
+        }
+        
         this.selectionEndDate = date
         this.selectionEndHour = hour
         this.updateReservationTimesFromCells()
@@ -1209,6 +996,23 @@ export default {
         if (this.selectionStartDate === this.selectionEndDate) {
           const startHour = Math.min(this.selectionStartHour, this.selectionEndHour)
           const endHour = Math.max(this.selectionStartHour, this.selectionEndHour)
+          
+          // 자원이 선택된 상태에서만 예약된 시간대 검사
+          if (this.reservationForm.resourceId) {
+            let hasReservedTime = false
+            for (let hour = startHour; hour <= endHour; hour++) {
+              if (this.isTimeCellReserved(this.selectionStartDate, hour)) {
+                hasReservedTime = true
+                break
+              }
+            }
+            
+            if (hasReservedTime) {
+              this.endTimeCellSelection()
+              this.error('선택 범위에 예약된 시간대가 포함되어 있습니다.')
+              return
+            }
+          }
           
           this.reservationForm.date = this.selectionStartDate
           this.reservationForm.startTime = `${startHour.toString().padStart(2, '0')}:00`
@@ -1228,12 +1032,36 @@ export default {
       return hour >= startHour && hour < endHour
     },
     isTimeCellReserved(date, hour) {
-      // 자원이 선택되지 않았으면 예약된 시간으로 표시하지 않음
-      if (!this.reservationForm.resourceId) return false
+      // 자원이 선택되지 않았으면 모든 자원의 예약을 확인
+      if (!this.reservationForm.resourceId) {
+        // 모든 자원의 예약 확인 (수정 중인 예약은 제외)
+        return this.allReservations.some(reservation => {
+          if (reservation.date !== date || reservation.status === 'CANCELLED') {
+            return false
+          }
+          
+          // 수정 모드에서는 현재 수정 중인 예약을 제외
+          if (this.isEditingMode && reservation.id === this.editingReservationId) {
+            return false
+          }
+          
+          const startHour = parseInt(reservation.startTime.split(':')[0])
+          const endHour = parseInt(reservation.endTime.split(':')[0])
+          
+          return hour >= startHour && hour < endHour
+        })
+      }
       
-      return this.reservations.some(reservation => {
-        if (reservation.resourceId !== this.reservationForm.resourceId || 
-            reservation.date !== date) {
+      // 특정 자원이 선택된 경우 해당 자원의 예약만 확인
+      return this.allReservations.some(reservation => {
+        if (reservation.reservationTypeId !== this.reservationForm.resourceId || 
+            reservation.date !== date ||
+            reservation.status === 'CANCELLED') {
+          return false
+        }
+        
+        // 수정 모드에서는 현재 수정 중인 예약을 제외
+        if (this.isEditingMode && reservation.id === this.editingReservationId) {
           return false
         }
         
@@ -1243,6 +1071,130 @@ export default {
         return hour >= startHour && hour < endHour
       })
     },
+    
+    getReservationInfoForTimeCell(date, hour) {
+      // 특정 시간대의 예약 정보 반환
+      if (!this.reservationForm.resourceId) {
+        // 자원이 선택되지 않았으면 모든 자원의 예약 확인 (수정 중인 예약은 제외)
+        return this.allReservations.filter(reservation => {
+          if (reservation.date !== date || reservation.status === 'CANCELLED') {
+            return false
+          }
+          
+          // 수정 모드에서는 현재 수정 중인 예약을 제외
+          if (this.isEditingMode && reservation.id === this.editingReservationId) {
+            return false
+          }
+          
+          const startHour = parseInt(reservation.startTime.split(':')[0])
+          const endHour = parseInt(reservation.endTime.split(':')[0])
+          
+          return hour >= startHour && hour < endHour
+        })
+      }
+      
+      // 특정 자원이 선택된 경우 (수정 중인 예약은 제외)
+      const reservation = this.allReservations.find(reservation => {
+        if (reservation.reservationTypeId !== this.reservationForm.resourceId || 
+            reservation.date !== date ||
+            reservation.status === 'CANCELLED') {
+          return false
+        }
+        
+        // 수정 모드에서는 현재 수정 중인 예약을 제외
+        if (this.isEditingMode && reservation.id === this.editingReservationId) {
+          return false
+        }
+        
+        const startHour = parseInt(reservation.startTime.split(':')[0])
+        const endHour = parseInt(reservation.endTime.split(':')[0])
+        
+        return hour >= startHour && hour < endHour
+      })
+      
+      return reservation
+    },
+    
+    getReservationTooltip(date, hour) {
+      // 예약된 시간대에 대한 툴팁 정보 반환
+      const reservationInfo = this.getReservationInfoForTimeCell(date, hour)
+      
+      if (!reservationInfo) return ''
+      
+      // 자원이 선택되지 않았을 때 (배열 반환)
+      if (Array.isArray(reservationInfo)) {
+        if (reservationInfo.length === 0) return ''
+        
+        // 여러 자원이 예약된 경우 그룹화하여 표시
+        const groupedReservations = {}
+        reservationInfo.forEach(reservation => {
+          const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+          const resourceName = resource ? resource.name : '알 수 없는 자원'
+          const resourceType = resource ? resource.type : 'other'
+          
+          if (!groupedReservations[resourceName]) {
+            groupedReservations[resourceName] = {
+              type: resourceType,
+              reservations: []
+            }
+          }
+          groupedReservations[resourceName].reservations.push(reservation)
+        })
+        
+        // 툴팁 내용 구성
+        const tooltipLines = []
+        Object.keys(groupedReservations).forEach(resourceName => {
+          const group = groupedReservations[resourceName]
+          const timeRanges = group.reservations.map(r => `${r.startTime}-${r.endTime}`).join(', ')
+          const statusLabel = this.getReservationStatusLabel(group.reservations[0].status)
+          tooltipLines.push(`${resourceName}: ${timeRanges} (${statusLabel})`)
+        })
+        
+        return tooltipLines.join('\n')
+      }
+      
+      // 특정 자원이 선택된 경우 (단일 객체 반환)
+      if (reservationInfo) {
+        const statusLabel = this.getReservationStatusLabel(reservationInfo.status)
+        return `예약됨 (${reservationInfo.startTime} - ${reservationInfo.endTime}, 상태: ${statusLabel})`
+      }
+      
+      return ''
+    },
+    
+    getTimeCellClass(date, hour) {
+      // 예약된 시간대에 자원별 클래스 추가
+      if (!this.isTimeCellReserved(date, hour)) return ''
+      
+      const reservationInfo = this.getReservationInfoForTimeCell(date, hour)
+      
+      // 자원이 선택되지 않았을 때 (배열 반환)
+      if (Array.isArray(reservationInfo) && reservationInfo.length > 0) {
+        // 여러 자원이 예약된 경우
+        if (reservationInfo.length > 1) {
+          return 'reserved-multiple'
+        }
+        
+        // 단일 자원 예약
+        const reservation = reservationInfo[0]
+        const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+        if (resource) {
+          return `reserved-${resource.type}`
+        }
+      }
+      
+      // 특정 자원이 선택된 경우 (단일 객체 반환)
+      if (reservationInfo && !Array.isArray(reservationInfo)) {
+        const resource = this.resources.find(r => r.id === reservationInfo.reservationTypeId)
+        if (resource) {
+          return `reserved-${resource.type}`
+        }
+      }
+      
+      return 'reserved'
+    },
+    
+    
     isTimeCellInSelection(date, hour) {
       if (!this.isSelecting || !this.selectionStartDate || this.selectionStartHour === null ||
           !this.selectionEndDate || this.selectionEndHour === null) {
@@ -1269,6 +1221,53 @@ export default {
       this.resetReservationForm()
       if (done) done()
     },
+    openReservationModal() {
+      this.isEditingMode = false
+      this.reservationForm.resourceId = '' // 자원을 선택하지 않은 상태로 시작
+      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
+      this.reservationForm.startTime = ''
+      this.reservationForm.endTime = ''
+      this.reservationForm.purpose = ''
+      this.reservationForm.attendees = 1
+      this.reservationForm.notes = ''
+      this.reservationForm.sharedUsers = []
+      this.reservationForm.sharedUserInput = ''
+      this.reservationForm.isRecurring = false
+      this.reservationForm.recurrenceType = 'weekly'
+      this.reservationForm.recurrenceInterval = 1
+      this.reservationForm.recurrenceEndDate = ''
+      this.reservationForm.recurrenceDays = []
+      this.showReservation = true
+      this.generateTimeSlots()
+      this.generateWeekDates()
+      
+      // 자원이 선택되지 않은 상태에서도 캘린더를 표시하기 위해 선택 상태 초기화
+      this.isSelecting = false
+      this.selectionStartDate = null
+      this.selectionStartHour = null
+      this.selectionEndDate = null
+      this.selectionEndHour = null
+    },
+    reserveResource(resource) {
+      this.isEditingMode = false
+      this.reservationForm.resourceId = resource.id
+      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
+      this.reservationForm.startTime = ''
+      this.reservationForm.endTime = ''
+      this.reservationForm.purpose = ''
+      this.reservationForm.attendees = 1
+      this.reservationForm.notes = ''
+      this.reservationForm.sharedUsers = []
+      this.reservationForm.sharedUserInput = ''
+      this.reservationForm.isRecurring = false
+      this.reservationForm.recurrenceType = 'weekly'
+      this.reservationForm.recurrenceInterval = 1
+      this.reservationForm.recurrenceEndDate = ''
+      this.reservationForm.recurrenceDays = []
+      this.showReservation = true
+      this.generateTimeSlots()
+      this.generateWeekDates()
+    },
     resetReservationForm() {
       this.reservationForm = {
         resourceId: '',
@@ -1278,7 +1277,13 @@ export default {
         purpose: '',
         attendees: 1,
         notes: '',
-        sharedUsers: []
+        sharedUsers: [],
+        sharedUserInput: '',
+        isRecurring: false,
+        recurrenceType: 'weekly',
+        recurrenceInterval: 1,
+        recurrenceEndDate: '',
+        recurrenceDays: []
       }
       this.isSelecting = false
       this.selectionStartDate = null
@@ -1289,52 +1294,136 @@ export default {
     viewResourceDetails(resource) {
       this.info(`${resource.name} 상세 정보`)
     },
-    submitReservation() {
-      // 중복 예약 방지 검증
-      if (this.checkDuplicateReservation()) {
-        this.error('해당 시간대에 이미 예약이 있습니다.')
+    async submitReservation() {
+      // 자원이 선택되지 않은 경우 에러 메시지
+      if (!this.reservationForm.resourceId) {
+        this.error('예약할 자원을 선택해주세요.')
         return
       }
-
+      
       // 예약 시간 검증
       if (!this.validateReservationTime()) {
         this.error('예약 시간을 확인해주세요.')
         return
       }
 
-      // 승인이 필요한 자원인지 확인
-      const resource = this.resources.find(r => r.id == this.reservationForm.resourceId)
-      if (resource && resource.requiresApproval) {
-        this.info('승인이 필요한 자원입니다. 결재함으로 이동합니다.')
-        this.$router.push('/approval')
-      } else {
-        this.success('예약이 완료되었습니다.')
+      // 반복 예약 검증
+      if (this.reservationForm.isRecurring) {
+        if (this.reservationForm.recurrenceType === 'weekly' && this.reservationForm.recurrenceDays.length === 0) {
+          this.error('매주 반복시 반복 요일을 선택해주세요.')
+          return
+        }
+        if (!this.reservationForm.recurrenceEndDate) {
+          this.error('반복 종료일을 설정해주세요.')
+          return
+        }
       }
+
+      // 반복 예약 생성
+      const reservations = this.generateRecurringReservations()
+      
+      // 중복 예약 방지 검증 (각 예약에 대해)
+      for (const reservation of reservations) {
+        if (this.checkDuplicateReservationForDate(reservation)) {
+          this.error(`${reservation.date} ${reservation.startTime} 시간대에 이미 예약이 있습니다.`)
+          return
+        }
+      }
+
+      try {
+        // 백엔드로 예약 데이터 전송
+        for (const reservation of reservations) {
+          await this.submitReservationToServer(reservation, this.isEditingMode ? this.editingReservationId : null)
+        }
+        
+        // 승인이 필요한 자원인지 확인
+        const resource = this.resources.find(r => r.id == this.reservationForm.resourceId)
+        if (resource && resource.requiresApproval) {
+          this.info('승인이 필요한 자원입니다. 결재함으로 이동합니다.')
+          this.$router.push('/approval')
+        } else {
+          if (this.isEditingMode) {
+            this.success('예약이 수정되었습니다.')
+          } else if (this.reservationForm.isRecurring) {
+            this.success(`${reservations.length}개의 정기 예약이 완료되었습니다.`)
+          } else {
+            this.success('예약이 완료되었습니다.')
+          }
+        }
+        
+        // 예약 목록 새로고침
+        await this.loadMyReservations()
+        await this.loadAllReservations()
+        
+        // 모달 닫기 및 상태 초기화
+        this.showReservation = false
+        this.isEditingMode = false
+        this.editingReservationId = null
+        
+      } catch (error) {
+        if (error.response && error.response.status === 409) {
+          this.error('해당 시간대에 이미 예약이 있습니다.')
+        } else {
+          this.error('예약 생성 중 오류가 발생했습니다.')
+        }
+        return
+      }
+      
       this.showReservation = false
-      this.reservationForm = {
-        resourceId: '',
-        date: '',
-        startTime: '',
-        endTime: '',
-        purpose: '',
-        attendees: '',
-        notes: ''
-      }
+      this.resetReservationForm()
     },
     checkDuplicateReservation() {
-      const { resourceId, date, startTime, endTime } = this.reservationForm
+      return this.checkDuplicateReservationForDate(this.reservationForm)
+    },
+    checkDuplicateReservationForDate(reservation) {
+      const { resourceId, date, startTime, endTime } = reservation
       
-      // 실제 구현에서는 서버에서 검증해야 하지만, 
-      // 여기서는 간단한 클라이언트 검증만 수행
-      const existingReservations = this.myReservations.filter(reservation => 
-        reservation.resourceName === this.getResourceName(resourceId) &&
-        reservation.date === date &&
-        ((reservation.startTime <= startTime && reservation.endTime > startTime) ||
-         (reservation.startTime < endTime && reservation.endTime >= endTime) ||
-         (reservation.startTime >= startTime && reservation.endTime <= endTime))
+      // 자원이 선택되지 않았으면 모든 자원의 예약과 충돌 검사
+      if (!resourceId) {
+        const existingReservations = this.allReservations.filter(existingReservation => 
+          existingReservation.date === date &&
+          existingReservation.status !== 'CANCELLED' && // 취소된 예약은 제외
+          // 수정 모드에서는 현재 수정 중인 예약을 제외
+          !(this.isEditingMode && existingReservation.id === this.editingReservationId) &&
+          ((existingReservation.startTime <= startTime && existingReservation.endTime > startTime) ||
+           (existingReservation.startTime < endTime && existingReservation.endTime >= endTime) ||
+           (existingReservation.startTime >= startTime && existingReservation.endTime <= endTime))
+        )
+        return existingReservations.length > 0
+      }
+      
+      // 특정 자원이 선택된 경우 해당 자원의 예약만 확인
+      const existingReservations = this.allReservations.filter(existingReservation => 
+        existingReservation.reservationTypeId === resourceId &&
+        existingReservation.date === date &&
+        existingReservation.status !== 'CANCELLED' && // 취소된 예약은 제외
+        // 수정 모드에서는 현재 수정 중인 예약을 제외
+        !(this.isEditingMode && existingReservation.id === this.editingReservationId) &&
+        ((existingReservation.startTime <= startTime && existingReservation.endTime > startTime) ||
+         (existingReservation.startTime < endTime && existingReservation.endTime >= endTime) ||
+         (existingReservation.startTime >= startTime && existingReservation.endTime <= endTime))
       )
       
       return existingReservations.length > 0
+    },
+    
+    getReservationsForResourceAndDate(resourceId, date) {
+      // 특정 자원의 특정 날짜에 대한 예약 목록 반환
+      return this.allReservations.filter(reservation => 
+        reservation.reservationTypeId === resourceId &&
+        reservation.date === date &&
+        reservation.status !== 'CANCELLED'
+      )
+    },
+    
+    isTimeSlotReserved(resourceId, date, timeSlot) {
+      // 특정 시간대가 예약되어 있는지 확인
+      const reservations = this.getReservationsForResourceAndDate(resourceId, date)
+      return reservations.some(reservation => {
+        const startTime = reservation.startTime
+        const endTime = reservation.endTime
+        return timeSlot >= startTime && timeSlot < endTime
+      })
     },
     validateReservationTime() {
       const { startTime, endTime, resourceId } = this.reservationForm
@@ -1360,6 +1449,12 @@ export default {
         }
       }
 
+      // 예약된 시간대와의 충돌 검사
+      if (this.checkDuplicateReservationForDate(this.reservationForm)) {
+        this.error('선택한 시간대에 이미 예약이 있습니다.')
+        return false
+      }
+
       return true
     },
     getResourceName(resourceId) {
@@ -1369,16 +1464,22 @@ export default {
     editReservation(reservation) {
       // 예약 수정 모달 표시
       this.isEditingMode = true
+      this.editingReservationId = reservation.id // 수정할 예약 ID 저장
       this.reservationForm = {
         resourceId: this.getResourceIdByName(reservation.resourceName),
         date: reservation.date,
         startTime: reservation.startTime,
         endTime: reservation.endTime,
-        purpose: reservation.purpose,
+        purpose: reservation.purpose === '사용 목적 없음' ? '' : reservation.purpose,
         attendees: reservation.attendees,
         notes: '',
         sharedUsers: [],
-        sharedUserInput: ''
+        sharedUserInput: '',
+        isRecurring: false,
+        recurrenceType: 'weekly',
+        recurrenceInterval: 1,
+        recurrenceEndDate: '',
+        recurrenceDays: []
       }
       this.showReservation = true
       this.generateTimeSlots()
@@ -1561,6 +1662,91 @@ export default {
     handleBackspace() {
       if (this.reservationForm.sharedUserInput === '' && (this.reservationForm.sharedUsers || []).length > 0) {
         this.removeSharedUser((this.reservationForm.sharedUsers || []).length - 1)
+      }
+    },
+    
+    // 반복 설정 관련 메서드들
+    onRecurrenceToggle() {
+      if (this.reservationForm.isRecurring) {
+        // 반복 설정이 활성화될 때 기본값 설정
+        this.reservationForm.recurrenceType = 'weekly'
+        this.reservationForm.recurrenceInterval = 1
+        this.reservationForm.recurrenceDays = []
+        this.reservationForm.recurrenceEndDate = ''
+      }
+    },
+    getRecurrenceIntervalText() {
+      const typeMap = {
+        'daily': '일마다',
+        'weekly': '주마다',
+        'monthly': '개월마다'
+      }
+      return typeMap[this.reservationForm.recurrenceType] || ''
+    },
+    generateRecurringReservations() {
+      if (!this.reservationForm.isRecurring) {
+        return [this.createReservationData()]
+      }
+      
+      const reservations = []
+      const startDate = new Date(this.reservationForm.date)
+      const endDate = this.reservationForm.recurrenceEndDate ? new Date(this.reservationForm.recurrenceEndDate) : new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000) // 기본 3개월
+      
+      let currentDate = new Date(startDate)
+      
+      while (currentDate <= endDate) {
+        if (this.shouldCreateReservationOnDate(currentDate)) {
+          reservations.push(this.createReservationData(currentDate))
+        }
+        currentDate = this.getNextRecurrenceDate(currentDate)
+      }
+      
+      return reservations
+    },
+    shouldCreateReservationOnDate(date) {
+      if (this.reservationForm.recurrenceType === 'daily') {
+        return true
+      } else if (this.reservationForm.recurrenceType === 'weekly') {
+        if (this.reservationForm.recurrenceDays.length === 0) {
+          // 요일이 선택되지 않았으면 시작일의 요일로 설정
+          const startDay = new Date(this.reservationForm.date).getDay()
+          return date.getDay() === startDay
+        }
+        return this.reservationForm.recurrenceDays.includes(date.getDay().toString())
+      } else if (this.reservationForm.recurrenceType === 'monthly') {
+        return date.getDate() === new Date(this.reservationForm.date).getDate()
+      }
+      return false
+    },
+    getNextRecurrenceDate(currentDate) {
+      const nextDate = new Date(currentDate)
+      
+      if (this.reservationForm.recurrenceType === 'daily') {
+        nextDate.setDate(currentDate.getDate() + this.reservationForm.recurrenceInterval)
+      } else if (this.reservationForm.recurrenceType === 'weekly') {
+        nextDate.setDate(currentDate.getDate() + (7 * this.reservationForm.recurrenceInterval))
+      } else if (this.reservationForm.recurrenceType === 'monthly') {
+        nextDate.setMonth(currentDate.getMonth() + this.reservationForm.recurrenceInterval)
+      }
+      
+      return nextDate
+    },
+    createReservationData(date = null) {
+      const reservationDate = date ? this.formatDate(date) : this.reservationForm.date
+      return {
+        resourceId: this.reservationForm.resourceId,
+        date: reservationDate,
+        startTime: this.reservationForm.startTime,
+        endTime: this.reservationForm.endTime,
+        purpose: this.reservationForm.purpose,
+        attendees: this.reservationForm.attendees,
+        notes: this.reservationForm.notes,
+        sharedUsers: [...this.reservationForm.sharedUsers],
+        isRecurring: this.reservationForm.isRecurring,
+        recurrenceType: this.reservationForm.recurrenceType,
+        recurrenceInterval: this.reservationForm.recurrenceInterval,
+        recurrenceEndDate: this.reservationForm.recurrenceEndDate,
+        recurrenceDays: [...this.reservationForm.recurrenceDays]
       }
     },
   }
@@ -1830,7 +2016,7 @@ export default {
 .reservation-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 8px;
 }
 
@@ -1877,6 +2063,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
+  margin-bottom: 5px;
+}
+
+.reservation-details > div:last-child {
+  margin-bottom: 0;
 }
 
 .reservation-actions {
@@ -2098,13 +2289,74 @@ export default {
   background: #4f46e5;
 }
 
+
+/* 자원별 호버 색상 */
+.time-cell.reserved-meeting:hover {
+  background: linear-gradient(135deg, #4fc3f7 0%, #81d4fa 100%);
+  box-shadow: 0 4px 8px rgba(79, 195, 247, 0.4);
+}
+
+.time-cell.reserved-vehicle:hover {
+  background: linear-gradient(135deg, #66bb6a 0%, #a5d6a7 100%);
+  box-shadow: 0 4px 8px rgba(102, 187, 106, 0.4);
+}
+
+.time-cell.reserved-equipment:hover {
+  background: linear-gradient(135deg, #ffb74d 0%, #ffcc80 100%);
+  box-shadow: 0 4px 8px rgba(255, 183, 77, 0.4);
+}
+
+.time-cell.reserved-other:hover {
+  background: linear-gradient(135deg, #ba68c8 0%, #ce93d8 100%);
+  box-shadow: 0 4px 8px rgba(186, 104, 200, 0.4);
+}
+
+.time-cell.reserved-multiple:hover {
+  background: linear-gradient(45deg, #ff6b6b 25%, #4fc3f7 25%, #4fc3f7 50%, #66bb6a 50%, #66bb6a 75%, #ffb74d 75%);
+  background-size: 8px 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 기본 예약된 시간대 스타일 - 모든 예약된 시간은 #FFEBEE로 통일 */
 .time-cell.reserved {
-  background: #ffebee;
-  cursor: not-allowed;
+  background: #ffebee !important;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .time-cell.reserved:hover {
-  background: #ffebee;
+  background: #ffcdd2 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 자원별 예약된 시간대도 모두 #FFEBEE로 통일 */
+.time-cell.reserved-meeting {
+  background: #ffebee !important;
+}
+
+.time-cell.reserved-vehicle {
+  background: #ffebee !important;
+}
+
+.time-cell.reserved-equipment {
+  background: #ffebee !important;
+}
+
+.time-cell.reserved-other {
+  background: #ffebee !important;
+}
+
+.time-cell.reserved-multiple {
+  background: #ffebee !important;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.1) 2px,
+    rgba(0,0,0,0.1) 4px
+  ) !important;
 }
 
 .time-cell.selecting {
@@ -2163,6 +2415,8 @@ export default {
 .legend-color.selected {
   background: #4f46e5;
 }
+
+
 
 .form-row {
   display: flex;
@@ -2224,7 +2478,66 @@ export default {
   font-size: 14px;
 }
 
+/* 반복 설정 스타일 */
+.recurrence-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+}
 
+.recurrence-container {
+  width: 100%;
+}
+
+.recurrence-options {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.recurrence-type-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recurrence-days {
+  margin-bottom: 16px;
+}
+
+.recurrence-days .recurrence-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.recurrence-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recurrence-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.recurrence-options :deep(.el-checkbox-group) {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.recurrence-options :deep(.el-checkbox) {
+  margin-right: 0;
+}
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
@@ -2248,6 +2561,18 @@ export default {
   
   .time-label {
     font-size: 11px;
+  }
+  
+  .recurrence-type-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .recurrence-end {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }
 
