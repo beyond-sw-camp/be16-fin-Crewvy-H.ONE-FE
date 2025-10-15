@@ -24,6 +24,8 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'AddOrganization',
   data() {
@@ -35,10 +37,26 @@ export default {
     };
   },
   methods: {
-    handleSubmit() {
-      console.log('New Organization:', this.organization);
-      // Add logic to save the new organization
-      this.$router.push('/organization');
+    async handleSubmit() {
+      if (!this.organization.name) {
+        this.$message.error('조직명을 입력해주세요.');
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('accessToken');
+        const headers = { 'Authorization': token ? `Bearer ${token}` : null };
+        
+        await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/create`, 
+          { parentId: this.organization.parentId, name: this.organization.name },
+          { headers }
+        );
+        this.$message.success('새로운 조직이 추가되었습니다.');
+        this.$router.push('/organization');
+      } catch (error) {
+        this.$message.error('작업에 실패했습니다.');
+        console.error(error);
+      }
     },
     handleCancel() {
       this.$router.push('/organization');

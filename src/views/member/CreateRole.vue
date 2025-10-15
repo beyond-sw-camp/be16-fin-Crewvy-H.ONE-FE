@@ -10,19 +10,38 @@
           <el-input v-model="roleName" placeholder="새 역할의 이름을 입력하세요"></el-input>
         </el-form-item>
 
-        <el-form-item label="권한 설정">
+        <el-form-item label="설명">
+          <el-input v-model="description" type="textarea" placeholder="역할에 대한 설명을 입력하세요"></el-input>
+        </el-form-item>
+
+        <div class="permission-section-header">
+          <span class="section-title">권한 설정</span>
+          <div class="bulk-actions">
+            <span style="font-size: 14px; font-weight: 600; color: #606266; margin-right: 10px;">일괄 적용:</span>
+            <el-button size="small" @click="setAllPermissions('없음')">없음</el-button>
+            <el-button size="small" @click="setAllPermissions('본인')">본인</el-button>
+            <el-button size="small" @click="setAllPermissions('부서')">부서</el-button>
+            <el-button size="small" @click="setAllPermissions('전사')">전사</el-button>
+          </div>
+        </div>
+        <div class="table-wrapper">
           <el-table :data="permissions" style="width: 100%">
-            <el-table-column prop="name" label="권한명"></el-table-column>
-            <el-table-column prop="description" label="설명"></el-table-column>
+            <el-table-column prop="resource" label="리소스"></el-table-column>
+            <el-table-column prop="action" label="액션"></el-table-column>
             <el-table-column label="범위" width="350">
               <template #default="scope">
                 <el-radio-group v-model="scope.row.selectedRange">
-                  <el-radio v-for="option in rangeOptions" :key="option" :label="option">{{ option }}</el-radio>
+                  <el-radio
+                    v-for="option in rangeOptions"
+                    :key="option"
+                    :label="option"
+                    :disabled="!scope.row.availableRanges.includes(option)"
+                  >{{ option }}</el-radio>
                 </el-radio-group>
               </template>
             </el-table-column>
           </el-table>
-        </el-form-item>
+        </div>
       </el-form>
 
       <div class="form-actions">
@@ -34,39 +53,113 @@
 </template>
 
 <script>
+import roleService from '@/api/roleService';
+
 export default {
   name: 'CreateRole',
   data() {
     return {
       roleName: '',
-      permissions: [
-        { id: 1, name: '멤버 조회', description: '멤버 목록을 조회합니다.', selectedRange: '없음' },
-        { id: 2, name: '멤버 상세정보', description: '멤버의 상세 정보를 봅니다.', selectedRange: '없음' },
-        { id: 3, name: '멤버 추가', description: '새로운 멤버를 추가합니다.', selectedRange: '없음' },
-        { id: 4, name: '멤버 수정', description: '멤버 정보를 수정합니다.', selectedRange: '없음' },
-        { id: 5, name: '급여 정보 조회', description: '급여 정보를 조회합니다.', selectedRange: '없음' },
-        { id: 6, name: '인사 평가 수행', description: '인사 평가를 수행합니다.', selectedRange: '없음' },
-      ],
+      description: '',
+      permissions: [],
       rangeOptions: ['없음', '본인', '부서', '전사'],
     };
   },
   methods: {
-    saveRole() {
+    setAllPermissions(range) {
+      this.permissions.forEach(p => {
+        p.selectedRange = range;
+      });
+      this.$message.success(`모든 권한 범위를 '${range}'(으)로 설정했습니다.`);
+    },
+    async fetchPermissions() {
+      try {
+        const response = await roleService.fetchAllPermissions();
+        const permissionData = response.data.data;
+
+        console.log('Fetched permissionData:', permissionData); // Debug log
+        if (!Array.isArray(permissionData) || permissionData.length === 0) {
+          console.warn('permissionData is empty or not an array:', permissionData);
+          this.$message.warning('권한 데이터가 비어있거나 올바른 형식이 아닙니다.');
+          this.permissions = []; // Ensure permissions array is empty
+          return; // Stop further processing
+        }
+
+        const rangeMapping = {
+          NONE: '없음',
+          INDIVIDUAL: '본인',
+          DEPARTMENT: '부서',
+          COMPANY: '전사',
+        };
+
+        this.permissions = permissionData.map(p => {
+          const availableRanges = Object.keys(p.rangeToIdMap).map(key => rangeMapping[key]);
+          return {
+            resource: p.resource,
+            action: p.action,
+            selectedRange: rangeMapping[p.permissionRange],
+            rangeToIdMap: p.rangeToIdMap,
+            availableRanges: availableRanges,
+          };
+        });
+
+        this.permissions.sort((a, b) => a.resource.localeCompare(b.resource));
+        console.log('Final this.permissions array:', this.permissions); // Add this log
+
+      } catch (error) {
+        console.error('Failed to fetch permissions:', error);
+        this.$message.error('권한 목록을 불러오는데 실패했습니다.');
+      }
+    },
+    async saveRole() {
+      const rangeReverseMapping = {
+        '본인': 'INDIVIDUAL',
+        '부서': 'DEPARTMENT',
+        '전사': 'COMPANY',
+        '없음': 'NONE',
+      };
+
       const selectedPermissions = this.permissions
         .filter(p => p.selectedRange !== '없음')
-        .map(p => ({ permissionId: p.id, range: p.selectedRange }));
+        .map(p => {
+          const rangeEnum = rangeReverseMapping[p.selectedRange];
+          const permissionId = p.rangeToIdMap[rangeEnum];
+          if (permissionId !== null && permissionId !== undefined) { // More explicit check
+            return {
+              permissionId: permissionId,
+              selectedRange: rangeEnum,
+            };
+          } else {
+            return null; // Return null for permissions without a valid ID for the selected range
+          }
+        })
+        .filter(p => p !== null); // Filter out null entries
 
-      console.log('Saving Role:', {
-        roleName: this.roleName,
+      console.log('Final selectedPermissions before sending:', selectedPermissions); // Add this log
+
+      const roleData = {
+        name: this.roleName,
+        description: this.description,
         permissions: selectedPermissions,
-      });
+      };
 
-      this.$message.success('역할이 성공적으로 생성되었습니다.');
-      this.$router.push('/'); // Redirect to a relevant page after saving
+      console.log('Sending roleData:', roleData); // Debug log
+
+      try {
+        await roleService.createRole(roleData);
+        this.$message.success('역할이 성공적으로 생성되었습니다.');
+        this.$router.push('/employee/role');
+      } catch (error) {
+        console.error('Failed to create role:', error);
+        this.$message.error('역할 생성에 실패했습니다.');
+      }
     },
     handleCancel() {
-      this.$router.back();
+      this.$router.push('/employee/role');
     }
+  },
+  created() {
+    this.fetchPermissions();
   }
 };
 </script>
@@ -90,6 +183,37 @@ export default {
   padding: 24px;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.form-container :deep(.el-form-item__label) {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 700;
+}
+
+.permission-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 700;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-wrapper {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin-bottom: 24px;
 }
 
 .form-actions {

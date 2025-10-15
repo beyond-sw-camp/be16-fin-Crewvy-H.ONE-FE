@@ -7,7 +7,7 @@
         </router-link>
       </div>
 
-      <el-form ref="form" :model="form" :rules="rules" @keyup.enter="handleLogin">
+      <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="handleLogin">
         <el-form-item prop="email">
           <el-input v-model="form.email" placeholder="이메일 주소">
             <template #prepend>ID</template>
@@ -23,7 +23,7 @@
           <el-checkbox v-model="rememberMe">로그인 상태 유지</el-checkbox>
         </el-form-item>
 
-        <el-button type="primary" @click="handleLogin" class="login-button">
+        <el-button type="primary" @click="handleLogin" class="login-button" :loading="loading">
           로그인
         </el-button>
       </el-form>
@@ -39,38 +39,70 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'LoginPage',
-  data() {
-    return {
-      form: {
-        email: '',
-        password: ''
-      },
-      rules: {
-        email: [{ required: true, message: ' ', trigger: 'blur' }],
-        password: [{ required: true, message: ' ', trigger: 'blur' }]
-      },
-      rememberMe: false
-    };
-  },
-  methods: {
-    handleLogin() {
-      this.$refs.form.validate((valid) => {
-        if (valid) {
-          if (this.form.email === 'admin@h.one' && this.form.password === 'password') {
-            this.$message.success('로그인 성공!');
-            this.$router.push('/'); // Redirect to dashboard
-          } else {
-            this.$message.error('아이디 또는 비밀번호가 올바르지 않습니다.');
-          }
+<script setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
+import axios from 'axios';
+import { useSnackbar } from '@/composables/useSnackbar';
+
+const router = useRouter();
+const store = useStore();
+const { success, error } = useSnackbar();
+
+const formRef = ref(null);
+const form = ref({
+  email: '',
+  password: ''
+});
+const rules = ref({
+  email: [{ required: true, message: '이메일을 입력해주세요.', trigger: 'blur' }],
+  password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }]
+});
+const rememberMe = ref(false);
+const loading = ref(false);
+
+const handleLogin = async () => {
+  if (!formRef.value) return;
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      loading.value = true;
+      try {
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/login`, {
+          email: form.value.email,
+          password: form.value.password
+        });
+
+        if (response.data && response.data.success) {
+          const { accessToken, refreshToken, userName, memberId, memberPositionId } = response.data.data;
+          
+          // 로컬 스토리지에 사용자 정보 저장
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          localStorage.setItem("userName", userName);
+          localStorage.setItem("memberId", memberId);
+          localStorage.setItem("memberPositionId", memberPositionId);
+
+          // Vuex 스토어에 사용자 정보 저장
+          const user = { userName, memberId, memberPositionId };
+          store.dispatch('setUser', user);
+
+          success('로그인 성공!');
+          router.push('/'); // 대시보드로 리디렉션
         } else {
-          return false;
+          error(response.data.message || '로그인에 실패했습니다.');
         }
-      });
+      } catch (err) {
+        console.error(err);
+        const errorMessage = err.response?.data?.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
+        error(errorMessage);
+      } finally {
+        loading.value = false;
+      }
+    } else {
+      return false;
     }
-  }
+  });
 };
 </script>
 

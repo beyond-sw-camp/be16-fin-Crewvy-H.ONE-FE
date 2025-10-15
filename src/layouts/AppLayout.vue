@@ -3,15 +3,17 @@
     <!-- 사이드바 -->
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <div class="logo" @click="sidebarCollapsed ? toggleSidebar() : null" :class="{ 'clickable': sidebarCollapsed }">
-          <div class="logo-icon">
-            <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
+        <router-link to="/" class="logo-link">
+          <div class="logo">
+            <div class="logo-icon">
+              <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
+            </div>
+            <div v-if="!sidebarCollapsed" class="logo-text-container">
+              <div class="logo-text">H.ONE</div>
+              <div class="logo-subtitle">HR MANAGEMENT</div>
+            </div>
           </div>
-          <div v-if="!sidebarCollapsed" class="logo-text-container">
-            <div class="logo-text">H.ONE</div>
-            <div class="logo-subtitle">HR MANAGEMENT</div>
-          </div>
-        </div>
+        </router-link>
         <el-button v-if="!sidebarCollapsed" type="text" @click="toggleSidebar" class="collapse-btn">
           <el-icon>
             <Fold />
@@ -49,20 +51,20 @@
           <el-menu-item index="/organization">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/titles">
+          <el-menu-item index="/employee/title">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grades">
+          <el-menu-item index="/employee/grade">
             <span>직급 관리</span>
           </el-menu-item>
-          <el-sub-menu index="roles">
+          <el-sub-menu index="role">
             <template #title>
               <span>역할 관리</span>
             </template>
-            <el-menu-item index="/employee/roles">
+            <el-menu-item index="/employee/role">
               <span>역할 목록</span>
             </el-menu-item>
-            <el-menu-item index="/employee/roles/create">
+            <el-menu-item index="/employee/role/create">
               <span>역할 생성</span>
             </el-menu-item>
           </el-sub-menu>
@@ -89,6 +91,15 @@
           </el-menu-item>
           <el-menu-item index="/admin/leave-management">
             <span>관리자 연차 현황</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/policy-management">
+            <span>근태 정책 관리</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/work-location-management">
+            <span>근무지 관리</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/audit-log">
+            <span>감사 로그</span>
           </el-menu-item>
         </el-sub-menu>
 
@@ -170,7 +181,9 @@
 
         <el-sub-menu index="resource">
           <template #title>
-            <el-icon><Calendar /></el-icon>
+            <el-icon>
+              <Calendar />
+            </el-icon>
             <span>예약</span>
           </template>
           <el-menu-item index="/resource/reservation">
@@ -253,10 +266,10 @@
           </el-popover>
 
           <!-- 사용자 메뉴 -->
-          <el-dropdown @command="handleUserCommand">
+          <el-dropdown v-if="user" @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="user.avatar" :size="32" />
-              <span class="user-name">{{ user.name }}</span>
+              <span class="user-name">{{ userName }}</span>
               <el-icon>
                 <ArrowDown />
               </el-icon>
@@ -422,10 +435,10 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
-
+import { mapState, mapMutations, mapGetters } from 'vuex'
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
+import organizationService from '@/api/organizationService';
 
 export default {
   name: 'MainLayout',
@@ -447,6 +460,11 @@ export default {
       sessionExpiryTime: null,
       sessionTimer: null,
       currentTime: new Date(),
+      sessionWarningShown: false, // 세션 경고 표시 여부 추적
+      expandedDepartments: {
+        management: false,
+        sales: true
+      },
       orgTreeData: [
         {
           id: 1,
@@ -669,6 +687,7 @@ export default {
   },
   computed: {
     ...mapState(['user', 'notifications']),
+    ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
       if (path.startsWith('/payroll')) {
@@ -747,11 +766,26 @@ export default {
   },
   methods: {
     ...mapMutations(['removeNotification']),
+    async fetchOrganizationTree() {
+      try {
+        if (!this.memberId) {
+          console.error('User UUID not found in store.');
+          return;
+        }
+        const response = await organizationService.getOrganizationTreeWithMembers(this.memberId);
+        this.orgTreeData = response.data.data;
+        this.allEmployees = this.flattenOrgTree(this.orgTreeData);
+        this.searchedEmployees = this.allEmployees;
+      } catch (error) {
+        console.error('Failed to fetch organization tree:', error);
+        this.$message.error('조직도 데이터를 불러오는데 실패했습니다.');
+      }
+    },
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
     getPageTitle() {
-      const titles = {
+      const title = {
         '/': '대시보드',
         '/organization': '조직/사원',
         '/employee': '직원 관리',
@@ -759,7 +793,13 @@ export default {
         '/employee/grades': '직급 관리',
         '/employee/roles': '역할 목록',
         '/employee/roles/create': '역할 생성',
-        '/attendance': '근태 관리',
+        '/attendance': '내 근태 현황',
+        '/leave-request': '휴가/출장 신청',
+        '/shared-calendar': '공유 캘린더',
+        '/admin/attendance': '관리자 근태 현황',
+        '/admin/leave-management': '관리자 연차 현황',
+        '/performance/team-goal': '팀 목표 관리',
+        '/performance/my-goal': '내 목표 관리',
         '/payroll': '급여 관리',
         '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
@@ -776,7 +816,7 @@ export default {
         '/board': '게시판',
         '/resource': '예약'
       }
-      return titles[this.$route.path] || 'H.ONE'
+      return title[this.$route.path] || 'H.ONE'
     },
     handleUserCommand(command) {
       switch (command) {
@@ -784,14 +824,15 @@ export default {
           this.$router.push('/my-info');
           break;
         case 'logout':
+          this.$store.dispatch('logout');
           this.$router.push('/landing');
           break
       }
     },
     showOrganizationModal() {
       this.showOrgModal = true
-      this.activeOrgTab = 'org'
-      this.orgSearch = ''
+      this.activeOrgTab = 'org',
+        this.orgSearch = ''
       this.employeeSearch = ''
       this.searchedEmployees = this.allEmployees
     },
@@ -997,9 +1038,10 @@ export default {
       })
     }
   },
-  created() {
-    this.allEmployees = this.flattenOrgTree(this.orgTreeData);
-    this.searchedEmployees = this.allEmployees;
+  async created() {
+    await this.fetchOrganizationTree();
+    this.initSessionTimer();
+    this.updatePayrollMenuState();
   },
   mounted() {
     this.initSessionTimer()
@@ -1015,6 +1057,14 @@ export default {
 
 <style scoped>
 /* ... (existing styles) */
+.logo-link {
+  text-decoration: none;
+}
+
+.logo {
+  cursor: pointer;
+}
+
 .main-layout {
   display: flex;
   height: 100vh;
