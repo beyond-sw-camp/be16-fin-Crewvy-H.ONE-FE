@@ -123,15 +123,12 @@
             <el-icon>
               <Money />
             </el-icon>
-            <span>급여</span>
+            <span>급여 관리</span>
           </template>
           <el-sub-menu index="payroll-management">
             <template #title>
               <span>급여 관리</span>
             </template>
-            <el-menu-item index="/payroll/item-management">
-              <span>급여 기초 정보</span>
-            </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
               <span>급여 기본 정보</span>
             </el-menu-item>
@@ -205,7 +202,7 @@
           <el-icon>
             <OfficeBuilding />
           </el-icon>
-          <span v-if="!sidebarCollapsed">직원찾기</span>
+          <span v-if="!sidebarCollapsed">조직/사원</span>
         </el-button>
       </div>
     </div>
@@ -344,17 +341,9 @@
       <div class="calendar-modal">
         <div class="calendar-header">
           <div class="calendar-controls">
-            <el-button @click="prevMonth" circle>
-              <el-icon>
-                <ArrowLeft />
-              </el-icon>
-            </el-button>
+            <el-button @click="prevMonth" :icon="ArrowLeft" circle />
             <h3>{{ currentMonthYear }}</h3>
-            <el-button @click="nextMonth" circle>
-              <el-icon>
-                <ArrowRight />
-              </el-icon>
-            </el-button>
+            <el-button @click="nextMonth" :icon="ArrowRight" circle />
           </div>
           <div class="calendar-actions">
             <el-button type="primary" @click="addEvent">
@@ -466,7 +455,7 @@ export default {
       activeOrgTab: 'org',
       orgSearch: '',
       employeeSearch: '',
-      currentDate: new Date(2024, 8, 1), // 2024년 9월
+      currentDate: new Date(2025, 8, 1), // 2025년 9월
       weekdays: ['일', '월', '화', '수', '목', '금', '토'],
       sessionExpiryTime: null,
       sessionTimer: null,
@@ -476,7 +465,63 @@ export default {
         management: false,
         sales: true
       },
-      orgTreeData: [], // Initialize as empty, will be populated by API
+      orgTreeData: [
+        {
+          id: 1,
+          label: 'H.ONE',
+          type: 'company',
+          members: [],
+          children: [
+            {
+              id: 2,
+              label: '경영팀',
+              type: 'department',
+              members: [
+                { id: 101, name: '김경영', position: '팀장', email: 'ky.kim@h.one' },
+                { id: 102, name: '이경영', position: '사원', email: 'ky.lee@h.one' },
+              ],
+              children: [],
+            },
+            {
+              id: 3,
+              label: '개발팀',
+              type: 'department',
+              members: [],
+              children: [
+                {
+                  id: 5,
+                  label: '프론트엔드',
+                  type: 'team',
+                  members: [
+                    { id: 201, name: '박프론', position: '과장', email: 'front.park@h.one' },
+                    { id: 202, name: '최프론', position: '대리', email: 'front.choi@h.one' },
+                  ],
+                  children: []
+                },
+                {
+                  id: 6,
+                  label: '백엔드',
+                  type: 'team',
+                  members: [
+                    { id: 301, name: '정보백', position: '차장', email: 'back.jung@h.one' },
+                    { id: 302, name: '강백엔', position: '주임', email: 'back.kang@h.one' },
+                  ],
+                  children: []
+                },
+              ],
+            },
+            {
+              id: 4,
+              label: '디자인팀',
+              type: 'department',
+              members: [
+                { id: 401, name: '오디자인', position: '팀장', email: 'design.oh@h.one' },
+              ],
+              children: [],
+            },
+          ],
+        },
+      ],
       defaultProps: {
         children: 'children',
         label: 'label',
@@ -487,140 +532,140 @@ export default {
         {
           id: 1,
           title: '주간 팀 미팅',
-          date: this.formatDateForEvent(new Date()),
+          date: '2025-09-20',
           type: 'meeting',
           time: '14:00'
         },
         {
           id: 2,
           title: '회의실 예약',
-          date: this.formatDateForEvent(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+          date: '2025-09-22',
           type: 'reservation',
           time: '10:00'
         },
         {
           id: 3,
           title: '연차 휴가',
-          date: this.formatDateForEvent(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-25',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 4,
           title: '프로젝트 마감',
-          date: this.formatDateForEvent(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-30',
           type: 'deadline',
           time: '18:00'
         },
         {
           id: 5,
           title: '월간 보고서 회의',
-          date: this.formatDateForEvent(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-15',
           type: 'meeting',
           time: '15:00'
         },
         {
           id: 6,
           title: '고객사 미팅',
-          date: this.formatDateForEvent(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-18',
           type: 'meeting',
           time: '11:00'
         },
         {
           id: 7,
           title: '법인 차량 예약',
-          date: this.formatDateForEvent(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-19',
           type: 'reservation',
           time: '09:00'
         },
         {
           id: 8,
           title: '반차 휴가',
-          date: this.formatDateForEvent(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-23',
           type: 'vacation',
           time: '14:00'
         },
         {
           id: 9,
           title: '신규 프로젝트 킥오프',
-          date: this.formatDateForEvent(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000)),
+          date: '2025-09-24',
           type: 'meeting',
           time: '10:00'
         },
         {
           id: 10,
           title: '대회의실 예약',
-          date: '2024-09-26',
+          date: '2025-09-26',
           type: 'reservation',
           time: '16:00'
         },
         {
           id: 11,
           title: '개인 휴가',
-          date: '2024-09-27',
+          date: '2025-09-27',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 12,
           title: '부서 회의',
-          date: '2024-09-28',
+          date: '2025-09-28',
           type: 'meeting',
           time: '14:30'
         },
         {
           id: 13,
           title: '프레젠테이션 준비',
-          date: '2024-09-29',
+          date: '2025-09-29',
           type: 'deadline',
           time: '17:00'
         },
         {
           id: 14,
           title: '팀 빌딩',
-          date: '2024-09-30',
+          date: '2025-09-30',
           type: 'meeting',
           time: '13:00'
         },
         {
           id: 15,
           title: '고객 상담',
-          date: '2024-09-16',
+          date: '2025-09-16',
           type: 'meeting',
           time: '10:30'
         },
         {
           id: 16,
           title: '회의실 A 예약',
-          date: '2024-09-17',
+          date: '2025-09-17',
           type: 'reservation',
           time: '14:00'
         },
         {
           id: 17,
           title: '개인 휴가',
-          date: '2024-09-21',
+          date: '2025-09-21',
           type: 'vacation',
           time: '09:00'
         },
         {
           id: 18,
           title: '프로젝트 발표',
-          date: '2024-09-19',
+          date: '2025-09-19',
           type: 'deadline',
           time: '16:00'
         },
         {
           id: 19,
           title: '부서 교육',
-          date: '2024-09-24',
+          date: '2025-09-24',
           type: 'meeting',
           time: '09:30'
         },
         {
           id: 20,
           title: '차량 예약',
-          date: '2024-09-25',
+          date: '2025-09-25',
           type: 'reservation',
           time: '08:00'
         }
@@ -645,32 +690,23 @@ export default {
     ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
-
-      // 급여 관련 경로인 경우 해당 경로를 반환 (하위 메뉴 활성화)
       if (path.startsWith('/payroll')) {
         return path
       }
-
-      // 예약 관련 경로인 경우 해당 경로를 반환 (하위 메뉴 활성화)
-      if (path.startsWith('/resource')) {
-        return path
-      }
-
       return path
     },
     openedMenus() {
       const path = this.$route.path
-
-      // 급여 관련 경로인 경우 급여 메뉴들을 열어둠
       if (path.startsWith('/payroll')) {
         return ['payroll', 'payroll-management', 'payroll-inquiry']
       }
-
-      // 예약 관련 경로인 경우 예약 메뉴를 열어둠
-      if (path.startsWith('/resource')) {
-        return ['resource']
+      if (path.startsWith('/employee')) {
+        const opened = ['employee'];
+        if (path.includes('/roles')) {
+          opened.push('roles');
+        }
+        return opened;
       }
-
       return []
     },
     currentMonthYear() {
@@ -753,10 +789,10 @@ export default {
         '/': '대시보드',
         '/organization': '조직/사원',
         '/employee': '직원 관리',
-        '/employee/title': '직책 관리',
-        '/employee/grade': '직급 관리',
-        '/employee/role': '역할 목록',
-        '/employee/role/create': '역할 생성',
+        '/employee/titles': '직책 관리',
+        '/employee/grades': '직급 관리',
+        '/employee/roles': '역할 목록',
+        '/employee/roles/create': '역할 생성',
         '/attendance': '내 근태 현황',
         '/leave-request': '휴가/출장 신청',
         '/shared-calendar': '공유 캘린더',
@@ -765,7 +801,6 @@ export default {
         '/performance/team-goal': '팀 목표 관리',
         '/performance/my-goal': '내 목표 관리',
         '/payroll': '급여 관리',
-        '/payroll/item-management': '급여기초정보',
         '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
         '/payroll/transfer-output': '급여 이체 출력',
@@ -775,11 +810,11 @@ export default {
         '/payroll/status-output': '급여 현황 출력',
         '/payroll/withholding-report': '원천징수이행신고서',
         '/payroll/elderly-incentive': '고령자장려금신고서',
+        '/chat': '채팅',
         '/meeting': '화상회의',
         '/approval': '전자결재',
         '/board': '게시판',
-        '/resource/reservation': '예약하기',
-        '/resource/management': '자원 관리'
+        '/resource': '예약'
       }
       return title[this.$route.path] || 'H.ONE'
     },
@@ -804,12 +839,6 @@ export default {
     handleClose(done) {
       this.showOrgModal = false
       done()
-    },
-    formatDateForEvent(date) {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
     },
     goToOrganizationManagement() {
       this.$router.push('/organization');
@@ -879,8 +908,6 @@ export default {
       });
     },
     openCalendarModal() {
-      // 캘린더를 열 때마다 현재 달로 리셋
-      this.currentDate = new Date()
       this.showCalendarModal = true
     },
     handleCalendarClose(done) {
@@ -949,7 +976,7 @@ export default {
 
         if (diff <= 0) {
           this.handleSessionExpiry()
-        } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000 && !this.sessionWarningShown) { // 5분 남았을 때 한 번만 경고
+        } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
           this.showSessionWarning()
         }
       }, 1000)
@@ -1522,7 +1549,7 @@ export default {
 
 .calendar-day.today {
   background: #f0f9ff;
-  border: 2px solid #93c5fd;
+  border: 2px solid #4f46e5;
 }
 
 .calendar-day.has-events {
@@ -1659,18 +1686,6 @@ export default {
 }
 
 .el-sub-menu[index="payroll"]:has(.el-menu-item.is-active)>.el-sub-menu__title .el-icon {
-  color: #4f46e5 !important;
-}
-
-/* 예약 하위 메뉴가 활성화된 경우 최상위 예약 메뉴만 활성화 */
-.el-sub-menu[index="resource"]:has(.el-menu-item.is-active)>.el-sub-menu__title {
-  background: #f0f9ff !important;
-  color: #4f46e5 !important;
-  border-right: 3px solid #4f46e5 !important;
-  font-weight: 600 !important;
-}
-
-.el-sub-menu[index="resource"]:has(.el-menu-item.is-active)>.el-sub-menu__title .el-icon {
   color: #4f46e5 !important;
 }
 </style>
