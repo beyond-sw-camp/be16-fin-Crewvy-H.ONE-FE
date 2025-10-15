@@ -9,32 +9,38 @@ const routes = [
   {
     path: '/performance/team-goal',
     name: 'TeamGoal',
-    component: TeamGoal
+    component: TeamGoal,
+    meta: { requiresAuth: true }
   },
   {
     path: '/performance/my-goal',
     name: 'MyGoal',
-    component: MyGoal
+    component: MyGoal,
+    meta: { requiresAuth: true }
   },
   {
     path: '/performance/team-goal/:id',
     name: 'TeamGoalDetail',
-    component: TeamGoalDetail
+    component: TeamGoalDetail,
+    meta: { requiresAuth: true }
   },
   {
     path: '/performance/team-goal/:goalId/member-goal/:memberGoalId',
     name: 'TeamMemberGoalDetail',
-    component: TeamMemberGoalDetail
+    component: TeamMemberGoalDetail,
+    meta: { requiresAuth: true }
   },
   {
     path: '/performance/register-my-goal/:teamGoalId',
     name: 'RegisterMyGoal',
-    component: RegisterMyGoal
+    component: RegisterMyGoal,
+    meta: { requiresAuth: true }
   },
   {
     path: '/performance/my-goal/:goalId',
     name: 'MyGoalDetail',
-    component: MyGoalDetail
+    component: MyGoalDetail,
+    meta: { requiresAuth: true }
   },
 ];
 

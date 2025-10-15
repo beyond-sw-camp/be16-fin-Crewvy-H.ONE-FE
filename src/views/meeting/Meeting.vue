@@ -107,7 +107,7 @@
                 <div class="meeting-info">
                   <div class="meeting-title">{{ meeting.title }}</div>
                   <div class="meeting-details">
-                    <span class="meeting-time">{{ meeting.date }} {{ meeting.time }}</span>
+                    <span class="meeting-time">{{ meeting.dateTimeFormatted }}</span>
                     <span class="meeting-host">주최: {{ meeting.host }}</span>
                     <span class="meeting-participants">{{ meeting.participants }}명 초대</span>
                   </div>
@@ -231,6 +231,60 @@
       </template>
     </el-dialog>
 
+    <!-- 회의 일정 등록 모달 -->
+    <el-dialog
+      v-model="showScheduleMeeting"
+      :title="isEditingSchedule ? '회의 일정 수정' : '회의 일정 등록'"
+      width="600px"
+    >
+      <el-form :model="scheduleForm" label-width="100px">
+        <el-form-item label="회의 제목">
+          <el-input v-model="scheduleForm.title" placeholder="회의 제목을 입력하세요" />
+        </el-form-item>
+        <el-form-item label="설명">
+          <el-input
+            v-model="scheduleForm.description"
+            type="textarea"
+            placeholder="회의 설명을 입력하세요"
+            :rows="3"
+          />
+        </el-form-item>
+        <el-form-item label="참여자">
+          <el-select
+            v-model="scheduleForm.participants"
+            multiple
+            placeholder="참여자를 선택하세요"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="employee in employees"
+              :key="employee.id"
+              :label="employee.name"
+              :value="employee.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="예약 일시">
+          <el-date-picker
+            v-model="scheduleForm.dateTime"
+            type="datetime"
+            placeholder="예약 일시를 선택하세요"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="녹화">
+          <el-switch v-model="scheduleForm.recording" />
+          <span class="form-help">회의 시작 시 자동으로 녹화합니다.</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="onCloseScheduleModal">취소</el-button>
+        <el-button type="primary" @click="createScheduledMeeting">{{ isEditingSchedule ? '수정 저장' : '일정 등록' }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 회의 참여 모달 -->
     <el-dialog
       v-model="showJoinMeeting"
@@ -255,6 +309,14 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import {
+  createVideoConference,
+  joinVideoConference,
+  startVideoConference,
+  getMyVideoConferences,
+  updateVideoConference,
+  deleteVideoConference
+} from '@/api/videoConference'
 
 export default {
   name: 'MeetingPage',
@@ -264,8 +326,16 @@ export default {
   },
   data() {
     return {
+      // 시간 상수들
+      MINUTE_MS: 60 * 1000,
+      HOUR_MS: 60 * 60 * 1000,
+      DAY_MS: 24 * 60 * 60 * 1000,
+      
       activeTab: 'active',
       showStartMeeting: false,
+      showScheduleMeeting: false,
+      isEditingSchedule: false,
+      editTargetId: null,
       showJoinMeeting: false,
       dateRange: [],
       selectedHost: '',
@@ -275,100 +345,145 @@ export default {
         participants: [],
         recording: false
       },
+      scheduleForm: {
+        title: '',
+        description: '',
+        participants: [],
+        inviteeIdList: [],
+        recording: false,
+        dateTime: ''
+      },
       joinForm: {
         meetingId: '',
         password: ''
       },
-      activeMeetings: 2,
-      todayMeetings: 3,
-      weeklyMeetingTime: 12,
-      totalParticipants: 8,
-      activeMeetingsList: [
-        {
-          id: 1,
-          title: '주간 팀 미팅',
-          host: '김철수',
-          participants: 5,
-          duration: '45분 진행 중'
-        },
-        {
-          id: 2,
-          title: '프로젝트 리뷰',
-          host: '박민수',
-          participants: 3,
-          duration: '20분 진행 중'
-        }
-      ],
-      scheduledMeetings: [
-        {
-          id: 1,
-          title: '월간 보고서 검토',
-          date: '2024-01-20',
-          time: '14:00',
-          host: '김영희',
-          participants: 8,
-          description: '월간 성과 보고서 검토 및 다음 달 계획 수립'
-        },
-        {
-          id: 2,
-          title: '신규 프로젝트 킥오프',
-          date: '2024-01-22',
-          time: '10:00',
-          host: '이지은',
-          participants: 12,
-          description: '신규 프로젝트 시작을 위한 킥오프 미팅'
-        }
-      ],
-      meetingHistory: [
-        {
-          id: 1,
-          title: '주간 팀 미팅',
-          date: '2024-01-15',
-          host: '김철수',
-          duration: '1시간 15분',
-          participants: 6,
-          status: '완료'
-        },
-        {
-          id: 2,
-          title: '프로젝트 진행상황 공유',
-          date: '2024-01-14',
-          host: '박민수',
-          duration: '45분',
-          participants: 4,
-          status: '완료'
-        },
-        {
-          id: 3,
-          title: '클라이언트 미팅',
-          date: '2024-01-12',
-          host: '이지은',
-          duration: '2시간',
-          participants: 8,
-          status: '완료'
-        }
-      ],
+      activeMeetings: 0,
+      todayMeetings: 0,
+      weeklyMeetingTime: 0,
+      totalParticipants: 0,
+      activeMeetingsList: [],
+      scheduledMeetings: [],
+      meetingHistory: [],
       employees: [
-        { id: 1, name: '김철수' },
-        { id: 2, name: '박민수' },
-        { id: 3, name: '이지은' },
-        { id: 4, name: '김영희' },
-        { id: 5, name: '정수진' }
+        { id: 'f6c1ca79-d6b1-46b5-97f0-432a99cbafe6', name: '김민준' },
+        { id: 'a87eed35-670f-4386-b8de-70c60e749352', name: '이서준' },
+        { id: '9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d', name: '이지은' },
+        { id: '123e4567-e89b-12d3-a456-426614174000', name: '김영희' },
+        { id: '550e8400-e29b-41d4-a716-446655440000', name: '정수진' }
       ]
     }
   },
+  mounted() {
+    this.loadMeetingLists()
+  },
   methods: {
+    getLocalDate() {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    },
     startMeeting() {
       this.showStartMeeting = true
     },
     joinMeeting() {
       this.showJoinMeeting = true
     },
-    handleTabChange(tab) {
-      this.activeTab = tab
+    parseActiveMeetings(inProgress) {
+      return (inProgress?.content || []).map(m => ({
+        id: m.id,
+        title: m.name || '임시 회의',
+        host: m.host || '주최자',
+        participants: m.participants || 0,
+        duration: this.calculateElapsedTime(m.actualStartTime),
+        actualStartTime: m.actualStartTime
+      }))
     },
-    joinActiveMeeting() {
-      this.success('회의에 참여합니다.')
+    parseScheduledMeetings(waiting) {
+      return (waiting?.content || []).map(m => {
+        const dt = m.scheduledStartTime || '';
+        let datetimeStr = '-';
+        if(dt) {
+          const d = new Date(dt);
+          datetimeStr = d.toLocaleString('ko-KR', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+          }).replace(/\. /g, '. ').replace(/\.\s*$/, '');
+        }
+        const [date, time] = dt.split('T');
+        return {
+          id: m.id,
+          title: m.name || '임시 회의',
+          date: date || '',
+          time: (time || '').slice(0, 8),
+          rawDateTime: dt,
+          dateTimeFormatted: datetimeStr,
+          host: m.host || '주최자',
+          participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
+          description: m.description || '',
+          isRecording: m.isRecording === true,
+          inviteeIdList: Array.isArray(m.inviteeIdList) ? m.inviteeIdList : []
+        }
+      })
+    },
+    parseMeetingHistory(ended) {
+      return (ended?.content || []).map(m => ({
+        id: m.id,
+        title: m.name || '임시 회의',
+        date: this.formatMeetingDate(m.actualStartTime || m.scheduledStartTime),
+        host: m.host || '주최자',
+        duration: m.duration || '-',
+        participants: m.participants || 0,
+        status: '완료'
+      }))
+    },
+    async handleTabChange(tab) {
+      this.activeTab = tab
+      if(tab === 'active') {
+        const inProgress = await getMyVideoConferences('IN_PROGRESS')
+        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
+        this.activeMeetings = this.activeMeetingsList.length
+      } else if(tab === 'scheduled') {
+        const waiting = await getMyVideoConferences('WAITING')
+        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
+        const localDate = this.getLocalDate();
+        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
+      } else if(tab === 'history') {
+        const ended = await getMyVideoConferences('ENDED')
+        this.meetingHistory = this.parseMeetingHistory(ended)
+      }
+    },
+    async loadMeetingLists() {
+      try {
+        const [inProgress, waiting, ended] = await Promise.all([
+          getMyVideoConferences('IN_PROGRESS'),
+          getMyVideoConferences('WAITING'),
+          getMyVideoConferences('ENDED')
+        ])
+
+        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
+        this.activeMeetings = this.activeMeetingsList.length
+
+        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
+        const localDate = this.getLocalDate();
+        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
+
+        this.meetingHistory = this.parseMeetingHistory(ended)
+
+        this.totalParticipants = this.activeMeetingsList.reduce((acc, cur) => acc + (cur.participants || 0), 0)
+      } catch (e) {
+        this.error('회의 목록을 불러오지 못했습니다.')
+      }
+    },
+    async joinActiveMeeting(meeting) {
+      try {
+        const res = await joinVideoConference(meeting.id)
+        this.success('회의에 참여합니다.')
+        // 새 창으로 실제 회의실 오픈
+        this.openMeetingWindow(res, meeting.title, meeting.id)
+      } catch (e) {
+        this.error('회의 참여에 실패했습니다.')
+      }
     },
     endMeeting() {
       this.$confirm('정말로 회의를 종료하시겠습니까?', '확인', {
@@ -377,24 +492,58 @@ export default {
         type: 'warning'
       }).then(() => {
         this.success('회의가 종료되었습니다.')
+      }).catch(() => {
+        // 사용자가 "돌아가기"를 선택한 경우 - 아무것도 하지 않음
       })
     },
     scheduleMeeting() {
-      this.info('회의 일정 등록 기능')
+      this.isEditingSchedule = false
+      this.editTargetId = null
+      this.scheduleForm = { title: '', description: '', participants: [], recording: false, dateTime: '' }
+      this.showScheduleMeeting = true
     },
-    startScheduledMeeting(meet) {
-      this.success(`${meet.title}을 시작합니다.`)
+    async startScheduledMeeting(meet) {
+      try {
+        const res = await startVideoConference(meet.id)
+        this.success(`${meet.title}을 시작합니다.`)
+        this.openMeetingWindow(res, meet.title, meet.id)
+        this.loadMeetingLists()
+      } catch (e) {
+        this.error('회의 시작에 실패했습니다.')
+      }
     },
-    editMeeting(meet) {
-      this.info(`${meet.title} 수정`)
+    async editMeeting(meet) {
+      // 동일 모달 재사용: 폼에 값 바인딩 후 열기
+      this.isEditingSchedule = true
+      this.editTargetId = meet.id
+      this.scheduleForm.title = meet.title || ''
+      this.scheduleForm.description = meet.description || ''
+      const dtFromRaw = (meet.rawDateTime || '').replace('T', ' ').slice(0, 19)
+      const dt = dtFromRaw || `${meet.date || ''} ${meet.time || ''}`.trim()
+      // 기대 포맷: YYYY-MM-DD HH:mm:ss (Element Plus value-format)
+      this.scheduleForm.dateTime = dt.length === 16 ? `${dt}:00` : dt
+      this.scheduleForm.recording = meet.isRecording
+      this.scheduleForm.participants = Array.isArray(meet.inviteeIdList) ? [...meet.inviteeIdList] : []
+      if (this.scheduleForm.inviteeIdList !== undefined) {
+        this.scheduleForm.inviteeIdList = Array.isArray(meet.inviteeIdList) ? [...meet.inviteeIdList] : []
+      }
+      this.showScheduleMeeting = true
     },
-    cancelMeeting() {
+    cancelMeeting(meet) {
       this.$confirm('정말로 회의를 취소하시겠습니까?', '확인', {
         confirmButtonText: '취소',
         cancelButtonText: '돌아가기',
         type: 'warning'
-      }).then(() => {
-        this.success('회의가 취소되었습니다.')
+      }).then(async () => {
+        try {
+          await deleteVideoConference(meet.id)
+          this.success('회의가 취소되었습니다.')
+          this.loadMeetingLists()
+        } catch (e) {
+          this.error('회의 취소에 실패했습니다.')
+        }
+      }).catch(() => {
+        // 사용자가 "돌아가기"를 선택한 경우 - 아무것도 하지 않음
       })
     },
     viewRecording(meeting) {
@@ -403,23 +552,132 @@ export default {
     downloadTranscript(meeting) {
       this.success(`${meeting.title} 회의록을 다운로드합니다.`)
     },
-    createMeeting() {
-      this.success('회의가 시작되었습니다.')
-      this.showStartMeeting = false
-      this.meetingForm = {
-        title: '',
-        description: '',
-        participants: [],
-        recording: false
+    async createMeeting() {
+      try {
+        const payload = {
+          immediate: true,
+          name: this.meetingForm.title,
+          description: this.meetingForm.description,
+          inviteeIdList: this.meetingForm.participants,
+          isRecording: this.meetingForm.recording
+        }
+        const res = await createVideoConference(payload)
+        this.success('회의가 시작되었습니다.')
+        this.openMeetingWindow(res, this.meetingForm.title, res.videoConferenceId)
+        this.showStartMeeting = false
+        this.meetingForm = { title: '', description: '', participants: [], recording: false }
+        this.loadMeetingLists()
+      } catch (e) {
+        this.error('회의 생성에 실패했습니다.')
       }
     },
-    joinMeetingRoom() {
-      this.success('회의에 참여합니다.')
-      this.showJoinMeeting = false
-      this.joinForm = {
-        meetingId: '',
-        password: ''
+    async createScheduledMeeting() {
+      try {
+        if (!this.scheduleForm.dateTime) {
+          this.warning('예약 일시를 선택하세요.')
+          return
+        }
+        const scheduledStartTime = this.scheduleForm.dateTime.replace(' ', 'T')
+        if (this.isEditingSchedule && this.editTargetId) {
+          const updateBody = {}
+          if (this.scheduleForm.title) updateBody.name = this.scheduleForm.title
+          if (this.scheduleForm.description) updateBody.description = this.scheduleForm.description
+          if (this.scheduleForm.dateTime) updateBody.scheduledStartTime = scheduledStartTime
+          if (typeof this.scheduleForm.recording === 'boolean') updateBody.isRecording = this.scheduleForm.recording
+          if (Array.isArray(this.scheduleForm.participants) && this.scheduleForm.participants.length > 0) {
+            updateBody.inviteeIdList = this.scheduleForm.participants
+          }
+          await updateVideoConference(this.editTargetId, updateBody)
+          this.success('회의 일정이 수정되었습니다.')
+        } else {
+          const payload = {
+            immediate: false,
+            name: this.scheduleForm.title,
+            description: this.scheduleForm.description,
+            inviteeIdList: this.scheduleForm.participants,
+            isRecording: this.scheduleForm.recording,
+            scheduledStartTime
+          }
+          await createVideoConference(payload)
+          this.success('회의 일정이 등록되었습니다.')
+        }
+        this.onCloseScheduleModal()
+        this.handleTabChange('scheduled')
+      } catch (e) {
+        this.error(this.isEditingSchedule ? '회의 일정 수정에 실패했습니다.' : '회의 일정 등록에 실패했습니다.')
       }
+    },
+    onCloseScheduleModal() {
+      this.showScheduleMeeting = false
+      this.isEditingSchedule = false
+      this.editTargetId = null
+      this.scheduleForm = { title: '', description: '', participants: [], recording: false, dateTime: '' }
+    },
+    async joinMeetingRoom() {
+      try {
+        const res = await joinVideoConference(this.joinForm.meetingId)
+        this.success('회의에 참여합니다.')
+        this.openMeetingWindow(res, '', this.joinForm.meetingId)
+        this.showJoinMeeting = false
+        this.joinForm = { meetingId: '', password: '' }
+      } catch (e) {
+        this.error('회의 참여에 실패했습니다.')
+      }
+    }
+    ,
+    openMeetingWindow(apiResult, title, videoConferenceId) {
+      if (!apiResult) return
+      const sessionId = apiResult.sessionId || apiResult.sessionID || apiResult.id
+      const token = apiResult.token || apiResult.connectionToken || apiResult.accessToken
+      if (!sessionId || !token) {
+        this.warning('세션/토큰 정보를 찾지 못했습니다.')
+        return
+      }
+      const params = new URLSearchParams({
+        sid: String(sessionId),
+        token: String(token),
+        title: String(title),
+        vcid: String(videoConferenceId)
+      })
+      const base = (process.env.BASE_URL || '/').replace(/\/+$/, '')
+      const url = `${window.location.origin}${base}/meeting/room?${params.toString()}`
+      window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')
+    },
+    calculateElapsedTime(actualStartTime) {
+      if (!actualStartTime) return '진행 중'
+      
+      const startTime = new Date(actualStartTime)
+      const now = new Date()
+      const diffMs = now - startTime
+      
+      if (diffMs < 0) return '진행 중'
+      
+      const hours = Math.floor(diffMs / this.HOUR_MS)
+      const minutes = Math.floor((diffMs % this.HOUR_MS) / this.MINUTE_MS)
+      
+      return hours > 0 ? `${hours}시간 ${minutes}분 경과` : `${minutes}분 경과`
+    },
+    formatMeetingDate(dateTime) {
+      if (!dateTime) return '-'
+      
+      const meetingDate = new Date(dateTime)
+      const today = new Date()
+      
+      // 날짜만 비교 (시간 제거)
+      const meetingDateOnly = new Date(meetingDate.getFullYear(), meetingDate.getMonth(), meetingDate.getDate())
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      
+      const diffDays = Math.floor((todayOnly - meetingDateOnly) / this.DAY_MS)
+      
+      if (diffDays === 0) return '오늘'
+      if (diffDays === 1) return '어제'
+      if (diffDays < 7) return `${diffDays}일 전`
+      
+      return meetingDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
     }
   }
 }

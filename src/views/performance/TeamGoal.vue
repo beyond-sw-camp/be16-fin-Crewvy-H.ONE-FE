@@ -6,19 +6,15 @@
     </div>
 
     <div class="goal-list">
-      <el-card v-for="goal in teamGoals" :key="goal.id" class="goal-card" @click="goToDetail(goal.id)">
+      <el-card v-for="goal in teamGoals" :key="goal.teamGoalId" class="goal-card" @click="goToDetail(goal.teamGoalId)">
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
-            <p class="goal-description">{{ goal.description }}</p>
+            <p class="goal-description">{{ goal.contents }}</p>
           </div>
           <div class="goal-meta">
-            <div class="user-info">
-              <div>
-                <span class="user-name">{{ goal.user.name }}</span>
-                <span class="user-position">{{ goal.user.position }}</span>
-              </div>
-              <div class="user-department">{{ goal.user.department }}</div>
+            <div class="goal-author">
+              <span>{{ goal.memberName }} ({{ goal.memberPosition }})</span>
             </div>
             <div class="goal-period">
               <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
@@ -34,16 +30,12 @@
           <el-input v-model="form.title" placeholder="예: 2024년 하반기 매출 20% 증대"></el-input>
         </el-form-item>
         <el-form-item label="목표에 대한 설명">
-          <el-input v-model="form.description" type="textarea" :rows="6" placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
+          <el-input v-model="form.contents" type="textarea" :rows="6"
+            placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
         </el-form-item>
         <el-form-item label="목표 설정 기간">
-          <el-date-picker
-            v-model="form.dateRange"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="Start date"
-            end-placeholder="End date"
-          >
+          <el-date-picker v-model="form.dateRange" type="daterange" range-separator="-" start-placeholder="Start date"
+            end-placeholder="End date">
           </el-date-picker>
         </el-form-item>
       </el-form>
@@ -58,6 +50,8 @@
 </template>
 
 <script>
+import apiClient from '@/api/http';
+
 export default {
   name: 'TeamGoal',
   data() {
@@ -65,60 +59,79 @@ export default {
       dialogVisible: false,
       form: {
         title: '',
-        description: '',
+        contents: '',
         dateRange: ''
       },
-      teamGoals: [
-        {
-          id: 1,
-          title: '2024년 하반기 매출 20% 증대',
-          description: '신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다.',
-          user: {
-            name: '김팀장',
-            position: '팀장',
-            department: '영업 1팀',
-          },
-          startDate: '2024-07-01',
-          endDate: '2024-12-31',
-        },
-        {
-          id: 2,
-          title: '신제품 개발 프로젝트 완료',
-          description: "'A-Project'의 프로토타입을 10월까지 완료하고, 12월에 정식 출시하는 것을 목표로 합니다.",
-          user: {
-            name: '박개발',
-            position: '선임 연구원',
-            department: '개발팀',
-          },
-          startDate: '2024-08-01',
-          endDate: '2024-12-31',
-        },
-        {
-          id: 3,
-          title: '고객 만족도 95점 달성',
-          description: '고객 지원 응답 시간을 1시간 이내로 단축하고, 분기별 만족도 조사를 통해 피드백을 수렴합니다.',
-          user: {
-            name: '이서비스',
-            position: '대리',
-            department: '고객지원팀',
-          },
-          startDate: '2024-07-01',
-          endDate: '2024-09-30',
-        },
-      ],
+      teamGoals: [],
     };
   },
   methods: {
+    async fetchTeamGoals() {
+      try {
+        // In a real environment, you would uncomment the following lines:
+        const response = await apiClient.get('/workforce-service/performance/team-goal');
+        this.teamGoals = response.data.data;
+
+        // Using mock data provided by the user:
+        // this.teamGoals = [
+        //   {
+        //       "teamGoalId": "36e7c5a6-8df6-4c0a-9efa-c5f66377b431",
+        //       "title": "2025년 4분기 팀 매출 20% 성장 달성",
+        //       "contents": "신규 고객 확보 및 기존 고객 유지 전략을 통해 4분기 팀 목표 매출액 1억 2천만원을 달성하는 것을 목표로 합니다.",
+        //       "startDate": "2025-10-01",
+        //       "endDate": "2025-12-31"
+        //   }
+        // ];
+      } catch (error) {
+        console.error('Error fetching team goals:', error);
+      }
+    },
     addTeamGoal() {
       this.dialogVisible = true;
     },
-    saveGoal() {
-      // Add logic to save the goal
-      this.dialogVisible = false;
+    async saveGoal() {
+      if (!this.form.title || !this.form.contents || !this.form.dateRange) {
+        this.$message.warning('모든 필드를 입력해주세요.');
+        return;
+      }
+
+      const formatDate = (date) => {
+        const d = new Date(date);
+        let month = '' + (d.getMonth() + 1);
+        let day = '' + d.getDate();
+        const year = d.getFullYear();
+
+        if (month.length < 2)
+          month = '0' + month;
+        if (day.length < 2)
+          day = '0' + day;
+
+        return [year, month, day].join('-');
+      }
+
+      const payload = {
+        title: this.form.title,
+        contents: this.form.contents,
+        startDate: formatDate(this.form.dateRange[0]),
+        endDate: formatDate(this.form.dateRange[1]),
+      };
+
+      try {
+        await apiClient.post('/workforce-service/performance/create-team-goal', payload);
+        this.$message.success('팀 목표가 성공적으로 추가되었습니다.');
+        this.dialogVisible = false;
+        await this.fetchTeamGoals(); // Refresh the list
+      } catch (error) {
+        console.error('Error creating team goal:', error);
+        this.$message.error('목표 추가에 실패했습니다.');
+      }
     },
     goToDetail(id) {
       this.$router.push(`/performance/team-goal/${id}`);
     },
+  },
+  created() {
+    this.fetchTeamGoals();
   },
 };
 </script>
@@ -166,13 +179,13 @@ export default {
 }
 
 .goal-title {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .goal-description {
-  font-size: 14px;
+  font-size: 16px;
   color: #606266;
 }
 
@@ -182,6 +195,13 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.goal-author {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
 }
 
 .user-info {
@@ -207,7 +227,7 @@ export default {
 }
 
 .goal-period {
-  font-size: 12px;
+  font-size: 14px;
   color: #909399;
 }
 </style>
