@@ -95,7 +95,17 @@
         </div>
       </div>
       
-      <div class="resource-list">
+      <div v-if="loadingResources" class="loading-state">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>자원 목록을 불러오는 중...</span>
+      </div>
+      <div v-else-if="filteredResources.length === 0" class="empty-state">
+        <el-icon><OfficeBuilding /></el-icon>
+        <span v-if="selectedType">선택한 유형의 자원이 없습니다.</span>
+        <span v-else>등록된 자원이 없습니다.</span>
+        <p>관리자에게 문의하세요.</p>
+      </div>
+      <div v-else class="resource-list">
         <div class="resource-item" v-for="resource in filteredResources" :key="resource.id">
           <div class="resource-info">
             <div class="resource-name">{{ resource.name }}</div>
@@ -145,11 +155,24 @@
       <div class="reservation-modal">
         <!-- 자원 선택 및 날짜 선택 -->
         <div class="reservation-form-header">
+          <div class="resource-type-selection">
+            <el-form-item label="자원 유형">
+              <el-select v-model="reservationForm.resourceType" placeholder="자원 유형을 선택하세요" @change="onResourceTypeChange">
+                <el-option label="전체" value="" />
+                <el-option 
+                  v-for="category in categories" 
+                  :key="category.id" 
+                  :label="category.name" 
+                  :value="category.name" 
+                />
+              </el-select>
+            </el-form-item>
+          </div>
           <div class="resource-selection">
             <el-form-item label="자원 선택">
               <el-select v-model="reservationForm.resourceId" placeholder="자원을 선택하세요" @change="onResourceChange">
                 <el-option
-                  v-for="resource in availableResources"
+                  v-for="resource in filteredAvailableResources"
                   :key="resource.id"
                   :label="resource.name"
                   :value="resource.id"
@@ -166,6 +189,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 @change="onDateChange"
+                :disabled-date="disabledDate"
               />
             </el-form-item>
           </div>
@@ -209,13 +233,16 @@
                     :disabled="!getReservationTooltip(date.date, hour.value)"
                     effect="dark"
                     :show-after="300"
+                    popper-class="reservation-tooltip"
+                    raw-content
                   >
                     <div 
                       class="time-cell"
                       :class="[
                         {
                           'selected': isTimeCellSelected(date.date, hour.value),
-                          'selecting': isTimeCellInSelection(date.date, hour.value)
+                          'selecting': isTimeCellInSelection(date.date, hour.value),
+                          'past-time': isPastTime(date.date, hour.value)
                         },
                         getTimeCellClass(date.date, hour.value)
                       ]"
@@ -238,10 +265,13 @@
                     ({{ getResourceName(reservationForm.resourceId) }})
                   </span>
                 </span>
-                <span v-else-if="!reservationForm.resourceId" class="selection-hint">
-                  모든 자원의 예약 현황을 확인할 수 있습니다. 자원을 선택하거나 드래그하여 날짜와 시간을 선택하세요
+                <span v-else-if="reservationForm.date && !reservationForm.resourceId" class="selection-hint">
+                  {{ reservationForm.date }}의 모든 자원 예약 현황을 확인할 수 있습니다. 자원을 선택하거나 드래그하여 시간을 선택하세요
                 </span>
-                <span v-else class="selection-hint">드래그하여 날짜와 시간을 선택하세요</span>
+                <span v-else-if="!reservationForm.date" class="selection-hint">
+                  예약 날짜를 선택하면 해당 날짜의 예약 현황을 확인할 수 있습니다
+                </span>
+                <span v-else class="selection-hint">드래그하여 시간을 선택하세요</span>
               </div>
               <div class="legend">
                 <div class="legend-item">
@@ -338,7 +368,7 @@
                         v-model="reservationForm.recurrenceInterval"
                         :min="1"
                         :max="12"
-                        style="width: 80px; margin-right: 12px;"
+                        style="width: 100px;"
                       />
                       <span class="recurrence-label">{{ getRecurrenceIntervalText() }}</span>
                     </div>
@@ -390,30 +420,46 @@
       width="800px"
     >
       <div class="my-reservations">
-        <div class="reservation-list">
-          <div class="reservation-item" v-for="reservation in myReservations" :key="reservation.id">
+        <div v-if="loadingMyReservations" class="loading-state">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>예약 목록을 불러오는 중...</span>
+        </div>
+        <div v-else-if="sortedMyReservations.length === 0" class="empty-state">
+          <el-icon><Calendar /></el-icon>
+          <span>예약된 자원이 없습니다.</span>
+          <p>새로운 예약을 만들어보세요!</p>
+        </div>
+        <div v-else class="reservation-list">
+          <div class="reservation-item" v-for="reservation in sortedMyReservations" :key="reservation.id">
             <div class="reservation-info">
               <div class="reservation-header">
                 <div class="reservation-title">{{ reservation.resourceName }}</div>
                 <div class="reservation-date-large">{{ reservation.date }}</div>
               </div>
               <div class="reservation-details">
-                <div class="reservation-time">
-                  <el-icon><Clock /></el-icon>
-                  <span>{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                <!-- 첫 번째 줄: 시간, 상태 -->
+                <div class="reservation-detail-row">
+                  <div class="reservation-time">
+                    <el-icon><Clock /></el-icon>
+                    <span>{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                  </div>
+                  <div class="reservation-status">
+                    <el-tag :type="getReservationStatusType(reservation.status)" size="small">
+                      {{ getReservationStatusLabel(reservation.status) }}
+                    </el-tag>
+                  </div>
                 </div>
-                <div class="reservation-purpose">
-                  <el-icon><Document /></el-icon>
-                  <span>{{ reservation.purpose }}</span>
-                </div>
-                <div class="reservation-attendees">
-                  <el-icon><User /></el-icon>
-                  <span>{{ reservation.attendees }}명</span>
-                </div>
-                <div class="reservation-status">
-                  <el-tag :type="getReservationStatusType(reservation.status)" size="small">
-                    {{ getReservationStatusLabel(reservation.status) }}
-                  </el-tag>
+                
+                <!-- 두 번째 줄: 인원, 설명 -->
+                <div class="reservation-detail-row">
+                  <div class="reservation-attendees">
+                    <el-icon><User /></el-icon>
+                    <span>{{ reservation.attendees }}명</span>
+                  </div>
+                  <div class="reservation-purpose">
+                    <el-icon><Document /></el-icon>
+                    <span>{{ reservation.purpose }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -422,11 +468,14 @@
                 <el-icon><Edit /></el-icon>
                 수정
               </el-button>
-              <el-button @click="cancelReservation(reservation)">
+              <el-button 
+                @click="cancelReservation(reservation)"
+                :disabled="reservation.status === 'IN_USE'"
+              >
                 <el-icon><Close /></el-icon>
-                취소
+                {{ reservation.status === 'USED' ? '삭제' : '취소' }}
               </el-button>
-              <el-button v-if="reservation.status === '이용 중'" type="success" @click="completeUsage(reservation)">
+              <el-button v-if="reservation.status === 'IN_USE' || reservation.status === 'BEFORE'" type="success" @click="completeUsage(reservation)">
                 <el-icon><Check /></el-icon>
                 이용 완료
               </el-button>
@@ -470,12 +519,148 @@
         </div>
         
         <div class="chart-section">
-          <h4>자원별 이용률</h4>
+          <h4>카테고리별 이용률</h4>
           <div class="chart-container">
             <canvas ref="resourceChart" width="400" height="200"></canvas>
           </div>
         </div>
       </div>
+    </el-dialog>
+
+    <!-- 자원 상세 정보 모달 -->
+    <el-dialog
+      v-model="showResourceDetail"
+      title="자원 상세 정보"
+      width="800px"
+    >
+      <div class="resource-detail-modal" v-if="selectedResource">
+        <!-- 자원 기본 정보 -->
+        <div class="detail-section">
+          <h4>기본 정보</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>자원명</label>
+              <span>{{ selectedResource.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>위치</label>
+              <span>{{ selectedResource.location || '위치 정보 없음' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>수용 인원</label>
+              <span>{{ selectedResource.capacity }}명</span>
+            </div>
+            <div class="detail-row-half">
+              <div class="detail-item">
+                <label>자원 유형</label>
+                <el-tag :type="getResourceType(selectedResource.type)" size="small">
+                  {{ selectedResource.categoryName || '기타' }}
+                </el-tag>
+              </div>
+              <div class="detail-item">
+                <label>자원 상태</label>
+                <el-tag :type="getStatusType(selectedResource.status)" size="small">
+                  {{ getStatusText(selectedResource.status) }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="detail-item full-width">
+              <label>시설/장비 정보</label>
+              <span>{{ selectedResource.equipment || '시설 정보 없음' }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>설명</label>
+              <span>{{ selectedResource.description || '자세한 설명이 없습니다.' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 예약 현황 -->
+        <div class="detail-section">
+          <h4>예약 현황</h4>
+          <div class="reservation-status">
+            <div class="status-item">
+              <label>오늘 예약 현황</label>
+              <div class="today-reservations">
+                <div v-if="getTodayReservations(selectedResource.id).length === 0" class="no-reservation">
+                  오늘 예약이 없습니다
+                </div>
+                <div v-else class="reservation-list">
+                  <div v-for="reservation in getTodayReservations(selectedResource.id)" :key="reservation.id" class="reservation-item">
+                    <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                    <el-tag :type="getReservationStatusType(reservation.status)" size="small">
+                      {{ getReservationStatusLabel(reservation.status) }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="status-item">
+              <label>이번 주 예약 현황</label>
+              <div class="week-reservations">
+                <div v-if="getWeekReservations(selectedResource.id).length === 0" class="no-reservation">
+                  이번 주 예약이 없습니다
+                </div>
+                <div v-else class="reservation-list">
+                  <div v-for="reservation in getWeekReservations(selectedResource.id)" :key="reservation.id" class="reservation-item">
+                    <span class="date">{{ reservation.date }}</span>
+                    <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                    <el-tag :type="getReservationStatusType(reservation.status)" size="small">
+                      {{ getReservationStatusLabel(reservation.status) }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="status-item">
+              <label>다음 예약</label>
+              <div class="next-reservation">
+                <div v-if="getNextReservation(selectedResource.id)" class="next-reservation-info">
+                  <span class="date">{{ formatDateWithDay(getNextReservation(selectedResource.id).date) }}</span>
+                  <span class="time">{{ getNextReservation(selectedResource.id).startTime }} - {{ getNextReservation(selectedResource.id).endTime }}</span>
+                </div>
+                <div v-else class="no-reservation">
+                  예정된 예약이 없습니다
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 이용 규칙/주의사항 -->
+        <div class="detail-section">
+          <h4>이용 규칙 및 주의사항</h4>
+          <div class="rules-grid">
+            <div class="rule-item">
+              <label>예약 가능 시간</label>
+              <span>09:00 - 22:00</span>
+            </div>
+            <div class="rule-item">
+              <label>최대 예약 시간</label>
+              <span>{{ selectedResource.maxHours || 8 }}시간</span>
+            </div>
+            <div class="rule-item">
+              <label>승인 필요</label>
+              <span>{{ selectedResource.requiresApproval ? '예' : '아니오' }}</span>
+            </div>
+            <div class="rule-item full-width">
+              <label>특별 사용 규칙</label>
+              <div class="special-rules">
+                <ul>
+                  <li>예약 시간 10분 전까지 도착해주세요</li>
+                  <li>사용 후 정리정돈을 부탁드립니다</li>
+                  <li>음식물 반입 금지</li>
+                  <li>시설 파손 시 즉시 신고해주세요</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showResourceDetail = false">닫기</el-button>
+        <el-button type="primary" @click="reserveFromDetail">예약하기</el-button>
+      </template>
     </el-dialog>
 
     <!-- 이용 완료 모달 -->
@@ -564,11 +749,16 @@ export default {
       showMyReservations: false,
       showStatistics: false,
       showUsageCompletion: false,
+      showResourceDetail: false,
+      selectedResource: null,
       isEditingMode: false,
+      loadingResources: false,
+      loadingMyReservations: false,
       editingReservationId: null,
       monthlyChartInstance: null,
       resourceChartInstance: null,
       reservationForm: {
+        resourceType: '', // 자원 유형 선택
         resourceId: '',
         date: '',
         startTime: '',
@@ -605,27 +795,6 @@ export default {
         peakTime: '',
         noShow: 0,
         totalReservations: 0
-      },
-      monthlyData: {
-        labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
-        datasets: [{
-          label: '예약 건수',
-          data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          backgroundColor: 'rgba(79, 70, 229, 0.2)',
-          borderColor: 'rgba(79, 70, 229, 1)',
-          borderWidth: 2,
-          tension: 0.4
-        }]
-      },
-      resourceData: {
-        labels: [],
-        datasets: [{
-          label: '이용률 (%)',
-          data: [],
-          backgroundColor: [],
-          borderColor: [],
-          borderWidth: 2
-        }]
       },
       usageCompletionForm: {
         resourceName: '',
@@ -670,6 +839,18 @@ export default {
     availableResources() {
       return this.resources.filter(resource => resource.status === 'available')
     },
+    
+    filteredAvailableResources() {
+      let filtered = this.availableResources
+      
+      // 자원 유형이 선택된 경우 해당 유형의 자원만 필터링
+      if (this.reservationForm.resourceType) {
+        filtered = filtered.filter(resource => resource.categoryName === this.reservationForm.resourceType)
+      }
+      
+      // 자원명으로 사전 순 정렬
+      return filtered.sort((a, b) => a.name.localeCompare(b.name))
+    },
     canSubmitReservation() {
       return this.reservationForm.resourceId && 
              this.reservationForm.date && 
@@ -677,18 +858,71 @@ export default {
              this.reservationForm.endTime && 
              this.reservationForm.purpose
     },
+    
+    sortedMyReservations() {
+      // 상태별 우선순위: IN_USE(이용 중) > BEFORE(이용 전) > USED(이용 완료)
+      const statusPriority = {
+        'IN_USE': 1,
+        'BEFORE': 2,
+        'USED': 3
+      }
+      
+      return [...this.myReservations].sort((a, b) => {
+        const priorityA = statusPriority[a.status] || 999
+        const priorityB = statusPriority[b.status] || 999
+        
+        // 상태별로 먼저 정렬
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB
+        }
+        
+        // 같은 상태 내에서는 날짜순으로 정렬 (오름차순)
+        return new Date(a.date) - new Date(b.date)
+      })
+    },
     safeMeetingRooms() {
-      return this.meetingRooms || []
+      // 회의실 카테고리의 자원 중 오늘 예약 가능한 자원만 반환
+      const meetingRoomResources = this.resources.filter(resource => 
+        resource.categoryName && resource.categoryName.includes('회의실')
+      )
+      
+      const today = this.formatDate(new Date())
+      const todayReservedResourceIds = this.allReservations
+        .filter(reservation => 
+          reservation.date === today && 
+          reservation.status !== 'CANCELLED'
+        )
+        .map(reservation => reservation.reservationTypeId)
+      
+      return meetingRoomResources.filter(resource => 
+        !todayReservedResourceIds.includes(resource.id)
+      )
     },
     safeVehicles() {
-      return this.vehicles || []
+      // 차량 카테고리의 자원 중 오늘 예약 가능한 자원만 반환
+      const vehicleResources = this.resources.filter(resource => 
+        resource.categoryName && resource.categoryName.includes('차량')
+      )
+      
+      const today = this.formatDate(new Date())
+      const todayReservedResourceIds = this.allReservations
+        .filter(reservation => 
+          reservation.date === today && 
+          reservation.status !== 'CANCELLED'
+        )
+        .map(reservation => reservation.reservationTypeId)
+      
+      return vehicleResources.filter(resource => 
+        !todayReservedResourceIds.includes(resource.id)
+      )
     }
   },
   methods: {
     async loadResources() {
+      this.loadingResources = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -708,6 +942,8 @@ export default {
       } catch (error) {
         console.error('자원 목록 로드 실패:', error)
         this.error('자원 목록을 불러오는데 실패했습니다.')
+      } finally {
+        this.loadingResources = false
       }
     },
     
@@ -715,14 +951,14 @@ export default {
     async loadCategories() {
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
           id: cat.id || cat.categoryId || cat.uuid,
           name: cat.name,
           value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
-        }))
+        })).sort((a, b) => a.name.localeCompare(b.name)) // 카테고리명으로 사전 순 정렬
       } catch (error) {
         console.error('카테고리 조회 실패:', error)
         this.error('카테고리 목록을 불러오는데 실패했습니다.')
@@ -746,11 +982,12 @@ export default {
     },
     
     async loadMyReservations() {
+      this.loadingMyReservations = true
       try {
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/myList`, {
           params: { 
-            memberId: 'c4998317-a9a3-4856-981f-366f07c29367',
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' 
+            memberId: 'a0c31eea-64fb-4c4f-adc2-f042e117d68d',
+            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' 
           }
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
@@ -758,6 +995,19 @@ export default {
         this.myReservations = list.map(item => {
           const startDateTime = new Date(item.startDateTime)
           const endDateTime = new Date(item.endDateTime)
+          
+          // 현재 시간이 예약 시간 내에 있는지 확인하여 상태 업데이트
+          let status = item.status
+          const now = new Date()
+          
+          // 예약 시간 내에 현재 시간이 포함되어 있고, 상태가 'BEFORE'인 경우 'IN_USE'로 변경
+          if (item.status === 'BEFORE' && now >= startDateTime && now <= endDateTime) {
+            status = 'IN_USE'
+          }
+          // 예약 종료 시간이 현재 시간을 지났고, 상태가 'BEFORE' 또는 'IN_USE'인 경우 'USED'로 변경
+          else if ((item.status === 'BEFORE' || item.status === 'IN_USE') && now > endDateTime) {
+            status = 'USED'
+          }
           
           // 자원 정보 찾기
           const resource = this.resources.find(r => r.id === item.reservationTypeId)
@@ -767,7 +1017,7 @@ export default {
             reservationTypeId: item.reservationTypeId,
             memberId: item.memberId,
             companyId: item.companyId,
-            status: item.status,
+            status: status,
             startDateTime: item.startDateTime,
             endDateTime: item.endDateTime,
             // [check] 이후 추가
@@ -782,6 +1032,8 @@ export default {
       } catch (error) {
         console.error('내 예약 목록 로드 실패:', error)
         this.error('예약 목록을 불러오는데 실패했습니다.')
+      } finally {
+        this.loadingMyReservations = false
       }
     },
     
@@ -789,7 +1041,7 @@ export default {
       try {
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
           params: { 
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' 
+            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' 
           }
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
@@ -799,12 +1051,25 @@ export default {
           const startDateTime = new Date(item.startDateTime)
           const endDateTime = new Date(item.endDateTime)
           
+          // 현재 시간이 예약 시간 내에 있는지 확인하여 상태 업데이트
+          let status = item.status
+          const now = new Date()
+          
+          // 예약 시간 내에 현재 시간이 포함되어 있고, 상태가 'BEFORE'인 경우 'IN_USE'로 변경
+          if (item.status === 'BEFORE' && now >= startDateTime && now <= endDateTime) {
+            status = 'IN_USE'
+          }
+          // 예약 종료 시간이 현재 시간을 지났고, 상태가 'BEFORE' 또는 'IN_USE'인 경우 'USED'로 변경
+          else if ((item.status === 'BEFORE' || item.status === 'IN_USE') && now > endDateTime) {
+            status = 'USED'
+          }
+          
           return {
             id: item.id,
             reservationTypeId: item.reservationTypeId,
             memberId: item.memberId,
             companyId: item.companyId,
-            status: item.status,
+            status: status,
             startDateTime: item.startDateTime,
             endDateTime: item.endDateTime,
             date: startDateTime.toISOString().split('T')[0],
@@ -812,6 +1077,13 @@ export default {
             endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5)
           }
         })
+        
+        // 오늘 날짜의 예약 건수 계산
+        const today = this.formatDate(new Date())
+        this.todayReservations = this.allReservations.filter(reservation => 
+          reservation.date === today && reservation.status !== 'CANCELLED'
+        ).length
+        
       } catch (error) {
         console.error('전체 예약 목록 로드 실패:', error)
         this.error('예약 현황을 불러오는데 실패했습니다.')
@@ -822,8 +1094,8 @@ export default {
       try {
         const requestData = {
           reservationTypeId: reservationData.resourceId,
-          memberId: 'c4998317-a9a3-4856-981f-366f07c29367',
-          companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
+          memberId: 'a0c31eea-64fb-4c4f-adc2-f042e117d68d',
+          companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9',
           startDateTime: `${reservationData.date}T${reservationData.startTime}:00`,
           endDateTime: `${reservationData.date}T${reservationData.endTime}:00`
         }
@@ -868,21 +1140,17 @@ export default {
     },
     getReservationStatusType(status) {
       const statusMap = {
-        'ACTIVE': 'success',      // 활성 상태
-        'CANCELLED': 'danger',    // 취소됨
-        'COMPLETED': 'info',      // 완료됨
-        'PENDING': 'warning',     // 대기 중
-        'CONFIRMED': 'primary'    // 확인됨
+        'BEFORE': 'warning',      // 이용 전 (노란색)
+        'IN_USE': 'danger',       // 이용 중 (빨간색)
+        'USED': 'success'         // 이용 완료 (초록색)
       }
       return statusMap[status] || 'info'
     },
     getReservationStatusLabel(status) {
       const statusMap = {
-        'ACTIVE': '이용 중',
-        'CANCELLED': '취소됨',
-        'COMPLETED': '완료됨',
-        'PENDING': '대기 중',
-        'CONFIRMED': '확인됨'
+        'BEFORE': '이용 전',
+        'IN_USE': '이용 중',
+        'USED': '이용 완료'
       }
       return statusMap[status] || status
     },
@@ -934,11 +1202,24 @@ export default {
       const today = this.formatDate(new Date())
       return dateStr === today
     },
-    onResourceChange() {
-      // 자원이 변경되면 선택된 시간을 초기화하고 캘린더를 다시 렌더링
+    onResourceTypeChange() {
+      // 자원 유형이 변경되면 자원 선택과 시간을 초기화하지만 날짜는 유지
+      this.reservationForm.resourceId = ''
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
-      this.reservationForm.date = ''
+      this.isSelecting = false
+      this.selectionStartDate = null
+      this.selectionStartHour = null
+      this.selectionEndDate = null
+      this.selectionEndHour = null
+      this.generateWeekDates()
+    },
+    
+    onResourceChange() {
+      // 자원이 변경되면 선택된 시간만 초기화하고 캘린더를 다시 렌더링
+      // 날짜는 유지하여 날짜 먼저 선택 후 자원 선택도 가능하도록 함
+      this.reservationForm.startTime = ''
+      this.reservationForm.endTime = ''
       this.isSelecting = false
       this.selectionStartDate = null
       this.selectionStartHour = null
@@ -947,7 +1228,8 @@ export default {
       this.generateWeekDates()
     },
     onDateChange() {
-      // 날짜가 변경되면 선택된 시간을 초기화하고 캘린더를 다시 렌더링
+      // 날짜가 변경되면 선택된 시간만 초기화하고 캘린더를 다시 렌더링
+      // 자원 선택은 유지하여 날짜 먼저 선택 후 자원 선택도 가능하도록 함
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
       this.isSelecting = false
@@ -957,8 +1239,42 @@ export default {
       this.selectionEndHour = null
       this.generateWeekDates()
     },
+    
+    // 과거 날짜 비활성화
+    disabledDate(time) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return time.getTime() < today.getTime()
+    },
+    
+    // 과거 시간인지 확인
+    isPastTime(date, hour) {
+      const today = new Date()
+      const selectedDate = new Date(date)
+      const currentHour = today.getHours()
+      
+      // 오늘 날짜인 경우에만 시간 체크
+      if (selectedDate.toDateString() === today.toDateString()) {
+        // 현재 시간 이전만 과거로 판단 (현재 시간은 포함하지 않음)
+        return hour < currentHour
+      }
+      
+      return false
+    },
     // 새로운 시간 셀 선택 메서드들
     startTimeCellSelection(date, hour) {
+      // 과거 시간 선택 방지
+      if (this.isPastTime(date, hour)) {
+        this.warning('현재 시간 이전으로는 예약할 수 없습니다.')
+        return
+      }
+      
+      // 날짜가 선택되지 않은 상태에서는 시간 선택 불가
+      if (!this.reservationForm.date) {
+        this.warning('먼저 예약 날짜를 선택해주세요.')
+        return
+      }
+      
       // 자원이 선택되지 않은 상태에서는 예약된 시간대도 선택할 수 있음 (자원 선택을 위해)
       if (this.reservationForm.resourceId && this.isTimeCellReserved(date, hour)) {
         return
@@ -1032,6 +1348,11 @@ export default {
       return hour >= startHour && hour < endHour
     },
     isTimeCellReserved(date, hour) {
+      // 날짜가 선택되지 않았으면 예약 현황을 표시하지 않음
+      if (!this.reservationForm.date) {
+        return false
+      }
+      
       // 자원이 선택되지 않았으면 모든 자원의 예약을 확인
       if (!this.reservationForm.resourceId) {
         // 모든 자원의 예약 확인 (수정 중인 예약은 제외)
@@ -1073,6 +1394,11 @@ export default {
     },
     
     getReservationInfoForTimeCell(date, hour) {
+      // 날짜가 선택되지 않았으면 예약 정보를 반환하지 않음
+      if (!this.reservationForm.date) {
+        return null
+      }
+      
       // 특정 시간대의 예약 정보 반환
       if (!this.reservationForm.resourceId) {
         // 자원이 선택되지 않았으면 모든 자원의 예약 확인 (수정 중인 예약은 제외)
@@ -1141,22 +1467,24 @@ export default {
           groupedReservations[resourceName].reservations.push(reservation)
         })
         
-        // 툴팁 내용 구성
+        // 툴팁 내용 구성 - '자원명 : 예약 시간 (예약자명)' 형태
         const tooltipLines = []
         Object.keys(groupedReservations).forEach(resourceName => {
           const group = groupedReservations[resourceName]
-          const timeRanges = group.reservations.map(r => `${r.startTime}-${r.endTime}`).join(', ')
-          const statusLabel = this.getReservationStatusLabel(group.reservations[0].status)
-          tooltipLines.push(`${resourceName}: ${timeRanges} (${statusLabel})`)
+          group.reservations.forEach(reservation => {
+            const timeRange = `${reservation.startTime}-${reservation.endTime}`
+            const reserverName = reservation.memberId || '알 수 없음'
+            tooltipLines.push(`${resourceName}: ${timeRange} (${reserverName})`)
+          })
         })
         
-        return tooltipLines.join('\n')
+        return tooltipLines.join('<br>')
       }
       
-      // 특정 자원이 선택된 경우 (단일 객체 반환)
+      // 특정 자원이 선택된 경우 (단일 객체 반환) - '예약자 : {memberId}' 형태
       if (reservationInfo) {
-        const statusLabel = this.getReservationStatusLabel(reservationInfo.status)
-        return `예약됨 (${reservationInfo.startTime} - ${reservationInfo.endTime}, 상태: ${statusLabel})`
+        const reserverName = reservationInfo.memberId || '알 수 없음'
+        return `예약자: ${reserverName}`
       }
       
       return ''
@@ -1223,6 +1551,7 @@ export default {
     },
     openReservationModal() {
       this.isEditingMode = false
+      this.reservationForm.resourceType = '' // 자원 유형을 선택하지 않은 상태로 시작
       this.reservationForm.resourceId = '' // 자원을 선택하지 않은 상태로 시작
       this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
       this.reservationForm.startTime = ''
@@ -1250,8 +1579,10 @@ export default {
     },
     reserveResource(resource) {
       this.isEditingMode = false
+      this.reservationForm.resourceType = resource.categoryName // 자원 유형 설정
       this.reservationForm.resourceId = resource.id
-      this.reservationForm.date = this.formatDate(new Date()) // 오늘 날짜로 기본 설정
+      // 자원 목록에서 날짜가 선택된 경우 해당 날짜 사용, 아니면 오늘 날짜 사용
+      this.reservationForm.date = this.selectedDate || this.formatDate(new Date())
       this.reservationForm.startTime = ''
       this.reservationForm.endTime = ''
       this.reservationForm.purpose = ''
@@ -1270,6 +1601,7 @@ export default {
     },
     resetReservationForm() {
       this.reservationForm = {
+        resourceType: '',
         resourceId: '',
         date: '',
         startTime: '',
@@ -1292,7 +1624,78 @@ export default {
       this.selectionEndHour = null
     },
     viewResourceDetails(resource) {
-      this.info(`${resource.name} 상세 정보`)
+      this.selectedResource = resource
+      this.showResourceDetail = true
+    },
+    
+    reserveFromDetail() {
+      this.showResourceDetail = false
+      this.reserveResource(this.selectedResource)
+    },
+    
+    getStatusType(status) {
+      const statusMap = {
+        'available': 'success',
+        'occupied': 'danger',
+        'maintenance': 'warning'
+      }
+      return statusMap[status] || 'info'
+    },
+    
+    getTodayReservations(resourceId) {
+      const today = this.formatDate(new Date())
+      return this.allReservations.filter(reservation => 
+        reservation.reservationTypeId === resourceId && 
+        reservation.date === today &&
+        reservation.status !== 'CANCELLED'
+      ).sort((a, b) => {
+        // 시간순으로 정렬
+        return a.startTime.localeCompare(b.startTime)
+      })
+    },
+    
+    getWeekReservations(resourceId) {
+      const today = new Date()
+      const weekStart = new Date(today)
+      weekStart.setDate(today.getDate() - today.getDay())
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
+      
+      return this.allReservations.filter(reservation => {
+        const reservationDate = new Date(reservation.date)
+        return reservation.reservationTypeId === resourceId && 
+               reservationDate >= weekStart && 
+               reservationDate <= weekEnd &&
+               reservation.status !== 'CANCELLED'
+      }).sort((a, b) => {
+        // 날짜순으로 먼저 정렬, 같은 날짜면 시간순으로 정렬
+        const dateCompare = a.date.localeCompare(b.date)
+        if (dateCompare !== 0) {
+          return dateCompare
+        }
+        return a.startTime.localeCompare(b.startTime)
+      })
+    },
+    
+    getNextReservation(resourceId) {
+      const today = this.formatDate(new Date())
+      const futureReservations = this.allReservations.filter(reservation => 
+        reservation.reservationTypeId === resourceId && 
+        reservation.date > today &&
+        reservation.status !== 'CANCELLED'
+      ).sort((a, b) => new Date(a.date) - new Date(b.date))
+      
+      return futureReservations.length > 0 ? futureReservations[0] : null
+    },
+    
+    formatDateWithDay(dateStr) {
+      const date = new Date(dateStr)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const dayName = this.getDayName(date.getDay())
+      
+      return `${year}-${month}-${day} (${dayName})`
     },
     async submitReservation() {
       // 자원이 선택되지 않은 경우 에러 메시지
@@ -1465,7 +1868,12 @@ export default {
       // 예약 수정 모달 표시
       this.isEditingMode = true
       this.editingReservationId = reservation.id // 수정할 예약 ID 저장
+      
+      // 자원 정보 찾기
+      const resource = this.resources.find(r => r.name === reservation.resourceName)
+      
       this.reservationForm = {
+        resourceType: resource ? resource.categoryName : '',
         resourceId: this.getResourceIdByName(reservation.resourceName),
         date: reservation.date,
         startTime: reservation.startTime,
@@ -1495,17 +1903,60 @@ export default {
       const resource = this.resources.find(r => r.name === resourceName)
       return resource ? resource.id : null
     },
-    cancelReservation() {
-      this.$confirm('정말로 예약을 취소하시겠습니까?', '확인', {
-        confirmButtonText: '취소',
-        cancelButtonText: '돌아가기',
-        type: 'warning'
-      }).then(() => {
-        this.success('예약이 취소되었습니다.')
-      })
+    async cancelReservation(reservation) {
+      // 이용 중 상태일 때는 취소/삭제 불가
+      if (reservation.status === 'IN_USE') {
+        this.warning('이용 중인 예약은 취소할 수 없습니다.')
+        return
+      }
+      
+      const actionText = reservation.status === 'USED' ? '삭제' : '취소'
+      
+      try {
+        await this.$confirm(`정말로 예약을 ${actionText}하시겠습니까?`, '확인', {
+          confirmButtonText: actionText,
+          cancelButtonText: '돌아가기',
+          type: 'warning'
+        })
+
+        // API 요청으로 예약 삭제
+        const response = await axios.delete(
+          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/${reservation.id}`
+        )
+
+        if (response.data && response.data.success) {
+          // 로컬에서 예약 제거
+          const index = this.myReservations.findIndex(r => r.id === reservation.id)
+          if (index > -1) {
+            this.myReservations.splice(index, 1)
+          }
+          
+          // 전체 예약 목록에서도 제거
+          const allIndex = this.allReservations.findIndex(r => r.id === reservation.id)
+          if (allIndex > -1) {
+            this.allReservations.splice(allIndex, 1)
+          }
+          
+          this.success(`예약이 ${actionText}되었습니다.`)
+        } else {
+          throw new Error(response.data?.message || `예약 ${actionText}에 실패했습니다.`)
+        }
+      } catch (error) {
+        if (error !== 'cancel') { // 사용자가 확인을 취소한 경우가 아닐 때만 에러 처리
+          console.error('예약 취소 실패:', error)
+          this.error(`예약 ${actionText} 중 오류가 발생했습니다: ${error.message}`)
+        }
+      }
     },
-    showStatisticsModal() {
+    async showStatisticsModal() {
       this.showStatistics = true
+      
+      // 자원 데이터가 없으면 먼저 로드
+      if (this.resources.length === 0) {
+        await this.fetchResources()
+      }
+      
+      this.calculateStatistics()
       this.$nextTick(() => {
         // DOM이 완전히 렌더링된 후 차트 생성
         setTimeout(() => {
@@ -1514,6 +1965,93 @@ export default {
         }, 100)
       })
     },
+    
+    // API 데이터를 기반으로 통계 계산
+    calculateStatistics() {
+      const reservations = this.allReservations
+      
+      if (reservations.length === 0) {
+        this.statistics = {
+          usageRate: 0,
+          peakTime: '데이터 없음',
+          noShow: 0,
+          totalReservations: 0
+        }
+        return
+      }
+      
+      // 총 예약 수
+      const totalReservations = reservations.length
+      
+      // 이용률 계산 (USED 상태의 예약 비율)
+      const usedReservations = reservations.filter(r => r.status === 'USED').length
+      const usageRate = totalReservations > 0 ? Math.round((usedReservations / totalReservations) * 100) : 0
+      
+      // No Show 계산 (BEFORE 상태의 예약 수)
+      const noShow = reservations.filter(r => r.status === 'BEFORE').length
+      
+      // Peak Time 계산 (가장 많이 예약된 시간대)
+      const timeSlotCounts = {}
+      reservations.forEach(reservation => {
+        const startHour = parseInt(reservation.startTime.split(':')[0])
+        const timeSlot = `${startHour}:00-${startHour + 1}:00`
+        timeSlotCounts[timeSlot] = (timeSlotCounts[timeSlot] || 0) + 1
+      })
+      
+      let peakTime = '데이터 없음'
+      let maxCount = 0
+      Object.entries(timeSlotCounts).forEach(([timeSlot, count]) => {
+        if (count > maxCount) {
+          maxCount = count
+          peakTime = timeSlot
+        }
+      })
+      
+      this.statistics = {
+        usageRate,
+        peakTime,
+        noShow,
+        totalReservations
+      }
+    },
+    
+    // 월별 차트 데이터 생성
+    generateMonthlyChartData() {
+      const reservations = this.allReservations
+      
+      // 최근 12개월 데이터 생성
+      const months = []
+      const counts = []
+      
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        months.push(monthKey)
+        
+        // 해당 월의 예약 수 계산
+        const monthReservations = reservations.filter(reservation => {
+          const reservationDate = new Date(reservation.date)
+          const reservationMonth = `${reservationDate.getFullYear()}-${String(reservationDate.getMonth() + 1).padStart(2, '0')}`
+          return reservationMonth === monthKey
+        })
+        
+        counts.push(monthReservations.length)
+      }
+      
+      return {
+        labels: months,
+        datasets: [{
+          label: '예약 수',
+          data: counts,
+          backgroundColor: 'rgba(79, 70, 229, 0.2)',
+          borderColor: 'rgba(79, 70, 229, 1)',
+          borderWidth: 2,
+          tension: 0.4
+        }]
+      }
+    },
+    
     createMonthlyChart() {
       const ctx = this.$refs.monthlyChart
       if (!ctx || !ctx.getContext) {
@@ -1527,10 +2065,13 @@ export default {
         this.monthlyChartInstance = null
       }
       
+      // 실제 데이터로 월별 차트 데이터 생성
+      const monthlyData = this.generateMonthlyChartData()
+      
       try {
         this.monthlyChartInstance = new Chart(ctx, {
         type: 'line',
-        data: this.monthlyData,
+        data: monthlyData,
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -1570,6 +2111,85 @@ export default {
         this.monthlyChartInstance = null
       }
     },
+    
+    // 카테고리별 차트 데이터 생성
+    generateResourceChartData() {
+      const reservations = this.allReservations
+      const resourceCounts = {}
+      
+      console.log('카테고리별 차트 데이터 생성:', {
+        reservations: reservations.length,
+        resources: this.resources.length,
+        resourceIds: this.resources.map(r => ({ id: r.id, name: r.name, category: r.categoryName }))
+      })
+      
+      // 카테고리별 예약 수 계산
+      reservations.forEach(reservation => {
+        // 자원 정보 찾기
+        const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+        
+        if (resource) {
+          // 카테고리명만 사용
+          const categoryName = resource.categoryName || '기타'
+          resourceCounts[categoryName] = (resourceCounts[categoryName] || 0) + 1
+        } else {
+          // 자원을 찾을 수 없는 경우
+          const fallbackCategory = '알 수 없음'
+          resourceCounts[fallbackCategory] = (resourceCounts[fallbackCategory] || 0) + 1
+          console.log('자원을 찾을 수 없음:', {
+            reservationTypeId: reservation.reservationTypeId,
+            resourceName: reservation.resourceName,
+            reservation: reservation
+          })
+        }
+      })
+      
+      const labels = Object.keys(resourceCounts)
+      const data = Object.values(resourceCounts)
+      
+      // 카테고리별 색상 매핑
+      const categoryColors = {
+        '회의실': 'rgba(79, 70, 229, 0.8)',      // 보라색
+        '차량': 'rgba(16, 185, 129, 0.8)',        // 초록색
+        '기타': 'rgba(245, 158, 11, 0.8)',        // 노란색
+        '알 수 없음': 'rgba(239, 68, 68, 0.8)'    // 빨간색
+      }
+      
+      // 기본 색상 배열
+      const defaultColors = [
+        'rgba(139, 92, 246, 0.8)',
+        'rgba(236, 72, 153, 0.8)',
+        'rgba(6, 182, 212, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(251, 146, 60, 0.8)',
+        'rgba(168, 85, 247, 0.8)',
+        'rgba(20, 184, 166, 0.8)',
+        'rgba(244, 63, 94, 0.8)'
+      ]
+      
+      // 각 라벨에 대한 색상 생성
+      const backgroundColor = labels.map((label, index) => {
+        // 카테고리별 색상 우선 적용
+        for (const [category, color] of Object.entries(categoryColors)) {
+          if (label.includes(category)) {
+            return color
+          }
+        }
+        // 기본 색상 적용
+        return defaultColors[index % defaultColors.length]
+      })
+      
+      return {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor,
+          borderColor: backgroundColor.map(color => color.replace('0.8', '1')),
+          borderWidth: 2
+        }]
+      }
+    },
+    
     createResourceChart() {
       const ctx = this.$refs.resourceChart
       if (!ctx || !ctx.getContext) {
@@ -1583,17 +2203,20 @@ export default {
         this.resourceChartInstance = null
       }
       
+      // 실제 데이터로 카테고리별 차트 데이터 생성
+      const resourceData = this.generateResourceChartData()
+      
       try {
         this.resourceChartInstance = new Chart(ctx, {
         type: 'doughnut',
-        data: this.resourceData,
+        data: resourceData,
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             title: {
               display: true,
-              text: '자원별 이용률',
+              text: '카테고리별 이용률',
               font: {
                 size: 16,
                 weight: 'bold'
@@ -1613,6 +2236,7 @@ export default {
     },
     completeUsage(reservation) {
       this.usageCompletionForm = {
+        reservationId: reservation.id, // 예약 ID 저장
         resourceName: reservation.resourceName,
         date: reservation.date,
         timeRange: `${reservation.startTime} - ${reservation.endTime}`,
@@ -1624,19 +2248,42 @@ export default {
       }
       this.showUsageCompletion = true
     },
-    submitUsageCompletion() {
-      // 이용 완료 처리
-      const index = this.myReservations.findIndex(r => r.id === this.usageCompletionForm.resourceName)
-      if (index > -1) {
-        this.myReservations[index].status = '완료됨'
+    async submitUsageCompletion() {
+      try {
+        if (!this.usageCompletionForm.reservationId) {
+          this.error('예약 정보를 찾을 수 없습니다.')
+          return
+        }
+
+        // API 요청으로 예약 상태를 USED로 변경
+        const response = await axios.put(
+          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/status/${this.usageCompletionForm.reservationId}`,
+          {
+            reservationStatus: 'USED'
+          }
+        )
+
+        if (response.data && response.data.success) {
+          // 로컬 상태 업데이트
+          const index = this.myReservations.findIndex(r => r.id === this.usageCompletionForm.reservationId)
+          if (index > -1) {
+            this.myReservations[index].status = 'USED'
+          }
+          
+          this.success('이용 완료가 처리되었습니다.')
+          this.showUsageCompletion = false
+          this.resetUsageCompletionForm()
+        } else {
+          throw new Error(response.data?.message || '이용 완료 처리에 실패했습니다.')
+        }
+      } catch (error) {
+        console.error('이용 완료 처리 실패:', error)
+        this.error(`이용 완료 처리 중 오류가 발생했습니다: ${error.message}`)
       }
-      
-      this.success('이용 완료가 처리되었습니다.')
-      this.showUsageCompletion = false
-      this.resetUsageCompletionForm()
     },
     resetUsageCompletionForm() {
       this.usageCompletionForm = {
+        reservationId: '',
         resourceName: '',
         date: '',
         timeRange: '',
@@ -1896,6 +2543,7 @@ export default {
   flex-direction: column;
   gap: 4px;
   margin-right: 20px;
+  justify-content: center;
 }
 
 .resource-name {
@@ -1911,7 +2559,7 @@ export default {
   gap: 8px;
   min-width: 120px;
   align-self: flex-start;
-  margin-top: 16px;
+  margin-top: 10px;
   justify-content: flex-end;
 }
 
@@ -1925,9 +2573,9 @@ export default {
 .resource-details {
   display: flex;
   gap: 16px;
-  margin-bottom: 8px;
   font-size: 14px;
   color: #606266;
+  margin-top: 4px;
 }
 
 .resource-details > div {
@@ -1961,7 +2609,7 @@ export default {
 .resource-description {
   font-size: 14px;
   color: #909399;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .resource-actions {
@@ -1991,6 +2639,54 @@ export default {
 
 .my-reservations {
   padding: 20px 0;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #606266;
+  gap: 12px;
+}
+
+.loading-state .el-icon {
+  font-size: 32px;
+  color: #4f46e5;
+}
+
+.loading-state span {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #909399;
+  gap: 12px;
+}
+
+.empty-state .el-icon {
+  font-size: 48px;
+  color: #c0c4cc;
+  margin-bottom: 8px;
+}
+
+.empty-state span {
+  font-size: 16px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: #909399;
+  margin: 0;
 }
 
 .reservation-list {
@@ -2068,6 +2764,26 @@ export default {
 
 .reservation-details > div:last-child {
   margin-bottom: 0;
+}
+
+/* 내 예약 현황의 두 줄 레이아웃 */
+.reservation-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 16px;
+}
+
+.reservation-detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.reservation-detail-row > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
 .reservation-actions {
@@ -2153,6 +2869,7 @@ export default {
   border-bottom: 1px solid #e9ecef;
 }
 
+.resource-type-selection,
 .resource-selection,
 .date-selection {
   flex: 1;
@@ -2363,6 +3080,70 @@ export default {
   background: #e3f2fd;
 }
 
+.time-cell.past-time {
+  background: #e0e0e0 !important;
+  color: #999 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+  position: relative;
+}
+
+/* 예약된 시간대가 과거 시간보다 우선순위 높음 */
+.time-cell.past-time.reserved,
+.time-cell.past-time.reserved-meeting,
+.time-cell.past-time.reserved-vehicle,
+.time-cell.past-time.reserved-equipment,
+.time-cell.past-time.reserved-other,
+.time-cell.past-time.reserved-multiple {
+  background: #ffebee !important;
+  opacity: 1 !important;
+}
+
+.time-cell.past-time::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.1) 2px,
+    rgba(0,0,0,0.1) 4px
+  );
+  pointer-events: none;
+}
+
+/* 예약된 시간대에는 대각선 패턴 제거 */
+.time-cell.past-time.reserved::after,
+.time-cell.past-time.reserved-meeting::after,
+.time-cell.past-time.reserved-vehicle::after,
+.time-cell.past-time.reserved-equipment::after,
+.time-cell.past-time.reserved-other::after,
+.time-cell.past-time.reserved-multiple::after {
+  display: none;
+}
+
+.time-cell.past-time:hover {
+  background: #e0e0e0 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 예약된 시간대 호버 효과는 유지 */
+.time-cell.past-time.reserved:hover,
+.time-cell.past-time.reserved-meeting:hover,
+.time-cell.past-time.reserved-vehicle:hover,
+.time-cell.past-time.reserved-equipment:hover,
+.time-cell.past-time.reserved-other:hover,
+.time-cell.past-time.reserved-multiple:hover {
+  background: #ffcdd2 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 
 .selection-info {
   padding: 16px;
@@ -2539,6 +3320,196 @@ export default {
   margin-right: 0;
 }
 
+/* 자원 상세 정보 모달 스타일 */
+
+.detail-section {
+  margin-bottom: 30px;
+}
+
+/* 자원 상세 모달 footer 패딩 제거 */
+.resource-detail-modal + .el-dialog__footer {
+  padding-top: 0;
+}
+
+.detail-section h4 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 2px solid #4f46e5;
+  padding-bottom: 8px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 0 5px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-item.half-width {
+  grid-column: span 1;
+}
+
+.detail-row-half {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.detail-item label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-item span {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.reservation-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin: 0 5px;
+}
+
+.status-item {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.status-item label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reservation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.reservation-item .date {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.reservation-item .time {
+  font-size: 13px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.no-reservation {
+  text-align: center;
+  color: #909399;
+  font-size: 14px;
+  font-style: italic;
+  padding: 20px;
+}
+
+.next-reservation-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.next-reservation-info .date {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.next-reservation-info .time {
+  font-size: 13px;
+  color: #606266;
+}
+
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 0 5px;
+}
+
+.rule-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rule-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.rule-item label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rule-item span {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.special-rules ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.special-rules li {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.special-rules li:last-child {
+  margin-bottom: 0;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .reservation-form-header {
@@ -2584,5 +3555,10 @@ export default {
   .time-slot {
     height: 32px;
   }
+}
+
+/* 예약 툴팁 스타일 */
+:deep(.reservation-tooltip) {
+  max-width: 300px;
 }
 </style>
