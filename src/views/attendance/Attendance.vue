@@ -212,13 +212,15 @@
 </template>
 
 <script>
-import { useSnackbar } from '@/composables/useSnackbar'
-import CorrectionRequestModal from '@/components/attendance/CorrectionRequestModal.vue'
-import EssentialRequestInputModal from '@/components/attendance/EssentialRequestInputModal.vue'
-import { Line } from 'vue-chartjs'
-import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement } from 'chart.js'
+import { useSnackbar } from '@/composables/useSnackbar';
+import CorrectionRequestModal from '@/components/attendance/CorrectionRequestModal.vue';
+import EssentialRequestInputModal from '@/components/attendance/EssentialRequestInputModal.vue';
+import { Line } from 'vue-chartjs';
+import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement } from 'chart.js';
+import { mapState } from 'vuex'; // Vuex mapState 임포트
+import { recordEvent } from '@/api/attendance'; // 변경된 API 함수 임포트
 
-ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement)
+ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement);
 
 export default {
   name: 'AttendancePage',
@@ -359,6 +361,7 @@ export default {
     }
   },
   computed: {
+    ...mapState(['user']),
     filteredRecords() {
       let filtered = this.records
       
@@ -370,18 +373,43 @@ export default {
     }
   },
   methods: {
-    checkInOut() {
-      const now = new Date()
-      const timeString = now.toTimeString().slice(0, 5)
-      
-      if (!this.isCheckedIn) {
-        this.isCheckedIn = true
-        this.checkInTime = timeString
-        this.success(`출근 체크 완료: ${timeString}`)
-      } else {
-        this.isCheckedIn = false
-        this.checkOutTime = timeString
-        this.success(`퇴근 체크 완료: ${timeString}`)
+    // 출/퇴근 메인 메소드 (RequestParam 방식으로 수정)
+    async checkInOut() {
+      if (!this.user || !this.user.memberId || !this.user.companyId) {
+        this.error('사용자 또는 회사 정보가 없습니다.');
+        return;
+      }
+
+      try {
+        const position = await this.getCurrentPosition();
+        const deviceId = this.getDeviceId();
+
+        const params = {
+          memberId: this.user.memberId,
+          companyId: this.user.companyId,
+        };
+        
+        const requestBody = {
+          deviceId: deviceId,
+          deviceType: 'LAPTOP',
+          latitude: position.latitude,
+          longitude: position.longitude,
+          eventType: this.isCheckedIn ? 'CLOCK_OUT' : 'CLOCK_IN', // 이벤트 타입 명시
+        };
+
+        const responseData = await recordEvent(params, requestBody);
+
+        if (requestBody.eventType === 'CLOCK_IN') {
+          this.isCheckedIn = true;
+          this.checkInTime = new Date(responseData.eventTime).toTimeString().slice(0, 5);
+          this.success(`출근 체크 완료: ${this.checkInTime}`);
+        } else {
+          this.isCheckedIn = false;
+          this.checkOutTime = new Date(responseData.eventTime).toTimeString().slice(0, 5);
+          this.success(`퇴근 체크 완료: ${this.checkOutTime}`);
+        }
+      } catch (err) {
+        this.error(err.message || '요청 중 오류가 발생했습니다.');
       }
     },
     handleTabChange(tab) {
@@ -432,7 +460,7 @@ export default {
           routeName = 'BusinessTripRequestForm';
           break;
         // Add other cases if more types are added to EssentialRequestInputModal
-        default:
+        default: 
           this.error('알 수 없는 신청 유형입니다.');
           return;
       }
@@ -476,8 +504,7 @@ export default {
       }
     }
   }
-}
-</script>
+}</script>
 
 <style scoped>
 .attendance {

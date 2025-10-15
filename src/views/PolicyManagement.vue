@@ -8,16 +8,17 @@
           <span style="margin-left: 8px;">새 정책 추가</span>
         </el-button>
       </div>
-      <div class="policy-layout">
+      <div class="policy-layout" v-loading="isLoading">
         <div class="policy-list-panel">
-          <el-menu :default-active="selectedPolicy?.id.toString()" class="policy-menu" @select="handlePolicySelect">
+          <el-menu :default-active="selectedPolicyId" class="policy-menu" @select="handlePolicySelect">
             <el-sub-menu v-for="(group, type) in groupedPolicies" :key="type" :index="type">
               <template #title>
                 <span>{{ policyTypeNames[type] }}</span>
               </template>
-              <el-menu-item v-for="policy in group" :key="policy.id" :index="policy.id.toString()">
+              <el-menu-item v-for="policy in group" :key="policy.policyId" :index="policy.policyId">
                 <el-icon><Document /></el-icon>
                 <span>{{ policy.name }}</span>
+                <el-tag v-if="policy.isActive" type="success" size="small" style="margin-left: 8px;">활성</el-tag>
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -25,26 +26,25 @@
         <div class="policy-details-panel" v-if="selectedPolicy">
           <div class="panel-header">
             <h4>{{ selectedPolicy.name }} 상세</h4>
-            <el-button 
-              v-if="selectedPolicy.type === 'leave' || selectedPolicy.type === 'trip' || selectedPolicy.type === 'work'"
-              type="primary" 
-              plain 
-              @click="editPolicy(selectedPolicy)"
-            >세부 정책 수정</el-button>
+            <div>
+              <el-button v-if="!selectedPolicy.isActive" type="success" @click="handleActivate(selectedPolicy.policyId)">활성화</el-button>
+              <el-button type="danger" plain @click="handleDelete(selectedPolicy.policyId)">삭제</el-button>
+              <el-button type="primary" plain @click="editPolicy(selectedPolicy)">정책 수정</el-button>
+            </div>
           </div>
           <div class="details-content">
             <el-descriptions :column="1" border>
               <el-descriptions-item label="정책명">{{ selectedPolicy.name }}</el-descriptions-item>
-              <el-descriptions-item label="적용 대상">{{ selectedPolicy.target }}</el-descriptions-item>
-              <el-descriptions-item v-if="selectedPolicy.autoGrant" label="자동 부여 기준">
-                <el-tag>{{ selectedPolicy.autoGrant }}</el-tag>
+              <el-descriptions-item label="적용 기간">
+                {{ selectedPolicy.effectiveFrom }} ~ {{ selectedPolicy.effectiveTo || '무기한' }}
               </el-descriptions-item>
-              <el-descriptions-item label="규칙">
-                <el-timeline style="margin-top: 10px;">
-                  <el-timeline-item v-for="(rule, index) in selectedPolicy.rules" :key="index" :timestamp="rule.condition">
-                    {{ rule.action }}
-                  </el-timeline-item>
-                </el-timeline>
+              <el-descriptions-item v-if="selectedPolicy.ruleDetails.workTimeRule" label="근무 유형">
+                <el-tag>{{ selectedPolicy.ruleDetails.workTimeRule.type }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item v-if="selectedPolicy.ruleDetails.authRule" label="인증 방식">
+                <el-tag v-for="method in selectedPolicy.ruleDetails.authRule.methods" :key="method.deviceType" type="info" style="margin-right: 5px;">
+                  {{ method.deviceType }}: {{ method.authMethod }}
+                </el-tag>
               </el-descriptions-item>
             </el-descriptions>
           </div>
@@ -54,73 +54,31 @@
         </div>
       </div>
     </div>
-
-    <!-- 새 정책 유형 선택 다이얼로그 -->
-    <el-dialog v-model="newPolicyDialogVisible" title="새 정책 생성" width="500px">
-      <el-form label-position="top">
-        <el-form-item label="생성할 정책 유형을 선택하세요.">
-          <el-select v-model="selectedNewPolicyType" style="width: 100%;">
-            <el-option label="연차 정책" value="leave"></el-option>
-            <el-option label="근무 정책" value="work"></el-option>
-            <el-option label="출장 정책" value="trip"></el-option>
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="newPolicyDialogVisible = false">취소</el-button>
-        <el-button type="primary" @click="confirmNewPolicy">생성</el-button>
-      </template>
-    </el-dialog>
-
   </div>
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Document, Plus } from '@element-plus/icons-vue';
+import { useStore } from 'vuex';
+import { Document, Plus} from '@element-plus/icons-vue';
+import { getPolicies, deletePolicy, activatePolicy } from '@/api/attendance';
+import { useSnackbar } from '@/composables/useSnackbar';
+import { ElMessageBox } from 'element-plus';
 
 export default {
   name: 'PolicyManagement',
   components: { Document, Plus },
   setup() {
     const router = useRouter();
+    const store = useStore();
+    const { success, error } = useSnackbar();
 
-    const policies = ref([
-      {
-        id: 1,
-        type: 'leave',
-        name: '연차 정책',
-        target: '전사',
-        autoGrant: '매년 1월 1일',
-        rules: [
-          { condition: '1년 미만', action: '1개월 만근 시 1일 발생' },
-          { condition: '1년 이상', action: '15일 부여' },
-          { condition: '3년 이상', action: '16일 부여 (매 2년마다 1일 가산)' },
-        ]
-      },
-      {
-        id: 2,
-        type: 'work',
-        name: '기본 근무 정책',
-        target: '전사',
-        rules: [
-          { condition: '근무 시간', action: '09:00 ~ 18:00' },
-          { condition: '휴게 시간', action: '12:00 ~ 13:00' },
-          { condition: '코어 타임', action: '10:00 ~ 16:00' },
-        ]
-      },
-      {
-        id: 3,
-        type: 'trip',
-        name: '출장 정책',
-        target: '영업팀, 마케팅팀',
-        rules: [
-          { condition: '일일 한도', action: '100,000원' },
-          { condition: '필수 제출', action: '영수증, 출장 보고서' },
-        ]
-      },
-    ]);
+    const policies = ref([]);
+    const isLoading = ref(false);
+    const selectedPolicyId = ref(null);
+
+    const companyId = computed(() => store.state.user?.companyId);
 
     const policyTypeNames = {
       leave: '연차 정책',
@@ -128,74 +86,92 @@ export default {
       trip: '출장 정책',
     };
 
-    const selectedPolicyId = ref(1);
-    const newPolicyDialogVisible = ref(false);
-    const selectedNewPolicyType = ref('leave');
-
     const groupedPolicies = computed(() => {
       return policies.value.reduce((acc, policy) => {
-        (acc[policy.type] = acc[policy.type] || []).push(policy);
+        const type = policy.isBalanceDeductible ? 'leave' : 'work';
+        (acc[type] = acc[type] || []).push(policy);
         return acc;
       }, {});
     });
 
-    const selectedPolicy = computed(() => 
-      policies.value.find(p => p.id === selectedPolicyId.value)
+    const selectedPolicy = computed(() =>
+      policies.value.find(p => p.policyId === selectedPolicyId.value)
     );
 
-    const handlePolicySelect = (index) => {
-      selectedPolicyId.value = parseInt(index, 10);
-    };
-
-    const openNewPolicyDialog = () => {
-      selectedNewPolicyType.value = 'leave'; // Reset to default
-      newPolicyDialogVisible.value = true;
-    };
-
-    const confirmNewPolicy = () => {
-      if (selectedNewPolicyType.value === 'leave') {
-        router.push('/admin/policy-management/leave-editor');
-      } else if (selectedNewPolicyType.value === 'work') {
-        router.push('/admin/policy-management/work-editor');
-      } else if (selectedNewPolicyType.value === 'trip') {
-        router.push('/admin/policy-management/trip-editor');
+    const fetchPolicies = async () => {
+      if (!companyId.value) {
+        error('회사 정보를 찾을 수 없습니다.');
+        return;
       }
-      newPolicyDialogVisible.value = false;
+      isLoading.value = true;
+      try {
+        const params = { companyId: companyId.value, page: 0, size: 20 };
+        const response = await getPolicies(params);
+        policies.value = response.content.map(policy => ({ ...policy, isActive: policy.isActive ?? false }));
+        if (policies.value.length > 0 && !selectedPolicyId.value) {
+          selectedPolicyId.value = policies.value[0].policyId;
+        }
+      } catch (err) {
+        error(err.message || '정책 목록을 불러오는 데 실패했습니다.');
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
+    onMounted(fetchPolicies);
+
+    const handlePolicySelect = (index) => {
+      selectedPolicyId.value = index;
+    };
+
+    const goToCreatePage = () => {
+      router.push({ name: 'PolicyCreate' });
     };
 
     const editPolicy = (policy) => {
-      if (policy.type === 'leave') {
-        router.push('/admin/policy-management/leave-editor');
-      } else if (policy.type === 'trip') {
-        router.push('/admin/policy-management/trip-editor');
-      } else if (policy.type === 'work') {
-        router.push('/admin/policy-management/work-editor');
+      router.push({ name: 'PolicyEdit', params: { policyId: policy.policyId } });
+    };
+
+    const handleDelete = async (policyId) => {
+      try {
+        await ElMessageBox.confirm('정말로 이 정책을 삭제하시겠습니까?', '경고', { type: 'warning' });
+        await deletePolicy(policyId);
+        success('정책이 삭제되었습니다.');
+        selectedPolicyId.value = null;
+        fetchPolicies();
+      } catch (err) {
+        if (err !== 'cancel') {
+          error(err.message || '정책 삭제에 실패했습니다.');
+        }
       }
-      // Add other policy types here in the future
+    };
+
+    const handleActivate = async (policyId) => {
+      try {
+        await activatePolicy(policyId);
+        success('정책이 성공적으로 활성화되었습니다.');
+        fetchPolicies();
+      } catch (err) {
+        error(err.message || '정책 활성화에 실패했습니다.');
+      }
     };
 
     return {
       policies,
+      isLoading,
       groupedPolicies,
       policyTypeNames,
       selectedPolicyId,
       selectedPolicy,
-      newPolicyDialogVisible,
-      selectedNewPolicyType,
       handlePolicySelect,
-      openNewPolicyDialog,
-      confirmNewPolicy,
+      goToCreatePage,
       editPolicy,
+      handleDelete,
+      handleActivate,
     };
   },
-  methods: {
-    goToCreatePage() {
-      this.$router.push({ name: 'PolicyCreate' });
-    }
-  }
 };
 </script>
-
 <style scoped>
 .policy-management {
   max-width: 1200px;
