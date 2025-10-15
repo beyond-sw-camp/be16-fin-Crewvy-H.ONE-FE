@@ -141,6 +141,9 @@
 </template>
 
 <script>
+import axios from 'axios'; // Add axios import
+import { ElMessage } from 'element-plus'; // Import ElMessage for notifications
+
 export default {
   name: 'AddEmployee',
   data() {
@@ -163,10 +166,60 @@ export default {
     };
   },
   methods: {
-    handleSubmit() {
-      this.$message.success('새로운 직원이 추가되었습니다.');
-      console.log('Form Submitted', this.form);
-      this.$router.push('/employee');
+    async handleSubmit() { // Make handleSubmit async
+      // Placeholder for user UUID and memberPositionId - these should come from authenticated user context
+      const userUuid = 'YOUR_USER_UUID'; // TODO: Replace with actual user UUID
+      const memberPositionId = 'YOUR_MEMBER_POSITION_ID'; // TODO: Replace with actual member position ID
+
+      const formData = new FormData();
+      formData.append('email', this.form.email);
+      formData.append('password', this.form.password);
+      formData.append('name', this.form.name);
+      formData.append('employeeId', this.form.employeeId); // Assuming employeeId is part of CreateMemberReq
+      formData.append('phone', this.form.phone);
+      formData.append('emergencyContact', this.form.emergencyContact);
+      // Handle birthDate formatting if needed by backend (e.g., to 'YYYY-MM-DD')
+      if (this.form.birthDate) {
+        formData.append('birthDate', new Date(this.form.birthDate).toISOString().split('T')[0]);
+      }
+      formData.append('address', this.form.address);
+      formData.append('bank', this.form.bank);
+      formData.append('accountNumber', this.form.accountNumber);
+
+      // Handle positions array - backend expects organizationId, titleId, roleId, gradeId
+      // This part needs careful mapping to backend DTO (CreateMemberReq)
+      // For simplicity, assuming only the first position is sent for now, or backend handles a list
+      // This will likely need adjustment based on actual CreateMemberReq structure
+      if (this.form.positions.length > 0) {
+        const firstPosition = this.form.positions[0];
+        // These IDs need to be retrieved from backend (e.g., via dropdowns populated from API)
+        // For now, using placeholders or assuming direct string values are handled
+        formData.append('organizationId', firstPosition.department); // Assuming department maps to organizationId
+        formData.append('titleId', firstPosition.title); // Assuming title maps to titleId
+        formData.append('roleId', firstPosition.role); // Assuming role maps to roleId
+        formData.append('gradeId', firstPosition.rank); // Assuming rank maps to gradeId
+      }
+
+
+      try {
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/create`, formData, {
+          headers: {
+            'X-User-UUID': userUuid,
+            'X-User-MemberPositionId': memberPositionId,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+
+        if (response.data && response.data.success) {
+          ElMessage.success('새로운 직원이 추가되었습니다.');
+          this.$router.push('/employee');
+        } else {
+          ElMessage.error(response.data.message || '직원 추가에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('직원 추가 오류:', error);
+        ElMessage.error(error.response?.data?.message || '직원 추가 중 오류가 발생했습니다.');
+      }
     },
     handleCancel() {
       this.$router.push('/employee');

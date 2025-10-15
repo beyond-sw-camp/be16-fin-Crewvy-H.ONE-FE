@@ -11,10 +11,10 @@
       <!-- Left Column: Role Cards -->
       <el-col :span="8">
         <div class="role-cards-container">
-          <el-card 
-            v-for="role in roles" 
-            :key="role.id" 
-            class="role-card" 
+          <el-card
+            v-for="role in role"
+            :key="role.id"
+            class="role-card"
             :class="{ active: selectedRole && selectedRole.id === role.id }"
             @click="selectRole(role)"
           >
@@ -42,16 +42,18 @@
 
           <div class="details-section">
             <h4>권한</h4>
-            <div class="permissions-list">
-              <el-tag v-for="permission in selectedRole.permissions" :key="permission" class="permission-tag">
-                {{ permission }}
-              </el-tag>
-            </div>
+            <el-scrollbar max-height="140px">
+              <div class="permissions-list">
+                <el-tag v-for="permission in selectedRole.permissionList" :key="permission" class="permission-tag">
+                  {{ permission }}
+                </el-tag>
+              </div>
+            </el-scrollbar>
           </div>
 
           <div class="details-section">
             <h4>할당된 멤버 ({{ selectedRole.memberCount }})</h4>
-            <el-table :data="selectedRole.members" stripe style="width: 100%" height="300">
+            <el-table :data="selectedRole.memberList" stripe style="width: 100%" height="300">
               <el-table-column prop="name" label="이름"></el-table-column>
               <el-table-column prop="department" label="부서"></el-table-column>
               <el-table-column prop="position" label="직책"></el-table-column>
@@ -66,85 +68,72 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'RoleList',
-  data() {
-    return {
-      selectedRole: null,
-      roles: [
-        {
-          id: 1, 
-          name: 'System Administrator',
-          description: '시스템의 모든 기능에 접근할 수 있는 최상위 관리자입니다.',
-          memberCount: 2,
-          permissions: ['모든 설정 접근', '사용자 관리', '데이터베이스 관리', '서버 모니터링'],
-          members: [
-            { id: 101, name: '김관리', department: 'IT 지원팀', position: '시스템 관리자' },
-            { id: 102, name: '박서버', department: 'IT 지원팀', position: '서버 관리자' },
-          ]
-        },
-        {
-          id: 2, 
-          name: 'HR Manager',
-          description: '인사 관련 정보(채용, 평가, 급여)를 관리합니다.',
-          memberCount: 3,
-          permissions: ['직원 정보 조회', '직원 정보 수정', '급여 관리', '채용 관리'],
-          members: [
-            { id: 201, name: '이인사', department: '인사팀', position: '팀장' },
-            { id: 202, name: '최채용', department: '인사팀', position: '대리' },
-            { id: 203, name: '정평가', department: '인사팀', position: '사원' },
-          ]
-        },
-        {
-          id: 3, 
-          name: 'General User',
-          description: '자신의 정보 조회, 게시판 사용 등 기본 기능만 사용합니다.',
-          memberCount: 15,
-          permissions: ['내 정보 조회', '게시판 사용', '근태 기록'],
-          members: [
-            { id: 301, name: '오일반', department: '개발팀', position: '선임 연구원' },
-            { id: 302, name: '강평범', department: '디자인팀', position: '디자이너' },
-            // ... more members
-          ]
-        },
-      ],
-    };
-  },
-  methods: {
-    selectRole(role) {
-        this.selectedRole = role;
-    },
-    goToCreateRole() {
-      this.$router.push('/employee/roles/create');
-    },
-    editRole(role) {
-      this.$router.push(`/employee/roles/edit/${role.id}`);
-    },
-    deleteRole(role) {
-      this.$confirm(`'${role.name}' 역할을 삭제하시겠습니까?`, '경고', {
-        confirmButtonText: '삭제',
-        cancelButtonText: '취소',
-        type: 'warning'
-      }).then(() => {
-        const index = this.roles.findIndex(r => r.id === role.id);
-        if (index !== -1) {
-          this.roles.splice(index, 1);
-          this.selectedRole = null; // Clear selection
-        }
-        this.$message({ type: 'success', message: '삭제되었습니다.' });
-      }).catch(() => {
-        this.$message({ type: 'info', message: '삭제가 취소되었습니다.' });
-      });
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+import { ElMessageBox } from 'element-plus';
+import { useSnackbar } from '@/composables/useSnackbar';
+
+const router = useRouter();
+const { success, error, info } = useSnackbar(); // Destructure success and info as well
+const role = ref([]);
+const selectedRole = ref(null);
+
+const fetchRole = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const headers = { 'Authorization': token ? `Bearer ${token}` : null };
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role`, { headers });
+    role.value = response.data.data;
+    if (role.value.length > 0) {
+      selectedRole.value = role.value[0];
     }
-  },
-  mounted() {
-      // Select the first role by default
-      if (this.roles.length > 0) {
-          this.selectedRole = this.roles[0];
-      }
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || '역할 목록을 불러오는 데 실패했습니다.';
+    error(errorMessage);
+    console.error(err);
   }
 };
+
+const selectRole = (role) => {
+  selectedRole.value = role;
+};
+
+const goToCreateRole = () => {
+  router.push('/employee/role/create');
+};
+
+const editRole = (role) => {
+  router.push(`/employee/role/edit/${role.id}`);
+};
+
+const deleteRole = (role) => {
+  ElMessageBox.confirm(`'${role.name}' 역할을 삭제하시겠습니까?`, '경고', {
+    confirmButtonText: '삭제',
+    cancelButtonText: '취소',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const headers = { 'Authorization': token ? `Bearer ${token}` : null };
+      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role/${role.id}/delete`, { headers });
+      success('삭제되었습니다.');
+      selectedRole.value = null;
+      fetchRole();
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || '삭제에 실패했습니다.';
+      error(errorMessage);
+      console.error(error);
+    }
+  }).catch(() => {
+    info('삭제가 취소되었습니다.');
+  });
+};
+
+onMounted(() => {
+  fetchRole();
+});
 </script>
 
 <style scoped>
@@ -185,6 +174,7 @@ export default {
 .role-card {
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+    border-radius: 8px;
 }
 
 .role-card.active {
@@ -222,6 +212,7 @@ export default {
 
 .details-card {
     height: calc(60vh + 32px);
+    border-radius: 8px;
 }
 
 .details-header {
