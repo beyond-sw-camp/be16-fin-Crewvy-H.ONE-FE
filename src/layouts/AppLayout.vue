@@ -262,7 +262,7 @@
           <!-- 사용자 메뉴 -->
           <el-dropdown v-if="user" @command="handleUserCommand">
             <div class="user-profile">
-              <el-avatar :src="user.avatar" :size="32" />
+              <el-avatar :src="userAvatarUrl" :size="32" />
               <span class="user-name">{{ userName }}</span>
               <el-icon>
                 <ArrowDown />
@@ -441,6 +441,7 @@ import { mapState, mapMutations, mapGetters } from 'vuex'
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
 import organizationService from '@/api/organizationService';
+import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 
 export default {
   name: 'MainLayout',
@@ -451,6 +452,7 @@ export default {
   },
   data() {
     return {
+      defaultAvatarSvg, // Expose to template
       sidebarCollapsed: false,
       showOrgModal: false,
       showCalendarModal: false,
@@ -632,6 +634,9 @@ export default {
     }
   },
   computed: {
+    userAvatarUrl() {
+      return this.user?.avatar || this.defaultAvatarSvg;
+    },
     ...mapState(['user', 'notifications']),
     ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {

@@ -10,11 +10,11 @@
         <template #header><span>계정 설정</span></template>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="재직 상태">
-              <el-select v-model="form.status" placeholder="상태 선택">
-                <el-option label="재직" value="active"></el-option>
-                <el-option label="휴직" value="inactive"></el-option>
-                <el-option label="잠김" value="locked"></el-option>
+            <el-form-item label="계정 상태">
+              <el-select v-model="form.accountStatus" placeholder="계정 상태 선택">
+                <el-option label="정상" value="ACTIVE"></el-option>
+                <el-option label="비활성" value="INACTIVE"></el-option>
+                <el-option label="잠금" value="LOCK"></el-option>
               </el-select>
             </el-form-item>
           </el-col>
@@ -27,13 +27,42 @@
         </el-row>
       </el-card>
 
-      <!-- 계정 정보 -->
+      <!-- 기본 정보 -->
       <el-card class="form-section">
-        <template #header><span>계정 정보</span></template>
+        <template #header><span>기본 정보</span></template>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="이름">
-              <el-input v-model="form.name" disabled></el-input>
+              <el-input v-model="form.name"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="직급">
+              <el-input v-model="form.gradeName" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="재직 상태">
+              <el-select v-model="form.memberStatus" placeholder="재직 상태 선택">
+                <el-option label="재직" value="WORKING"></el-option>
+                <el-option label="휴직" value="LEAVE"></el-option>
+                <el-option label="파견" value="DETACHMENT"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="고용형태">
+              <el-select v-model="form.employmentType" placeholder="고용형태 선택">
+                <el-option label="정규직" value="FULL"></el-option>
+                <el-option label="계약직" value="CONTRACT"></el-option>
+                <el-option label="인턴" value="INTERN"></el-option>
+                <el-option label="기타" value="ETC"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="사번">
+              <el-input v-model="form.sabun" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -41,101 +70,154 @@
               <el-input v-model="form.email" disabled></el-input>
             </el-form-item>
           </el-col>
-        </el-row>
-      </el-card>
-
-      <!-- 개인 정보 -->
-      <el-card class="form-section">
-        <template #header><span>개인 정보</span></template>
-        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="연락처">
-              <el-input v-model="form.phone"></el-input>
+              <el-input v-model="form.phoneNumber" disabled></el-input>
             </el-form-item>
           </el-col>
-           <el-col :span="12">
-            <el-form-item label="입사일">
-              <el-date-picker
-                v-model="form.joinDate"
-                type="date"
-                placeholder="입사일 선택"
-                style="width: 100%;"
-              ></el-date-picker>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
-
-      <!-- 급여 정보 -->
-      <el-card class="form-section">
-        <template #header><span>급여 정보</span></template>
-        <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="은행">
-              <el-input v-model="form.bank"></el-input>
+            <el-form-item label="비상연락처">
+              <el-input v-model="form.emergencyContact" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="내선 전화">
+              <el-input v-model="form.extensionNumber"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="일반 전화">
+              <el-input v-model="form.telNumber"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="은행명">
+              <el-input v-model="form.bank" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="계좌번호">
-              <el-input v-model="form.accountNumber"></el-input>
+              <el-input v-model="form.bankAccount" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="입사일">
+              <el-date-picker v-model="form.joinDate" type="date" placeholder="입사일 선택"
+                style="width: 100%;"></el-date-picker>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="근속기간">
+              <el-input v-model="form.lengthOfService" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="주소">
+              <el-input v-model="form.address"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
       </el-card>
 
-      <!-- 직무/역할 정보 -->
+      <!-- 인사 정보 카드 (신규 추가) -->
       <el-card class="form-section">
         <template #header>
           <div class="section-title-container">
-            <span>직무/역할 정보</span>
-            <el-button @click="addPosition" type="primary" plain size="small"><el-icon><Plus /></el-icon> 직무 추가</el-button>
+            <span>인사 정보</span>
+            <div>
+              <el-button @click="addGradeHistory" type="primary" plain size="small"><el-icon>
+                  <Plus />
+                </el-icon> 직급 추가</el-button>
+              <el-button @click="showAllGradeHistory = !showAllGradeHistory" type="info" plain size="small">
+                {{ showAllGradeHistory ? '활성화된 직급만 보기' : '모든 직급 보기' }}
+              </el-button>
+            </div>
+          </div>
+        </template>
+        <div class="grade-history-list">
+          <div v-for="(grade, index) in filteredGradeHistorySet" :key="grade.gradeHistoryId || index" class="grade-history-item">
+            <el-row :gutter="24">
+              <el-col :span="12">
+                <el-form-item :label="`직급명 ${index + 1}`">
+                  <el-select v-model="grade.gradeId" placeholder="직급 선택" style="width: 100%;">
+                    <el-option v-for="g in allGrades" :key="g.id" :label="g.name" :value="g.id"></el-option>
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="`진급일 ${index + 1}`">
+                  <el-date-picker v-model="grade.promotionDate" type="date" placeholder="진급일 선택"
+                    style="width: 100%;"></el-date-picker>
+                </el-form-item>
+              </el-col>
+              <el-col :span="4" class="delete-grade-history-col">
+                <el-button type="danger" circle @click="removeGradeHistory(index)"
+                  v-if="filteredGradeHistorySet.length > 1">
+                  <el-icon>
+                    <Delete />
+                  </el-icon>
+                </el-button>
+              </el-col>
+            </el-row>
+            <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
+            <el-tag v-if="grade.isActive === false && grade.ynDel === false" type="warning" size="small">비활성화</el-tag>
+          </div>
+          <p v-if="filteredGradeHistorySet.length === 0">진급 이력이 없습니다.</p>
+        </div>
+      </el-card>
+
+      <!-- 직무 정보 -->
+      <el-card class="form-section">
+        <template #header>
+          <div class="section-title-container">
+            <span>직무 정보</span>
+            <div>
+              <el-button @click="addPosition" type="primary" plain size="small"><el-icon>
+                  <Plus />
+                </el-icon> 직무 추가</el-button>
+              <el-button @click="showAllPositions = !showAllPositions" type="info" plain size="small">
+                {{ showAllPositions ? '활성화된 직무만 보기' : '모든 직무 보기' }}
+              </el-button>
+            </div>
           </div>
         </template>
         <div class="positions-list">
-          <div v-for="(position, index) in form.positions" :key="index" class="position-item">
+          <div v-for="(position, index) in filteredPositions" :key="position.memberPositionId || index" class="position-item">
             <div class="position-item-header">
               <h4>직무 {{ index + 1 }}</h4>
-              <el-button @click="removePosition(index)" type="danger" text v-if="form.positions.length > 1">
-                삭제
+              <el-button @click="removePosition(index)" type="danger" circle v-if="filteredPositions.length > 1">
+                <el-icon>
+                  <Delete />
+                </el-icon>
               </el-button>
             </div>
             <el-row :gutter="24">
-              <el-col :span="12">
+              <el-col :span="8">
                 <el-form-item label="부서">
-                  <el-input v-model="position.department" placeholder="부서명">
-                    <template #append>
-                      <el-button>조직도에서 선택</el-button>
-                    </template>
-                  </el-input>
+                  <el-select v-model="position.organizationId" placeholder="부서 선택" style="width: 100%;">
+                    <el-option v-for="org in allOrganizations" :key="org.id" :label="org.name"
+                      :value="org.id"></el-option>
+                  </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
+              <el-col :span="8">
                 <el-form-item label="직책">
-                  <el-select v-model="position.title" placeholder="직책 선택" style="width: 100%;">
-                    <el-option label="팀원" value="팀원"></el-option>
-                    <el-option label="팀장" value="팀장"></el-option>
+                  <el-select v-model="position.titleId" placeholder="직책 선택" style="width: 100%;">
+                    <el-option v-for="title in allTitles" :key="title.id" :label="title.name"
+                      :value="title.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
-                <el-form-item label="직급">
-                  <el-select v-model="position.rank" placeholder="직급 선택" style="width: 100%;">
-                    <el-option label="사원" value="사원"></el-option>
-                    <el-option label="주임" value="주임"></el-option>
-                    <el-option label="대리" value="대리"></el-option>
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
+              <el-col :span="8">
                 <el-form-item label="역할">
-                  <el-select v-model="position.role" placeholder="역할 선택" style="width: 100%;">
-                    <el-option label="일반 사용자" value="user"></el-option>
-                    <el-option label="인사 관리자" value="hr_manager"></el-option>
-                    <el-option label="시스템 관리자" value="admin"></el-option>
+                  <el-select v-model="position.roleId" placeholder="역할 선택" style="width: 100%;">
+                    <el-option v-for="role in allRoles" :key="role.id" :label="role.name" :value="role.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
+            <el-tag v-if="position.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
+            <el-tag v-if="position.isActive === false && position.ynDel === false" type="warning" size="small">비활성화</el-tag>
           </div>
         </div>
       </el-card>
@@ -149,65 +231,268 @@
 </template>
 
 <script>
+import employeeService from '../../api/employeeService';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus, Delete } from '@element-plus/icons-vue';
+
 export default {
   name: 'EmployeeEdit',
+  components: {
+    Plus,
+    Delete,
+  },
   data() {
     return {
       form: {
         id: null,
         name: '',
         email: '',
-        phone: '',
-        joinDate: '',
-        status: '',
+        phoneNumber: '',
+        emergencyContact: '',
+        extensionNumber: '',
+        telNumber: '',
+        address: '',
         bank: '',
-        accountNumber: '',
-        positions: []
+        bankAccount: '',
+        joinDate: '',
+        lengthOfService: '',
+        gradeName: '',
+        employmentType: '',
+        memberStatus: '',
+        sabun: '',
+        accountStatus: '',
+        gradeHistorySet: [],
+        positions: [],
       },
-      employees: [
-        { id: 1, name: '김철수', email: 'kim@company.com', phone: '010-1234-5678', joinDate: '2020-03-15', status: 'active', bank: '국민은행', accountNumber: '123-456-7890', positions: [{ department: '개발팀', title: '팀장', rank: '팀장', role: 'hr_manager' }] },
-        { id: 2, name: '박민수', email: 'park@company.com', phone: '010-2345-6789', joinDate: '2021-07-01', status: 'active', bank: '신한은행', accountNumber: '234-567-8901', positions: [{ department: '개발팀', title: '주임', rank: '주임', role: 'user' }] },
-        { id: 3, name: '이지은', email: 'lee@company.com', phone: '010-3456-7890', joinDate: '2022-01-10', status: 'active', bank: '우리은행', accountNumber: '345-678-9012', positions: [{ department: '개발팀', title: '대리', rank: '대리', role: 'user' }, { department: '디자인팀', title: '팀원', rank: '사원', role: 'user' }] },
-      ]
+      showAllGradeHistory: false, // 상태 변수 추가
+      showAllPositions: false,   // 상태 변수 추가
+      accountStatusMapping: {
+        '정상': 'AS001',
+        '비활성': 'AS002',
+        '잠금': 'AS003',
+        'ACTIVE': 'AS001',
+        'INACTIVE': 'AS002',
+        'LOCK': 'AS003',
+      },
+      employmentTypeMapping: {
+        '정규직': 'ET001',
+        '계약직': 'ET002',
+        '인턴': 'ET003',
+        '기타': 'ET004',
+        'FULL': 'ET001',
+        'CONTRACT': 'ET002',
+        'INTERN': 'ET003',
+        'ETC': 'ET004',
+      },
+      memberStatusMapping: {
+        '재직': 'MS001',
+        '휴직': 'MS002',
+        '파견': 'MS003',
+        'WORKING': 'MS001',
+        'LEAVE': 'MS002',
+        'DETACHMENT': 'MS003',
+      },
+      allOrganizations: [],
+      allTitles: [],
+      allRoles: [],
+      memberPositionId: 'YOUR_MEMBER_POSITION_ID_HERE', // TODO: 실제 로그인한 사용자의 memberPositionId로 교체해야 합니다.
+      // allGrades는 인사 정보 카드에서 사용되므로 여기서는 필요 없음
     };
   },
+  watch: {
+    'form.gradeHistorySet': {
+      handler(newVal) { // oldVal 제거
+        console.log('--- form.gradeHistorySet changed ---');
+        console.log(JSON.stringify(newVal, null, 2));
+      },
+      deep: true
+    }
+  },
+  computed: {
+    filteredGradeHistorySet() {
+      if (this.showAllGradeHistory) {
+        return this.form.gradeHistorySet;
+      }
+      return this.form.gradeHistorySet.filter(gh => gh.isActive === true);
+    },
+    filteredPositions() {
+      if (this.showAllPositions) {
+        return this.form.positions;
+      }
+      return this.form.positions.filter(p => p.isActive === true);
+    }
+  },
   methods: {
-    fetchEmployeeData(id) {
-      const employee = this.employees.find(emp => emp.id === parseInt(id));
-      if (employee) {
-        this.form = JSON.parse(JSON.stringify(employee)); // Deep copy
-        if (!this.form.positions || this.form.positions.length === 0) {
-          this.form.positions = [{ department: '', title: '', rank: '', role: '' }];
+    async fetchEmployeeData(id) {
+      try {
+        const response = await employeeService.getEmployee(id);
+        const editData = response.data.data;
+        console.log('--- fetchEmployeeData - editData ---');
+        console.log(JSON.stringify(editData, null, 2));
+
+        // Map API response to form data
+        this.form = {
+          id: id,
+          name: editData.memberDetail.name,
+          email: editData.memberDetail.email,
+          phoneNumber: editData.memberDetail.phoneNumber,
+          emergencyContact: editData.memberDetail.emergencyContact,
+          extensionNumber: editData.memberDetail.extensionNumber,
+          telNumber: editData.memberDetail.telNumber,
+          address: editData.memberDetail.address,
+          bank: editData.memberDetail.bank,
+          bankAccount: editData.memberDetail.bankAccount,
+          joinDate: editData.memberDetail.joinDate,
+          lengthOfService: editData.memberDetail.lengthOfService,
+          gradeName: editData.memberDetail.gradeName,
+          employmentType: editData.memberDetail.employmentType,
+          memberStatus: editData.memberDetail.memberStatus,
+          sabun: editData.memberDetail.sabun,
+          accountStatus: editData.memberDetail.accountStatus,
+          gradeHistorySet: editData.memberDetail.gradeHistoryList?.map(gh => ({
+            gradeHistoryId: gh.gradeHistoryId, // gh.gradeHistoryId를 그대로 사용
+            gradeId: gh.gradeId,
+            gradeName: gh.gradeName,
+            promotionDate: gh.promotionDate || null,
+            isActive: typeof gh.isActive === 'string' ? gh.isActive.toUpperCase() === 'TRUE' : (gh.isActive ?? true)
+          })) || [],
+          positions: editData.memberDetail.memberPositionResList?.map(p => ({
+            memberPositionId: p.id, // 기존 memberPositionId 추가
+            organizationId: p.organization ? p.organization.id : null,
+            titleId: p.title ? p.title.id : null,
+            roleId: p.role ? p.role.id : null,
+            startDate: p.startDate, // startDate 추가
+            isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true) // boolean으로 변환
+          })) || []
+        };
+
+        this.allOrganizations = editData.organizationResList;
+        this.allTitles = editData.titleResList;
+        this.allRoles = editData.roleResList;
+        this.allGrades = editData.gradeResList;
+
+        if (this.form.positions.length === 0) {
+          this.addPosition();
         }
-      } else {
-        this.$message.error('직원 정보를 찾을 수 없습니다.');
+
+      } catch (error) {
+        console.error("직원 정보를 불러오는데 실패했습니다:", error);
+        ElMessage.error(error.response?.data?.message || '직원 정보를 찾을 수 없습니다.');
         this.$router.push('/employee');
       }
     },
-    onSubmit() {
-      this.$message.success('직원 정보가 성공적으로 수정되었습니다.');
-      this.$router.push('/employee');
+    async onSubmit() {
+      try {
+        const updatePayload = {
+          name: this.form.name,
+          accountStatusCodeValue: this.accountStatusMapping[this.form.accountStatus] || this.form.accountStatus,
+          employmentTypeCodeValue: this.employmentTypeMapping[this.form.employmentType] || this.form.employmentType,
+          memberStatusCodeValue: this.memberStatusMapping[this.form.memberStatus] || this.form.memberStatus,
+          sabun: this.form.sabun,
+          extensionNumber: this.form.extensionNumber,
+          telNumber: this.form.telNumber,
+          joinDate: this.form.joinDate, // Ensure this is in a format backend expects (e.g., YYYY-MM-DD)
+          // newPw is not handled here, assuming separate resetPassword API or user input
+          gradeHistoryReqList: this.form.gradeHistorySet.map(gh => ({
+            gradeHistoryId: gh.gradeHistoryId, // null이 아닌 경우 그대로 사용
+            gradeId: gh.gradeId,
+            promotionDate: gh.promotionDate,
+            isActive: gh.isActive,
+          })),
+          positionUpdateReqList: this.form.positions.map(p => ({
+            memberPositionId: p.memberPositionId || null, // Send null for new entries
+            organizationId: p.organizationId,
+            titleId: p.titleId,
+            roleId: p.roleId,
+            startDate: p.startDate // startDate 추가
+          })),
+        };
+
+        console.log('--- onSubmit - updatePayload ---');
+        console.log(JSON.stringify(updatePayload, null, 2));
+
+        await employeeService.updateEmployee(this.form.id, this.memberPositionId, updatePayload);
+        ElMessage.success('직원 정보가 성공적으로 수정되었습니다.');
+        this.$router.push('/employee');
+      } catch (error) {
+        console.error("직원 정보 수정에 실패했습니다:", error);
+        ElMessage.error(error.response?.data?.message || '정보 수정에 실패했습니다.');
+      }
     },
     onCancel() {
       this.$router.push('/employee');
     },
     resetPassword() {
-      this.$confirm(`'${this.form.name}' 님의 비밀번호를 초기화하시겠습니까?`, '비밀번호 초기화', { confirmButtonText: '확인', cancelButtonText: '취소', type: 'warning' }).then(() => {
-        this.$message.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+      ElMessageBox.confirm(`'${this.form.name}' 님의 비밀번호를 초기화하시겠습니까?`, '비밀번호 초기화', {
+        confirmButtonText: '확인',
+        cancelButtonText: '취소',
+        type: 'warning'
+      }).then(() => {
+        // TODO: Implement actual password reset API call
+        ElMessage.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+      }).catch(() => {
+        ElMessage.info('비밀번호 초기화가 취소되었습니다.');
+      });
+    },
+    addGradeHistory() {
+      // 새로운 진급 이력을 추가하는 로직 (프론트엔드에서만)
+      // 실제로는 모달 등을 띄워 입력받고, 백엔드 API를 호출해야 합니다.
+      this.form.gradeHistorySet.push({
+        gradeHistoryId: null, // 새로운 항목이므로 null로 초기화
+        gradeId: null,
+        promotionDate: new Date().toISOString().slice(0, 10),
+        isActive: true // 새로 추가된 직급은 기본적으로 활성으로 표시
+      });
+      ElMessage.info('새로운 직급 항목이 추가되었습니다. 저장 시 반영됩니다.');
+    },
+    removeGradeHistory(index) {
+      // 진급 이력 삭제 (프론트엔드에서만, 실제로는 소프트 삭제 API 호출 필요)
+      ElMessageBox.confirm('해당 진급 이력을 삭제하시겠습니까?', '경고', {
+        confirmButtonText: '확인',
+        cancelButtonText: '취소',
+        type: 'warning'
+      }).then(() => {
+        this.form.gradeHistorySet.splice(index, 1);
+        ElMessage.success('진급 이력이 삭제되었습니다.');
+      }).catch(() => {
+        ElMessage.info('진급 이력 삭제가 취소되었습니다.');
       });
     },
     addPosition() {
-      this.form.positions.push({ department: '', title: '', rank: '', role: '' });
+      this.form.positions.push({
+        organizationId: null, // null로 초기화
+        titleId: null,       // null로 초기화
+        roleId: null,        // null로 초기화
+        startDate: new Date().toISOString().slice(0, 19) + 'Z', // ISO 8601 형식 (시간 정보 포함)
+        isActive: true // 새로 추가된 직무는 기본적으로 활성으로 표시
+      });
     },
     removePosition(index) {
       if (this.form.positions.length > 1) {
-        this.form.positions.splice(index, 1);
+        ElMessageBox.confirm('해당 직무 정보를 삭제하시겠습니까?', '경고', {
+          confirmButtonText: '확인',
+          cancelButtonText: '취소',
+          type: 'warning'
+        }).then(() => {
+          this.form.positions.splice(index, 1);
+          ElMessage.success('직무 정보가 삭제되었습니다.');
+        }).catch(() => {
+          ElMessage.info('직무 정보 삭제가 취소되었습니다.');
+        });
+      } else {
+        ElMessage.warning('최소 하나 이상의 직무 정보가 필요합니다.');
       }
+    },
+    getDisplayName(list, id) {
+      const item = list.find(item => item.id === id);
+      return item ? item.name : '';
     }
   },
   created() {
     const employeeId = this.$route.params.id;
-    this.fetchEmployeeData(employeeId);
+    if (employeeId) {
+      this.fetchEmployeeData(employeeId);
+    }
   }
 };
 </script>
@@ -231,13 +516,13 @@ export default {
 }
 
 .el-select {
-    width: 100%;
+  width: 100%;
 }
 
 .reset-info {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
 }
 
 .form-actions {
@@ -251,14 +536,16 @@ export default {
   align-items: center;
 }
 
-.positions-list .position-item {
+.positions-list .position-item,
+.grade-history-list .grade-history-item {
   border: 1px solid #e4e7ed;
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
 }
 
-.positions-list .position-item:last-child {
+.positions-list .position-item:last-child,
+.grade-history-list .grade-history-item:last-child {
   margin-bottom: 0;
 }
 
@@ -274,4 +561,10 @@ export default {
   font-size: 16px;
 }
 
+.delete-grade-history-col {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
 </style>
