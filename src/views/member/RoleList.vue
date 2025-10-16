@@ -10,21 +10,22 @@
     <el-row :gutter="24">
       <!-- Left Column: Role Cards -->
       <el-col :span="8">
-        <div class="role-cards-container">
-          <el-card
-            v-for="role in role"
-            :key="role.id"
-            class="role-card"
-            :class="{ active: selectedRole && selectedRole.id === role.id }"
-            @click="selectRole(role)"
-          >
-            <div class="role-card-header">
-              <span class="role-name">{{ role.name }}</span>
-              <span class="member-count">{{ role.memberCount }}명</span>
-            </div>
-            <p class="role-description">{{ role.description }}</p>
-          </el-card>
-        </div>
+        <draggable v-model="role" item-key="id" handle=".role-card" @end="handleRoleReorder" class="role-cards-container">
+          <template #item="{ element }">
+            <el-card
+              :key="element.id"
+              class="role-card"
+              :class="{ active: selectedRole && selectedRole.id === element.id }"
+              @click="selectRole(element)"
+            >
+              <div class="role-card-header">
+                <span class="role-name">{{ element.name }}</span>
+                <span class="member-count">{{ element.memberCount }}명</span>
+              </div>
+              <p class="role-description">{{ element.description }}</p>
+            </el-card>
+          </template>
+        </draggable>
       </el-col>
 
       <!-- Right Column: Role Details -->
@@ -72,8 +73,11 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus'; // ElMessage 임포트 제거
 import { useSnackbar } from '@/composables/useSnackbar';
+import draggable from 'vuedraggable'; // draggable 임포트
+import { Plus } from '@element-plus/icons-vue'; // Plus 아이콘은 이미 사용 중
+import roleService from '@/api/roleService'; // roleService 임포트
 
 const router = useRouter();
 const { success, error, info } = useSnackbar(); // Destructure success and info as well
@@ -83,7 +87,15 @@ const selectedRole = ref(null);
 const fetchRole = async () => {
   try {
     const token = localStorage.getItem('accessToken');
-    const headers = { 'Authorization': token ? `Bearer ${token}` : null };
+    const memberId = localStorage.getItem('memberId');
+    const memberPositionId = localStorage.getItem('memberPositionId');
+
+    const headers = {
+      'Authorization': token ? `Bearer ${token}` : null,
+      'X-User-UUID': memberId,
+      'X-User-MemberPositionId': memberPositionId
+    };
+
     const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role`, { headers });
     role.value = response.data.data;
     if (role.value.length > 0) {
@@ -115,9 +127,11 @@ const deleteRole = (role) => {
     type: 'warning'
   }).then(async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const headers = { 'Authorization': token ? `Bearer ${token}` : null };
-      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role/${role.id}/delete`, { headers });
+      const memberPositionId = localStorage.getItem('memberPositionId');
+      if (!memberPositionId) {
+        throw new Error("MemberPositionId not found.");
+      }
+      await roleService.deleteRole(memberPositionId, role.id);
       success('삭제되었습니다.');
       selectedRole.value = null;
       fetchRole();
@@ -129,6 +143,23 @@ const deleteRole = (role) => {
   }).catch(() => {
     info('삭제가 취소되었습니다.');
   });
+};
+
+const handleRoleReorder = async () => {
+  try {
+    const roleIds = role.value.map(r => r.id);
+    const memberPositionId = localStorage.getItem('memberPositionId'); // memberPositionId 가져오기
+    console.log('Reordering roles with:', { memberPositionId, roleIds }); // 디버깅 로그 추가
+    if (!memberPositionId) {
+      throw new Error("MemberPositionId not found.");
+    }
+    await roleService.reorderRole(memberPositionId, roleIds);
+    success('역할 순서가 변경되었습니다.');
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || '역할 순서 변경에 실패했습니다.';
+    error(errorMessage);
+    console.error(err);
+  }
 };
 
 onMounted(() => {

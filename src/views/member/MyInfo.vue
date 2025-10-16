@@ -9,7 +9,7 @@
       <el-col :xs="24" :sm="24" :md="8">
         <el-card class="profile-summary-card">
           <div class="profile-main">
-            <el-avatar :size="120" :src="userInfo.profile_url" />
+            <el-avatar :size="120" :src="userInfo.profile_url || defaultAvatarSvg" />
             <div class="profile-name-status">
               <h2>{{ userInfo.name }}</h2>
               <el-tag :type="statusTagType" effect="dark" size="small">{{ userInfo.member_status }}</el-tag>
@@ -24,11 +24,21 @@
             </div>
             <div class="info-item">
               <el-icon><Phone /></el-icon>
-              <span>{{ userInfo.phone_number }}</span>
+              <div class="info-item-content">
+                <span>{{ userInfo.phone_number }}</span>
+                <el-tag :type="userInfo.is_phone_number_public ? 'success' : 'info'" size="small" effect="plain">
+                  {{ userInfo.is_phone_number_public ? '공개' : '비공개' }}
+                </el-tag>
+              </div>
             </div>
             <div class="info-item">
               <el-icon><Location /></el-icon>
-              <span>{{ userInfo.address }}</span>
+              <div class="info-item-content">
+                <span>{{ userInfo.address }}</span>
+                <el-tag :type="userInfo.is_address_disclosure ? 'success' : 'info'" size="small" effect="plain">
+                  {{ userInfo.is_address_disclosure ? '공개' : '비공개' }}
+                </el-tag>
+              </div>
             </div>
           </div>
         </el-card>
@@ -47,12 +57,14 @@
             <el-descriptions title="인사 정보" :column="2" border class="info-table">
               <el-descriptions-item label="직급">{{ userInfo.grade }}</el-descriptions-item>
               <el-descriptions-item label="사번">{{ userInfo.sabun }}</el-descriptions-item>
-              <el-descriptions-item label="역할">{{ userInfo.role }}</el-descriptions-item>
-              <el-descriptions-item label="내선번호">{{ userInfo.extension_number }}</el-descriptions-item>
               <el-descriptions-item label="입사일">{{ userInfo.start_date }}</el-descriptions-item>
               <el-descriptions-item label="근속 기간">{{ daysWorked }}</el-descriptions-item>
-              <el-descriptions-item label="고용형태">{{ userInfo.employment_type }}</el-descriptions-item>
-              <el-descriptions-item label="비상연락처">{{ userInfo.emergency_contact }}</el-descriptions-item>
+              <el-descriptions-item label="고용형태">
+                <el-tag :type="employmentTypeTag" size="small">{{ userInfo.employment_type }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="대표직책">{{ userInfo.default_position }}</el-descriptions-item>
+              <el-descriptions-item label="내선번호">{{ userInfo.extension_number }}</el-descriptions-item>
+              <el-descriptions-item label="일반전화">{{ userInfo.telNumber }}</el-descriptions-item>
             </el-descriptions>
           </div>
 
@@ -69,33 +81,36 @@
 </template>
 
 <script>
+import memberService from '../../api/memberService';
+import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
+
 export default {
   name: 'MyInfo',
   data() {
     return {
+      defaultAvatarSvg, // Expose to template
       userInfo: {
-        member_id: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-        email: 'hong.gildong@h.one',
-        name: '홍길동',
-        phone_number: '010-1234-5678',
-        is_phone_number_public: true,
-        address: '서울시 강남구 테헤란로 123',
-        is_address_disclosure: true,
-        sabun: '20240001',
-        bank: 'H.ONE 은행',
-        bank_account: '123-456-789012',
-        profile_url: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', // Placeholder image
-        member_status: '재직',
-        company_id: 'f1e2d3c4-b5a6-7890-1234-567890abcdea',
-        // From other tables
-        department: '개발팀',
-        title: '선임 연구원',
-        grade: '대리',
-        role: '개발자',
-        start_date: '2023-01-15',
-        extension_number: '1234',
-        employment_type: '정규직',
-        emergency_contact: '010-8765-4321'
+        email: '',
+        name: '',
+        phone_number: '',
+        is_phone_number_public: false,
+        address: '',
+        is_address_disclosure: false,
+        sabun: '',
+        bank: '',
+        bank_account: '',
+        profile_url: '',
+        member_status: '',
+        department: '', // Will be mapped from organizationName
+        title: '', // Will be mapped from titleName
+        grade: '',
+        role: '', // This is not in the API response
+        start_date: '',
+        extension_number: '',
+        telNumber: '',
+        employment_type: '', // Will be mapped from employmentTypeName
+        emergency_contact: '',
+        default_position: '' // New field
       }
     };
   },
@@ -105,6 +120,14 @@ export default {
         case '재직': return 'success';
         case '휴직': return 'warning';
         case '파견': return 'info';
+        default: return 'info';
+      }
+    },
+    employmentTypeTag() {
+      switch (this.userInfo.employment_type) {
+        case '정규직': return 'success';
+        case '계약직': return 'warning';
+        case '인턴': return 'primary';
         default: return 'info';
       }
     },
@@ -121,7 +144,40 @@ export default {
   methods: {
     goToEdit() {
       this.$router.push('/my-info/edit');
+    },
+    async fetchMyPageInfo() {
+      try {
+        const data = await memberService.getMyPage();
+        this.userInfo = {
+          email: data.email,
+          name: data.memberName,
+          phone_number: data.phoneNumber,
+          is_phone_number_public: data.phoneNumberPublic,
+          address: data.address,
+          is_address_disclosure: data.addressDisclosure,
+          sabun: data.sabun,
+          bank: data.bank,
+          bank_account: data.bankAccount,
+          profile_url: data.profileUrl,
+          member_status: data.memberStatusName,
+          department: data.organizationName,
+          title: data.titleName,
+          grade: data.gradeName,
+          role: '', // This is not in the API response
+          start_date: data.joinDate,
+          extension_number: data.extensionNumber,
+          telNumber: data.telNumber,
+          employment_type: data.employmentTypeName,
+          emergency_contact: data.emergencyContact,
+          default_position: data.defaultPosition
+        };
+      } catch (error) {
+        console.error('마이페이지 정보를 가져오는데 실패했습니다.', error);
+      }
     }
+  },
+  created() {
+    this.fetchMyPageInfo();
   }
 };
 </script>
@@ -222,5 +278,12 @@ export default {
 
 .info-table ::v-deep .el-descriptions__label {
   width: 15%;
+}
+
+.info-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 </style>
