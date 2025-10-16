@@ -4,7 +4,7 @@
       <h1>직원 정보 수정</h1>
     </div>
 
-    <el-form ref="form" :model="form" label-width="120px" label-position="top">
+    <el-form ref="form" :model="form" label-width="120px" label-position="top" @submit.prevent>
       <!-- 계정 설정 -->
       <el-card class="form-section">
         <template #header><span>계정 설정</span></template>

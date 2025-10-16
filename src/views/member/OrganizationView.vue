@@ -45,10 +45,10 @@
       </el-card>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="modalTitle" width="400px">
-      <el-form :model="currentOrg" label-position="top">
+    <el-dialog v-model="dialogVisible" :title="modalTitle" width="400px" @opened="handleDialogOpened">
+      <el-form :model="currentOrg" label-position="top" @submit.prevent="saveOrganization">
         <el-form-item label="조직명">
-          <el-input v-model="currentOrg.name" placeholder="조직의 이름을 입력하세요" @keyup.enter="saveOrganization"></el-input>
+          <el-input ref="orgNameInput" v-model="currentOrg.name" placeholder="조직의 이름을 입력하세요"></el-input> <!-- @keyup.enter 제거 -->
         </el-form-item>
       </el-form>
       <template #footer>
@@ -75,8 +75,16 @@ const currentOrg = reactive({ id: null, name: '' });
 const parentNode = ref(null);
 const expandedKeys = ref([]);
 const orgTreeRef = ref(null);
+const orgNameInput = ref(null); // ref 선언
 
 const modalTitle = computed(() => (isEdit.value ? '조직 수정' : '조직 추가'));
+
+// 모달이 열릴 때 입력 필드에 포커스
+const handleDialogOpened = () => {
+  if (orgNameInput.value) {
+    orgNameInput.value.focus();
+  }
+};
 
 watch(orgSearch, (val) => {
   orgTreeRef.value.filter(val);
@@ -202,7 +210,7 @@ const handleNodeDrop = async (draggingNode, dropNode, dropType) => {
 
   try {
     const token = localStorage.getItem('accessToken');
-    await axios.put(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/reorder`, children, {
+    await axios.put(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/reorder`, { idList: children }, { // ReorderReq DTO 형식에 맞춰 변경
       headers: {
         'Authorization': token ? `Bearer ${token}` : null
       }
