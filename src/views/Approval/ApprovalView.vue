@@ -10,7 +10,7 @@
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
-        <el-button @click="showTemplate = true">
+        <el-button @click="goToTemplateList">
           <el-icon><Document /></el-icon>
           <span style="margin-left: 8px;">템플릿 관리</span>
         </el-button>
@@ -102,14 +102,6 @@
                     <div class="approval-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</div>
                   </div>
                   <div class="approval-actions">
-                    <el-button type="success" size="small" @click="approveItem(approval)">
-                      <el-icon><Check /></el-icon>
-                      승인
-                    </el-button>
-                    <el-button type="danger" size="small" @click="rejectItem(approval)">
-                      <el-icon><Close /></el-icon>
-                      반려
-                    </el-button>
                     <el-button size="small" @click="viewDetails(approval)">
                       <el-icon><View /></el-icon>
                       상세
@@ -259,13 +251,13 @@ import { useRouter } from 'vue-router';
 import apiClient from '@/api/http';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
-import { Plus, Document, Clock, Check, Close, View, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Document, Clock, Check, View, Edit, Delete } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalPage',
   components: {
     ApprovalTemplateSelectorModal,
-    Plus, Document, Clock, Check, Close, View, Edit, Delete
+    Plus, Document, Clock, Check, View, Edit, Delete
   },
   setup() {
     const { success, error, warning, info } = useSnackbar();
@@ -481,6 +473,10 @@ export default {
       }
     };
 
+    const goToTemplateList = () => {
+      router.push('/approval/templates/list');
+    };
+
     const filteredPendingApprovals = computed(() => {
       // TODO: Re-implement filtering based on new data structure
       return pendingApprovalsList.value;
@@ -519,7 +515,8 @@ export default {
       showMyRequestsTable,
       temporarySaves,
       continueWriting,
-      deleteTemporary
+      deleteTemporary,
+      goToTemplateList
     };
   },
 }

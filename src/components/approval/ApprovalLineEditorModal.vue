@@ -96,6 +96,10 @@ export default {
   },
   props: {
     visible: Boolean,
+    initialLine: {
+      type: Array,
+      default: () => []
+    }
   },
   emits: ['update:visible', 'save'],
   setup(props, { emit }) {
@@ -145,18 +149,6 @@ export default {
       });
     };
 
-    const findMemberNodeById = (nodes, userId) => {
-      for (const node of nodes) {
-        if (node.isLeaf && node.id === userId) {
-          return node;
-        }
-        if (node.children) {
-          const found = findMemberNodeById(node.children, userId);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
 
     const fetchOrgChartData = async () => {
       try {
@@ -168,31 +160,14 @@ export default {
       }
     };
 
-    const resetApprovalLine = () => {
-      approvalLine.value = [];
-      const currentUserId = localStorage.getItem('memberId');
-      if (currentUserId) {
-        const userNode = findMemberNodeById(orgChartData.value, currentUserId);
-        if (userNode) {
-          approvalLine.value.push({
-            id: userNode.id,
-            name: userNode.memberData.name,
-            department: userNode.memberData.department,
-            position: userNode.memberData.position,
-            memberPositionId: userNode.memberData.memberPositionId,
-          });
-        }
-      }
-    };
-
     onMounted(async () => {
       await fetchOrgChartData();
-      resetApprovalLine();
     });
 
     watch(() => props.visible, (newValue) => {
       if (newValue) {
-        resetApprovalLine();
+        // Deep copy to avoid mutating prop
+        approvalLine.value = JSON.parse(JSON.stringify(props.initialLine));
       }
     });
 

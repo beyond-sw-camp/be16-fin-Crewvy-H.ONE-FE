@@ -109,8 +109,9 @@
             </div>
           </template>
           <div class="approval-line-display">
-             <div v-for="(approver, index) in currentApprovalLine" :key="approver.id" class="approver-display-item">
-              <span>{{ index + 1 }}. {{ approver.name }} ({{ approver.department }} / {{ approver.position }})</span>
+             <div v-for="approver in currentApprovalLine" :key="approver.id" class="approver-display-item">
+              <div class="approver-name">{{ approver.name }}</div>
+              <div class="approver-details">{{ approver.department }} / {{ approver.position }}</div>
             </div>
             <div v-if="currentApprovalLine.length === 0" class="empty-state">
               <p>결재라인을 추가해 주세요.</p>
@@ -128,6 +129,7 @@
     <!-- Approval Line Editor Modal -->
     <ApprovalLineEditorModal 
       :visible="showApprovalLineEditor" 
+      :initial-line="currentApprovalLine"
       @update:visible="showApprovalLineEditor = $event"
       @save="updateApprovalLine"
     />
@@ -159,40 +161,101 @@ export default {
     const showApprovalLineEditor = ref(false);
     const currentApprovalLine = ref([]);
     const fileList = ref([]); // For <el-upload>
+    const memberInfo = ref(null);
 
-    const initializeFormData = (schema) => {
+    const fetchMemberInfo = async () => {
+      try {
+        const memberPositionId = localStorage.getItem('memberPositionId');
+        if (!memberPositionId) return;
+
+        const response = await apiClient.post('/member-service/member/position-list', {
+          uuidList: [memberPositionId]
+        });
+
+        if (response.data.data && response.data.data.length > 0) {
+          memberInfo.value = response.data.data[0];
+        }
+      } catch (error) {
+        console.error('Failed to fetch member info:', error);
+      }
+    };
+
+    const initializeFormData = (schema, userInfo) => {
       const data = {};
       if (schema && schema.rows) {
         schema.rows.forEach(row => {
           row.forEach(field => {
-            data[field.id] = null;
+            if (userInfo) {
+              if (field.id === 'department') {
+                data[field.id] = userInfo.organizationName;
+              } else if (field.id === 'position') {
+                data[field.id] = userInfo.titleName;
+              } else if (field.id === 'name') {
+                data[field.id] = userInfo.memberName;
+              } else {
+                data[field.id] = null;
+              }
+            } else {
+              data[field.id] = null;
+            }
           });
         });
       }
       formData.value = data;
     };
 
-    const fetchFormSchema = async (id) => {
+    const fetchFormSchema = async (id, userInfo) => {
       try {
         const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`);
         const doc = response.data.data;
         formTitle.value = doc.documentName;
         if (doc.metadata) {
           formSchema.value = doc.metadata.schema;
-          initializeFormData(doc.metadata.schema);
+          initializeFormData(doc.metadata.schema, userInfo);
+        }
+        if (doc.policy && doc.policy.length > 0) {
+          const sortedPolicy = doc.policy.sort((a, b) => a.index - b.index);
+          const approverIds = sortedPolicy.map(p => p.approverId);
+
+          const positionResponse = await apiClient.post('/member-service/member/position-list', {
+            uuidList: approverIds
+          });
+
+          if (positionResponse.data.data) {
+            const positionDataMap = new Map(positionResponse.data.data.map(p => [p.memberId, p]));
+
+            const policyApprovers = sortedPolicy.map(p => {
+              const positionInfo = positionDataMap.get(p.approverId);
+              return {
+                id: p.approverId,
+                name: p.approverName,
+                department: p.approverOrganization,
+                position: p.approverPosition,
+                memberPositionId: positionInfo ? positionInfo.memberPositionId : null
+              };
+            });
+
+            currentApprovalLine.value.push(...policyApprovers);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch form schema:', error);
       }
     };
 
-    const fetchDraftData = async (id) => {
+    const fetchDraftData = async (id, userInfo) => {
       try {
         const response = await apiClient.get(`/workforce-service/approval/find-approval/${id}`);
         const draftData = response.data.data;
 
         approvalTitle.value = draftData.title;
         formData.value = draftData.contents;
+
+        if (userInfo) {
+          formData.value.department = userInfo.organizationName;
+          formData.value.position = userInfo.titleName;
+          formData.value.name = userInfo.memberName;
+        }
         
         if (draftData.document) {
             documentId.value = draftData.document.documentId;
@@ -228,16 +291,28 @@ export default {
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
+      await fetchMemberInfo();
+
+      if (memberInfo.value) {
+        currentApprovalLine.value.push({
+          id: memberInfo.value.memberId,
+          name: memberInfo.value.memberName,
+          department: memberInfo.value.organizationName,
+          position: memberInfo.value.titleName,
+          memberPositionId: memberInfo.value.memberPositionId,
+        });
+      }
+
       const approvalIdFromRoute = route.params.id;
       const documentIdFromRoute = route.params.documentId;
 
       if (approvalIdFromRoute) {
         draftApprovalId.value = approvalIdFromRoute;
-        fetchDraftData(approvalIdFromRoute);
+        fetchDraftData(approvalIdFromRoute, memberInfo.value);
       } else if (documentIdFromRoute) {
         documentId.value = documentIdFromRoute;
-        fetchFormSchema(documentIdFromRoute);
+        fetchFormSchema(documentIdFromRoute, memberInfo.value);
       }
     });
 
@@ -439,13 +514,26 @@ export default {
 }
 
 .approval-line-display {
-  padding: 10px;
+  padding: 0;
   flex-grow: 1;
 }
 
 .approver-display-item {
+  background-color: #f9f9f9;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
   padding: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+.approver-name {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.approver-details {
+  font-size: 14px;
+  color: #606266;
 }
 
 .empty-state {

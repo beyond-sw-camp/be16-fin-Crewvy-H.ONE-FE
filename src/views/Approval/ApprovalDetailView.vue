@@ -46,8 +46,16 @@
             </div>
           </template>
           <div class="approval-line-display">
-             <div v-for="approver in currentApprovalLine" :key="approver.approverId" class="approver-display-item">
-              <span>{{ approver.index }}. {{ approver.approverName }} ({{ approver.approverOrganization }} / {{ approver.approverPosition }}) - <strong>{{ getKoreanStatus(approver.status) }}</strong></span>
+            <div v-for="approver in currentApprovalLine" :key="approver.approverId" class="approver-display-item">
+              <div class="approver-name">{{ approver.approverName }}</div>
+              <div class="approver-details">{{ approver.approverOrganization }} / {{ approver.approverPosition }}</div>
+              <div class="approver-status">
+                <span :class="`status-${approver.status.toLowerCase()}`">{{ getKoreanStatus(approver.status) }}</span>
+                <span v-if="approver.approveAt" class="approver-date">{{ formatApprovalDate(approver.approveAt) }}</span>
+              </div>
+              <div v-if="approver.status === 'REJECTED' && approver.comment" class="rejection-reason">
+                <strong>반려 사유:</strong> {{ approver.comment }}
+              </div>
             </div>
             <div v-if="currentApprovalLine.length === 0" class="empty-state">
               <p>결재라인 정보가 없습니다.</p>
@@ -107,10 +115,26 @@
     </el-card>
 
     <div class="form-actions">
-        <el-button type="success">승인</el-button>
-        <el-button type="danger">반려</el-button>
+        <el-button type="success" :disabled="!isCurrentUserTurn" @click="approve">승인</el-button>
+        <el-button type="danger" :disabled="!isCurrentUserTurn" @click="reject">반려</el-button>
         <el-button @click="goBack">목록으로</el-button>
     </div>
+
+    <!-- Rejection Modal -->
+    <el-dialog v-model="showRejectModal" title="반려 사유">
+      <el-input
+        v-model="rejectionReason"
+        type="textarea"
+        placeholder="반려 사유를 입력하세요..."
+        :rows="4"
+      />
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showRejectModal = false">취소</el-button>
+          <el-button type="primary" @click="handleReject">반려</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -118,6 +142,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/api/http';
+import { ElMessageBox, ElMessage } from 'element-plus';
 
 export default {
   name: 'ApprovalDetailView',
@@ -134,6 +159,9 @@ export default {
     const comments = ref([]);
     const newComment = ref('');
     const attachments = ref([]); // For attachment list
+    const isCurrentUserTurn = ref(false);
+    const showRejectModal = ref(false);
+    const rejectionReason = ref('');
 
     const getKoreanStatus = (status) => {
       const statusMap = {
@@ -178,6 +206,14 @@ export default {
         
         if (details.lineList) {
           currentApprovalLine.value = details.lineList;
+
+          const pendingApprover = details.lineList.find(approver => approver.status === 'PENDING');
+          if (pendingApprover) {
+            const currentUserMemberPositionId = localStorage.getItem('memberPositionId');
+            if (pendingApprover.approverId === currentUserMemberPositionId) {
+              isCurrentUserTurn.value = true;
+            }
+          }
         }
 
       } catch (error) {
@@ -233,6 +269,57 @@ export default {
       router.push('/approval');
     };
 
+    const approve = () => {
+      ElMessageBox.confirm('승인 하시겠습니까?', '승인 확인', {
+        confirmButtonText: '승인',
+        cancelButtonText: '취소',
+        type: 'warning',
+      }).then(async () => {
+        try {
+          await apiClient.patch(`/workforce-service/approval/approve/${approvalId.value}`);
+          ElMessage({ type: 'success', message: '결재가 승인되었습니다.' });
+          router.push('/approval');
+        } catch (error) {
+          console.error('Failed to approve:', error);
+          ElMessage({ type: 'error', message: '결재 승인에 실패했습니다.' });
+        }
+      }).catch(() => {
+        // Action cancelled
+      });
+    };
+
+    const reject = () => {
+      rejectionReason.value = '';
+      showRejectModal.value = true;
+    };
+
+    const handleReject = async () => {
+      if (!rejectionReason.value.trim()) {
+        ElMessage({ type: 'warning', message: '반려 사유를 입력해주세요.' });
+        return;
+      }
+      try {
+        await apiClient.patch(`/workforce-service/approval/reject/${approvalId.value}`, { comment: rejectionReason.value });
+        ElMessage({ type: 'success', message: '결재가 반려되었습니다.' });
+        showRejectModal.value = false;
+        router.push('/approval');
+      } catch (error) {
+        console.error('Failed to reject:', error);
+        ElMessage({ type: 'error', message: '결재 반려에 실패했습니다.' });
+      }
+    };
+
+    const formatApprovalDate = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    };
+
     return {
       approvalId,
       formSchema,
@@ -246,6 +333,13 @@ export default {
       goBack,
       attachments,
       getKoreanStatus,
+      formatApprovalDate,
+      isCurrentUserTurn,
+      approve,
+      reject,
+      showRejectModal,
+      rejectionReason,
+      handleReject,
     };
   },
 };
@@ -261,8 +355,53 @@ export default {
 .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 24px; }
 .dynamic-form { padding: 20px; }
 .form-placeholder { min-height: 500px; display: flex; align-items: center; justify-content: center; color: #909399; }
-.approval-line-display { padding: 10px; flex-grow: 1; }
-.approver-display-item { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+.approval-line-display { padding: 0; flex-grow: 1; }
+.approver-display-item {
+  background-color: #f9f9f9;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+.approver-name {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.approver-details {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+.approver-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.approver-date {
+  font-size: 12px;
+  color: #909399;
+}
+.rejection-reason {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+  font-style: italic;
+}
+.status-pending, .status-waiting {
+  color: #f56c6c;
+  font-weight: bold;
+}
+.status-approved {
+  color: #67c23a;
+  font-weight: bold;
+}
+.status-rejected {
+  color: #f56c6c;
+  font-weight: bold;
+}
 .empty-state { text-align: center; color: #909399; padding-top: 20px; padding-bottom: 20px;}
 .form-actions { display: flex; justify-content: flex-end; margin-top: 24px; gap: 10px; }
 
