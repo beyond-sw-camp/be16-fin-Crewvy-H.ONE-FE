@@ -66,7 +66,7 @@
           @click="selectEmployee(employee)"
         >
           <div class="card-header">
-            <el-avatar :src="employee.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="60" />
+            <el-avatar :src="employee.avatar || defaultAvatarSvg" :size="60" />
             <div class="employee-basic">
               <h3>{{ employee.name }}</h3>
               <p>{{ employee.position }} • {{ employee.department }}</p>
@@ -114,7 +114,7 @@
           <el-table-column prop="name" label="이름" width="180">
             <template #default="scope">
               <div class="table-employee">
-                <el-avatar :src="scope.row.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="32" />
+                <el-avatar :src="scope.row.avatar || defaultAvatarSvg" :size="32" />
                 <span>{{ scope.row.name }}</span>
               </div>
             </template>
@@ -159,12 +159,12 @@
     >
       <div v-if="selectedEmployee" class="employee-detail">
         <div class="detail-header">
-          <el-avatar :src="selectedEmployee.avatar || 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\' %3E%3Crect%20width=\'1\' %20height=\'1\'/%3E%3C/svg%3E'" :size="80" />
+          <el-avatar :src="selectedEmployee.avatar || defaultAvatarSvg" :size="80" />
           <div class="detail-info">
             <h3>{{ selectedEmployee.name }}</h3>
-            <p>{{ selectedEmployee.position }} • {{ selectedEmployee.department }}</p>
-            <el-tag :type="selectedEmployee.status === 'WORKING' ? 'success' : 'info'">
-              {{ selectedEmployee.status === 'WORKING' ? '재직' : '휴직' }}
+            <p>{{ activeEmployeeGradeName }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
+            <el-tag :type="selectedEmployee.memberStatus === 'WORKING' ? 'success' : 'info'">
+              {{ formatMemberStatus(selectedEmployee.memberStatus) }}
             </el-tag>
           </div>
         </div>
@@ -173,7 +173,7 @@
           <el-tab-pane label="기본 정보" name="basic">
             <div class="detail-content">
               <div class="info-grid">
-                 <div class="info-item">
+                <div class="info-item">
                   <span class="label">사번</span>
                   <span class="value">{{ selectedEmployee.sabun }}</span>
                 </div>
@@ -182,14 +182,100 @@
                   <span class="value">{{ selectedEmployee.email }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="label">전화번호</span>
-                  <span class="value">{{ selectedEmployee.phone }}</span>
+                  <span class="label">연락처</span>
+                  <span class="value">{{ selectedEmployee.phoneNumber }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">비상연락처</span>
+                  <span class="value">{{ selectedEmployee.emergencyContact || '-' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">내선 전화</span>
+                  <span class="value">{{ selectedEmployee.extensionNumber || '-' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">일반 전화</span>
+                  <span class="value">{{ selectedEmployee.telNumber || '-' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">은행명</span>
+                  <span class="value">{{ selectedEmployee.bank || '-' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">계좌번호</span>
+                  <span class="value">{{ selectedEmployee.bankAccount || '-' }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">입사일</span>
                   <span class="value">{{ selectedEmployee.joinDate }}</span>
                 </div>
+                <div class="info-item">
+                  <span class="label">근속기간</span>
+                  <span class="value">{{ selectedEmployee.lengthOfService }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">주소</span>
+                  <span class="value">{{ selectedEmployee.address || '-' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">고용형태</span>
+                  <span class="value">{{ formatEmploymentType(selectedEmployee.employmentType) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">재직 상태</span>
+                  <span class="value">{{ formatMemberStatus(selectedEmployee.memberStatus) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">계정 상태</span>
+                  <span class="value">{{ formatAccountStatus(selectedEmployee.accountStatus) }}</span>
+                </div>
               </div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="인사 정보" name="hr">
+            <div class="detail-content">
+              <div v-if="selectedEmployee.gradeHistorySet && selectedEmployee.gradeHistorySet.length > 0">
+                <div v-for="(grade, index) in selectedEmployee.gradeHistorySet" :key="index" class="info-item">
+                  <span class="label">직급명</span>
+                  <span class="value">{{ grade.gradeName }} ({{ grade.promotionDate }})</span>
+                </div>
+              </div>
+              <p v-else class="no-data">진급 이력이 없습니다.</p>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="직무 정보" name="job">
+            <div class="detail-content">
+              <div v-if="selectedEmployee.memberPositionResList && selectedEmployee.memberPositionResList.length > 0">
+                <div v-for="(position, index) in selectedEmployee.memberPositionResList" :key="index" class="position-detail-item">
+                  <div class="info-item">
+                    <span class="label">부서</span>
+                    <span class="value">{{ position.organization?.name || '-' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">직책</span>
+                    <span class="value">{{ position.title?.name || '-' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">역할</span>
+                    <span class="value">{{ position.role?.name || '-' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">시작일</span>
+                    <span class="value">{{ formatDate(position.startDate) }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">종료일</span>
+                    <span class="value">{{ formatDate(position.endDate) || '-' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">활성 여부</span>
+                    <span class="value">{{ position.isActive === 'TRUE' ? '활성' : '비활성' }}</span>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="no-data">직무 정보가 없습니다.</p>
             </div>
           </el-tab-pane>
         </el-tabs>
@@ -205,6 +291,8 @@ import { useSnackbar } from '@/composables/useSnackbar';
 import { usePermissions } from '@/composables/usePermissions';
 import { ElMessageBox } from 'element-plus';
 import axios from 'axios';
+import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
+import employeeService from '@/api/employeeService'; // Import employeeService
 
 const router = useRouter();
 const { success, error, info } = useSnackbar();
@@ -246,8 +334,8 @@ const fetchEmployees = async () => {
         phone: emp.phoneNumber,
         status: emp.memberStatus,
         sabun: emp.sabun,
-        joinDate: emp.joinDate, 
-        avatar: null, 
+        joinDate: emp.joinDate,
+        avatar: null,
       }));
     } else {
       error(response.data.message || '직원 목록을 불러오는 데 실패했습니다.');
@@ -264,7 +352,7 @@ onMounted(async () => {
   await fetchEmployees();
   // 권한 확인
   canCreate.value = await checkPermission('member', 'CREATE');
-  canRead.value = await checkPermission('member', 'READ'); // READ 권한 확인 추가
+  canRead.value = await checkPermission('member', 'READ');
   canUpdate.value = await checkPermission('member', 'UPDATE');
   canDelete.value = await checkPermission('member', 'DELETE');
 });
@@ -295,14 +383,28 @@ const activeEmployees = computed(() => {
   return employees.value.filter(emp => emp.status === 'WORKING').length;
 });
 
+const activeEmployeeGradeName = computed(() => {
+  if (selectedEmployee.value && selectedEmployee.value.gradeHistorySet) {
+    const activeGrade = selectedEmployee.value.gradeHistorySet.find(gh => gh.isActive === 'TRUE');
+    return activeGrade ? activeGrade.gradeName : '-';
+  }
+  return '-';
+});
+
 // Methods
 const goToAddEmployee = () => {
   router.push('/employee/add');
 };
 
-const selectEmployee = (employee) => {
-  selectedEmployee.value = employee;
-  showEmployeeDetail.value = true;
+const selectEmployee = async (employee) => {
+  try {
+    const response = await employeeService.getEmployee(employee.id); // Use getEmployee
+    selectedEmployee.value = response.data.data.memberDetail; // Extract memberDetail from MemberEditRes
+    showEmployeeDetail.value = true;
+  } catch (err) {
+    console.error('직원 상세 정보를 불러오는 데 실패했습니다:', err);
+    error(err.response?.data?.message || '직원 상세 정보를 불러오는 데 실패했습니다.');
+  }
 };
 
 const editEmployee = (emp) => {
@@ -332,6 +434,41 @@ const resetFilters = () => {
   searchQuery.value = '';
   selectedDepartment.value = '';
   selectedStatus.value = '';
+};
+
+// Helper functions for formatting
+const formatMemberStatus = (status) => {
+  switch (status) {
+    case 'WORKING': return '재직';
+    case 'LEAVE': return '휴직';
+    case 'DETACHMENT': return '파견';
+    default: return status;
+  }
+};
+
+const formatEmploymentType = (type) => {
+  switch (type) {
+    case 'FULL': return '정규직';
+    case 'CONTRACT': return '계약직';
+    case 'INTERN': return '인턴';
+    case 'ETC': return '기타';
+    default: return type;
+  }
+};
+
+const formatAccountStatus = (status) => {
+  switch (status) {
+    case 'ACTIVE': return '정상';
+    case 'INACTIVE': return '비활성';
+    case 'LOCK': return '잠금';
+    default: return status;
+  }
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ko-KR');
 };
 
 </script>

@@ -17,12 +17,6 @@ const routes = [
     component: () => import('@/views/dashboard/Board.vue'),
     meta: { requiresAuth: true }
   },
-  {
-    path: '/resource',
-    name: 'Resource',
-    component: () => import('@/views/reservation/Resource.vue'),
-    meta: { requiresAuth: true }
-  }
 ];
 
 export default routes;

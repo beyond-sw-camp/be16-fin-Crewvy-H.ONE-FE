@@ -49,4 +49,16 @@ export default {
       throw error;
     }
   },
-};
+
+  async reorderTitle(memberPositionId, titleIds) {
+    try {
+      const headers = getAuthHeadersFromToken();
+      if (!headers) throw new Error("Authentication headers not available.");
+      headers['X-User-MemberPositionId'] = memberPositionId; // 헤더에 memberPositionId 추가
+      const response = await apiClient.put('/member-service/member/title/reorder', { idList: titleIds }, { headers });
+      return response.data.data;
+    } catch (error) {
+      console.error("Error reordering title:", error);
+      throw error;
+    }
+  },};
