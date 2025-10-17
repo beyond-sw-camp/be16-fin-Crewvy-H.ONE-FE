@@ -10,7 +10,7 @@
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
-        <el-button @click="showTemplate = true">
+        <el-button @click="goToTemplateList">
           <el-icon><Document /></el-icon>
           <span style="margin-left: 8px;">템플릿 관리</span>
         </el-button>
@@ -93,23 +93,15 @@
                     <div class="approval-title">{{ approval.title }}</div>
                   </div>
                   <div class="approval-details">
-                    <span class="approval-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="approval-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
                     <span class="approval-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
                 </div>
                 <div class="approval-right-section">
                   <div class="approval-top-row">
-                    <div class="approval-date">{{ approval.createAt ? approval.createAt.split('T')[0] : '' }}</div>
+                    <div class="approval-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</div>
                   </div>
                   <div class="approval-actions">
-                    <el-button type="success" size="small" @click="approveItem(approval)">
-                      <el-icon><Check /></el-icon>
-                      승인
-                    </el-button>
-                    <el-button type="danger" size="small" @click="rejectItem(approval)">
-                      <el-icon><Close /></el-icon>
-                      반려
-                    </el-button>
                     <el-button size="small" @click="viewDetails(approval)">
                       <el-icon><View /></el-icon>
                       상세
@@ -134,10 +126,10 @@
                     <div class="request-title">{{ request.title }}</div>
                   </div>
                   <div class="request-details">
-                    <span class="request-requester"><strong>기안자:</strong> {{ request.requesterId }}</span>
+                    <span class="request-requester"><strong>기안자:</strong> {{ request.requesterName }} ({{ request.requesterPosition }})</span>
                     <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
-                    <span class="request-status"><strong>상태:</strong> {{ request.status }}</span>
-                    <span class="request-date"><strong>생성일:</strong> {{ request.createAt ? request.createAt.split('T')[0] : '' }}</span>
+                    <span class="request-status"><strong>상태:</strong> {{ getKoreanStatus(request.status) }}</span>
+                    <span class="request-date"><strong>기안일:</strong> {{ request.createAt ? request.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
                   </div>
                 </div>
                 <div class="request-actions" style="margin-left: 16px;">
@@ -183,7 +175,7 @@
                     <div class="completed-title">{{ approval.title }}</div>
                   </div>
                   <div class="completed-details">
-                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterId }}</span>
+                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
                     <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
                   </div>
                 </div>
@@ -191,9 +183,9 @@
                   <div class="completed-meta-actions-row">
                     <div class="completed-meta">
                       <el-tag :type="getStatusType(approval.status)" size="small">
-                        {{ approval.status }}
+                        {{ getKoreanStatus(approval.status) }}
                       </el-tag>
-                      <span class="completed-date">{{ approval.createAt ? approval.createAt.split('T')[0] : '' }}</span>
+                      <span class="completed-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
                     </div>
                     <div class="completed-actions">
                       <el-button size="small" @click="viewCompletedDetails(approval)">
@@ -221,7 +213,7 @@
                    <div class="request-details">
                     <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
                     <span class="request-status"><strong>상태:</strong> 임시저장</span>
-                    <span class="request-date"><strong>저장일:</strong> {{ request.createAt ? request.createAt.split('T')[0] : '' }}</span>
+                    <span class="request-date"><strong>저장일:</strong> {{ request.createAt ? request.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
                   </div>
                 </div>
                 <div class="request-actions" style="margin-left: 16px;">
@@ -256,16 +248,16 @@
 <script>
 import { ref, onMounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import apiClient from '@/api/http';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
-import { Plus, Document, Clock, Check, Close, View, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Document, Clock, Check, View, Edit, Delete } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalPage',
   components: {
     ApprovalTemplateSelectorModal,
-    Plus, Document, Clock, Check, Close, View, Edit, Delete
+    Plus, Document, Clock, Check, View, Edit, Delete
   },
   setup() {
     const { success, error, warning, info } = useSnackbar();
@@ -322,7 +314,7 @@ export default {
 
     const fetchApprovalStats = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/workforce-service/approval/stats');
+        const response = await apiClient.get('/workforce-service/approval/stats');
         const stats = response.data.data;
         pendingApprovals.value = stats.pendingCount;
         inProgressApprovals.value = stats.requestCount;
@@ -336,7 +328,7 @@ export default {
 
     const fetchPendingApprovals = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-pending-list');
+        const response = await apiClient.get('/workforce-service/approval/find-pending-list');
         pendingApprovalsList.value = response.data.data;
       } catch (err) {
         error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
@@ -346,7 +338,7 @@ export default {
 
     const fetchMyRequests = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-approval-list');
+        const response = await apiClient.get('/workforce-service/approval/find-approval-list');
         myRequests.value = response.data.data;
       } catch (err) {
         error('결재 내역을 불러오는 데 실패했습니다.');
@@ -356,7 +348,7 @@ export default {
 
     const fetchTemporarySaves = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-draft-list');
+        const response = await apiClient.get('/workforce-service/approval/find-draft-list');
         temporarySaves.value = response.data.data;
       } catch (err) {
         error('임시저장 내역을 불러오는 데 실패했습니다.');
@@ -366,7 +358,7 @@ export default {
 
     const fetchCompletedApprovals = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/workforce-service/approval/find-complete-list');
+        const response = await apiClient.get('/workforce-service/approval/find-complete-list');
         completedList.value = response.data.data;
       } catch (err) {
         error('완료된 결재 내역을 불러오는 데 실패했습니다.');
@@ -414,12 +406,21 @@ export default {
 
     const getPriorityType = (priority) => (priority === 'high' ? 'danger' : 'warning');
 
+    const getKoreanStatus = (status) => {
+      const statusMap = {
+        'PENDING': '진행중',
+        'DRAFT': '임시저장',
+        'APPROVED': '승인',
+        'REJECTED': '반려',
+      };
+      return statusMap[status] || status;
+    };
+
     const getStatusType = (status) => {
       const statusMap = {
-        '승인': 'success',
-        '반려': 'danger',
-        '진행중': 'warning',
-        '대기': 'info'
+        'APPROVED': 'success',
+        'REJECTED': 'danger',
+        'PENDING': 'warning',
       };
       return statusMap[status] || 'info';
     };
@@ -461,7 +462,7 @@ export default {
     const deleteTemporary = async (request) => {
       if (confirm(`'${request.title}' 문서를 삭제하시겠습니까?`)) {
         try {
-          await axios.delete(`http://localhost:8080/workforce-service/approval/discard-approval/${request.approvalId}`);
+          await apiClient.delete(`/workforce-service/approval/discard-approval/${request.approvalId}`);
           success('임시저장된 문서가 삭제되었습니다.');
           // Refresh the list
           fetchTemporarySaves();
@@ -470,6 +471,10 @@ export default {
           console.error(err);
         }
       }
+    };
+
+    const goToTemplateList = () => {
+      router.push('/approval/templates/list');
     };
 
     const filteredPendingApprovals = computed(() => {
@@ -498,6 +503,7 @@ export default {
       handleTemplateSelect,
       getPriorityType,
       getStatusType,
+      getKoreanStatus,
       approveItem,
       rejectItem,
       viewDetails,
@@ -509,7 +515,8 @@ export default {
       showMyRequestsTable,
       temporarySaves,
       continueWriting,
-      deleteTemporary
+      deleteTemporary,
+      goToTemplateList
     };
   },
 }
