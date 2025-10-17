@@ -321,9 +321,10 @@
             <el-table :data="searchedEmployees" style="width: 100%" height="40vh" empty-text="검색된 사원이 없습니다.">
               <el-table-column prop="name" label="이름" width="120"></el-table-column>
               <el-table-column prop="department" label="부서"></el-table-column>
-              <el-table-column prop="team" label="팀"></el-table-column>
               <el-table-column prop="position" label="직급" width="150"></el-table-column>
+              <el-table-column prop="phoneNumber" label="연락처" width="150"></el-table-column>
               <el-table-column prop="email" label="이메일"></el-table-column>
+              <el-table-column prop="status" label="재직상태" width="120"></el-table-column>
             </el-table>
           </div>
         </el-tab-pane>

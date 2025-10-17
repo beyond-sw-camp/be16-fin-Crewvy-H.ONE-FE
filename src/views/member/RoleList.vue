@@ -3,21 +3,20 @@
     <div class="page-header">
       <h1>역할 목록</h1>
       <el-button type="primary" @click="goToCreateRole">
-        <el-icon><Plus /></el-icon> 새로운 역할 생성
+        <el-icon>
+          <Plus />
+        </el-icon> 새로운 역할 생성
       </el-button>
     </div>
 
     <el-row :gutter="24">
       <!-- Left Column: Role Cards -->
       <el-col :span="8">
-        <draggable v-model="role" item-key="id" handle=".role-card" @end="handleRoleReorder" class="role-cards-container">
+        <draggable v-model="role" item-key="id" handle=".role-card" @end="handleRoleReorder"
+          class="role-cards-container">
           <template #item="{ element }">
-            <el-card
-              :key="element.id"
-              class="role-card"
-              :class="{ active: selectedRole && selectedRole.id === element.id }"
-              @click="selectRole(element)"
-            >
+            <el-card :key="element.id" class="role-card"
+              :class="{ active: selectedRole && selectedRole.id === element.id }" @click="selectRole(element)">
               <div class="role-card-header">
                 <span class="role-name">{{ element.name }}</span>
                 <span class="member-count">{{ element.memberCount }}명</span>
@@ -169,7 +168,8 @@ onMounted(() => {
 
 <style scoped>
 .role-list-page {
-  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-header {
@@ -180,107 +180,106 @@ onMounted(() => {
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
   margin: 0;
 }
 
-.page-header p {
-    font-size: 14px;
-    color: #606266;
-    margin-top: 8px;
-    margin-bottom: 16px;
-}
-
 .role-cards-container {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    height: 60vh;
-    overflow-y: auto;
-    padding-right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 60vh;
+  overflow-y: auto;
+  padding-right: 10px;
 }
 
 .role-card {
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border-radius: 8px;
 }
 
 .role-card.active {
-    border-color: #4f46e5;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
 }
 
 .role-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .role-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .role-name {
-    font-size: 16px;
-    font-weight: 600;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .member-count {
-    font-size: 14px;
-    color: #909399;
+  font-size: 14px;
+  color: #909399;
 }
 
 .role-description {
-    font-size: 14px;
-    color: #606266;
-    line-height: 1.5;
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.5;
 }
 
 .details-card {
-    height: calc(60vh + 32px);
-    border-radius: 8px;
+  height: calc(60vh + 32px);
+  border-radius: 8px;
 }
 
 .details-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .details-header h3 {
-    font-size: 20px;
-    font-weight: 600;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .details-section {
-    margin-bottom: 32px;
+  margin-bottom: 32px;
 }
 
 .details-section:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .details-section h4 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
 .permissions-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .no-selection {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
 }
 </style>

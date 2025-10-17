@@ -9,33 +9,38 @@
         <div class="card-header">
           <span>직책 목록</span>
           <el-button type="primary" @click="openAddModal" v-if="canCreateTitle">
-            <el-icon style="margin-right: 8px">
-              <Plus />
-            </el-icon> 새로운 직책 추가
+            <el-icon style="margin-right: 8px"><Plus /></el-icon> 새로운 직책 추가
           </el-button>
         </div>
       </template>
 
-      <draggable v-model="title" item-key="id" handle=".drag-handle" @end="handleTitleReorder" v-loading="loading" class="draggable-list">
-        <template #item="{ element }">
-          <div class="draggable-item">
+      <el-table :data="title" style="width: 100%" row-key="id" v-loading="loading" ref="tableRef" class="title-table">
+        <el-table-column label="" width="50">
+          <template #default>
             <div class="drag-handle">
-              <el-icon><Rank /></el-icon>
-              {{ element.name }}
+              <el-icon><Grid /></el-icon>
             </div>
-            <div class="actions">
-              <el-button size="small" @click="openEditModal(element)" v-if="canUpdateTitle">수정</el-button>
-              <el-button size="small" type="danger" @click="deleteTitle(element)" v-if="canDeleteTitle">삭제</el-button>
-            </div>
-          </div>
-        </template>
-      </draggable>
+          </template>
+        </el-table-column>
+        <el-table-column label="순서" width="80">
+          <template #default="scope">
+            <span>{{ scope.$index + 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="직책명"></el-table-column>
+        <el-table-column label="액션" width="150">
+          <template #default="scope">
+            <el-button size="small" @click="openEditModal(scope.row)" v-if="canUpdateTitle">수정</el-button>
+            <el-button size="small" type="danger" @click="deleteTitle(scope.row)" v-if="canDeleteTitle">삭제</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="modalTitle" width="500px" @opened="handleDialogOpened">
-      <el-form :model="currentTitle" label-position="top" @submit.prevent="saveTitle"> <!-- @submit.prevent="saveTitle" 추가 -->
+      <el-form :model="currentTitle" label-position="top" @submit.prevent="saveTitle">
         <el-form-item label="직책명">
-          <el-input ref="titleNameInput" v-model="currentTitle.name" placeholder="예: 팀장, 실장"></el-input> <!-- ref 추가, @keyup.enter 제거 -->
+          <el-input ref="titleNameInput" v-model="currentTitle.name" placeholder="예: 팀장, 실장"></el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -53,20 +58,33 @@ import { ref, computed, onMounted } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import titleService from '@/api/titleService';
 import { usePermissions } from '@/composables/usePermissions';
-import { useSnackbar } from '@/composables/useSnackbar'; // Import useSnackbar
-import draggable from 'vuedraggable'; // draggable 임포트
-import { Plus, Rank } from '@element-plus/icons-vue'; // Rank 아이콘 임포트
+import { useSnackbar } from '@/composables/useSnackbar';
+import { Plus, Grid } from '@element-plus/icons-vue';
+import Sortable from 'sortablejs';
 
 const { checkPermission } = usePermissions();
-const { success, error, info } = useSnackbar(); // Initialize useSnackbar
+const { success, error, info } = useSnackbar();
 const isEdit = ref(false);
 const loading = ref(false);
 const title = ref([]);
 const dialogVisible = ref(false);
-const titleNameInput = ref(null); // ref 선언
+const titleNameInput = ref(null);
 const currentTitle = ref({ id: null, name: '' });
+const tableRef = ref(null);
 
-// 모달이 열릴 때 입력 필드에 포커스
+const initSortable = () => {
+  const tbody = tableRef.value.$el.querySelector('.el-table__body-wrapper tbody');
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    onEnd: (evt) => {
+      const { oldIndex, newIndex } = evt;
+      const movedItem = title.value.splice(oldIndex, 1)[0];
+      title.value.splice(newIndex, 0, movedItem);
+      handleTitleReorder();
+    },
+  });
+};
+
 const handleDialogOpened = () => {
   if (titleNameInput.value) {
     titleNameInput.value.focus();
@@ -118,7 +136,6 @@ const saveTitle = async () => {
       await titleService.updateTitle(currentTitle.value.id, { name: currentTitle.value.name });
       success('직책이 수정되었습니다.');
     } else {
-      // 새로운 직책 추가 시 displayOrder 설정
       const newDisplayOrder = title.value.length > 0 ? Math.max(...title.value.map(t => t.displayOrder)) + 1 : 0;
       await titleService.createTitle({ name: currentTitle.value.name, displayOrder: newDisplayOrder });
       success('새로운 직책이 추가되었습니다.');
@@ -161,14 +178,10 @@ const handleTitleReorder = async () => {
   loading.value = true;
   try {
     const titleIds = title.value.map(t => t.id);
-    const memberPositionId = localStorage.getItem('memberPositionId'); // 예시: localStorage에서 가져옴
+    const memberPositionId = localStorage.getItem('memberPositionId');
     if (!memberPositionId) {
       throw new Error("MemberPositionId not found.");
     }
-
-    console.log('--- Reorder Title Request ---');
-    console.log('memberPositionId:', memberPositionId);
-    console.log('titleIds:', titleIds);
 
     await titleService.reorderTitle(memberPositionId, titleIds);
     success('직책 순서가 변경되었습니다.');
@@ -184,24 +197,38 @@ const handleTitleReorder = async () => {
 onMounted(() => {
   checkPermissions();
   fetchTitle();
+  initSortable();
 });
 </script>
 
 <style scoped>
 .title-management-page {
-  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
+.drag-handle {
+  cursor: grab;
+}
+
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin: 0;
 }
 
 .box-card {
@@ -219,45 +246,15 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.title-table {
+  font-size: 16px;
+}
+
 .el-table th {
   background-color: #f5f7fa;
 }
 
 .dialog-footer {
   text-align: right;
-}
-
-/* Draggable List Styles */
-.draggable-list {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.draggable-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 15px;
-  background-color: #fff;
-  border-bottom: 1px solid #ebeef5;
-  cursor: grab;
-}
-
-.draggable-item:last-child {
-  border-bottom: none;
-}
-
-.drag-handle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #606266;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
 }
 </style>
