@@ -103,7 +103,7 @@
           <el-col :span="12">
             <el-form-item label="입사일">
               <el-date-picker v-model="form.joinDate" type="date" placeholder="입사일 선택"
-                style="width: 100%;"></el-date-picker>
+                style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -147,7 +147,7 @@
               <el-col :span="12">
                 <el-form-item :label="`진급일 ${index + 1}`">
                   <el-date-picker v-model="grade.promotionDate" type="date" placeholder="진급일 선택"
-                    style="width: 100%;"></el-date-picker>
+                    style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
               <el-col :span="4" class="delete-grade-history-col">
@@ -192,7 +192,7 @@
               </el-button>
             </div>
             <el-row :gutter="24">
-              <el-col :span="8">
+              <el-col :span="12">
                 <el-form-item label="부서">
                   <el-select v-model="position.organizationId" placeholder="부서 선택" style="width: 100%;">
                     <el-option v-for="org in allOrganizations" :key="org.id" :label="org.name"
@@ -200,7 +200,7 @@
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :span="12">
                 <el-form-item label="직책">
                   <el-select v-model="position.titleId" placeholder="직책 선택" style="width: 100%;">
                     <el-option v-for="title in allTitles" :key="title.id" :label="title.name"
@@ -208,11 +208,23 @@
                   </el-select>
                 </el-form-item>
               </el-col>
+            </el-row>
+            <el-row :gutter="24">
               <el-col :span="8">
                 <el-form-item label="역할">
                   <el-select v-model="position.roleId" placeholder="역할 선택" style="width: 100%;">
                     <el-option v-for="role in allRoles" :key="role.id" :label="role.name" :value="role.id"></el-option>
                   </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="시작일">
+                  <el-date-picker v-model="position.startDate" type="date" placeholder="시작일 선택" style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="종료일">
+                  <el-date-picker v-model="position.endDate" type="date" placeholder="종료일 선택" style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -362,6 +374,7 @@ export default {
             titleId: p.title ? p.title.id : null,
             roleId: p.role ? p.role.id : null,
             startDate: p.startDate, // startDate 추가
+            endDate: p.endDate, // endDate 추가
             isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true) // boolean으로 변환
           })) || []
         };
@@ -404,7 +417,8 @@ export default {
             organizationId: p.organizationId,
             titleId: p.titleId,
             roleId: p.roleId,
-            startDate: p.startDate // startDate 추가
+            startDate: p.startDate, // startDate 추가
+            endDate: p.endDate // endDate 추가
           })),
         };
 
