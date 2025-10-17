@@ -111,7 +111,7 @@
       <!-- 테이블 뷰 -->
       <div v-else class="employee-table">
         <el-table :data="filteredEmployees" style="width: 100%">
-          <el-table-column prop="name" label="이름" width="180">
+          <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip>
             <template #default="scope">
               <div class="table-employee">
                 <el-avatar :src="scope.row.avatar || defaultAvatarSvg" :size="32" />
@@ -120,9 +120,9 @@
             </template>
           </el-table-column>
           <el-table-column prop="sabun" label="사번" width="100" />
-          <el-table-column prop="position" label="직책" width="120" />
-          <el-table-column prop="department" label="부서" width="120" />
-          <el-table-column prop="email" label="이메일" width="220" />
+          <el-table-column prop="position" label="직책" width="120" show-overflow-tooltip />
+          <el-table-column prop="department" label="부서" width="120" show-overflow-tooltip />
+          <el-table-column prop="email" label="이메일" width="220" show-overflow-tooltip />
           <el-table-column prop="phone" label="전화번호" width="150" />
           <el-table-column prop="joinDate" label="입사일" width="120" />
           <el-table-column prop="status" label="상태" width="100">
@@ -162,7 +162,7 @@
           <el-avatar :src="selectedEmployee.avatar || defaultAvatarSvg" :size="80" />
           <div class="detail-info">
             <h3>{{ selectedEmployee.name }}</h3>
-            <p>{{ activeEmployeeGradeName }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
+            <p>{{ selectedEmployee.memberPositionResList[0]?.title?.name || '-' }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
             <el-tag :type="selectedEmployee.memberStatus === 'WORKING' ? 'success' : 'info'">
               {{ formatMemberStatus(selectedEmployee.memberStatus) }}
             </el-tag>
@@ -235,12 +235,10 @@
 
           <el-tab-pane label="인사 정보" name="hr">
             <div class="detail-content">
-              <div v-if="selectedEmployee.gradeHistorySet && selectedEmployee.gradeHistorySet.length > 0">
-                <div v-for="(grade, index) in selectedEmployee.gradeHistorySet" :key="index" class="info-item">
-                  <span class="label">직급명</span>
-                  <span class="value">{{ grade.gradeName }} ({{ grade.promotionDate }})</span>
-                </div>
-              </div>
+              <el-table v-if="selectedEmployee.gradeHistoryList && selectedEmployee.gradeHistoryList.length > 0" :data="selectedEmployee.gradeHistoryList" style="width: 100%">
+                <el-table-column prop="gradeName" label="직급명"></el-table-column>
+                <el-table-column prop="promotionDate" label="진급일"></el-table-column>
+              </el-table>
               <p v-else class="no-data">진급 이력이 없습니다.</p>
             </div>
           </el-tab-pane>
@@ -248,31 +246,49 @@
           <el-tab-pane label="직무 정보" name="job">
             <div class="detail-content">
               <div v-if="selectedEmployee.memberPositionResList && selectedEmployee.memberPositionResList.length > 0">
-                <div v-for="(position, index) in selectedEmployee.memberPositionResList" :key="index" class="position-detail-item">
-                  <div class="info-item">
-                    <span class="label">부서</span>
-                    <span class="value">{{ position.organization?.name || '-' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="label">직책</span>
-                    <span class="value">{{ position.title?.name || '-' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="label">역할</span>
-                    <span class="value">{{ position.role?.name || '-' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="label">시작일</span>
-                    <span class="value">{{ formatDate(position.startDate) }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="label">종료일</span>
-                    <span class="value">{{ formatDate(position.endDate) || '-' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="label">활성 여부</span>
-                    <span class="value">{{ position.isActive === 'TRUE' ? '활성' : '비활성' }}</span>
-                  </div>
+                <div v-for="(position, index) in selectedEmployee.memberPositionResList" :key="index" class="position-detail-item" style="border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                  <el-row :gutter="20">
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">부서</span>
+                        <span class="value">{{ position.organization?.name || '-' }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">직책</span>
+                        <span class="value">{{ position.title?.name || '-' }}</span>
+                      </div>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="20">
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">역할</span>
+                        <span class="value">{{ position.role?.name || '-' }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">근무기간</span>
+                        <span class="value">{{ position.lengthOfService || '-' }}</span>
+                      </div>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="20">
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">시작일</span>
+                        <span class="value">{{ formatDate(position.startDate) }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="12">
+                      <div class="info-item">
+                        <span class="label">종료일</span>
+                        <span class="value">{{ formatDate(position.endDate) || '-' }}</span>
+                      </div>
+                    </el-col>
+                  </el-row>
                 </div>
               </div>
               <p v-else class="no-data">직무 정보가 없습니다.</p>
@@ -381,14 +397,6 @@ const filteredEmployees = computed(() => {
 
 const activeEmployees = computed(() => {
   return employees.value.filter(emp => emp.status === 'WORKING').length;
-});
-
-const activeEmployeeGradeName = computed(() => {
-  if (selectedEmployee.value && selectedEmployee.value.gradeHistorySet) {
-    const activeGrade = selectedEmployee.value.gradeHistorySet.find(gh => gh.isActive === 'TRUE');
-    return activeGrade ? activeGrade.gradeName : '-';
-  }
-  return '-';
 });
 
 // Methods
