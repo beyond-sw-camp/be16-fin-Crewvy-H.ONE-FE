@@ -14,7 +14,19 @@ const updateEmployee = (memberId, memberPositionId, employeeData) => {
   });
 };
 
+// 직원 삭제
+const deleteEmployee = (employeeId) => {
+  return apiClient.delete(`/member-service/member/${employeeId}/delete`);
+};
+
+// 직원 복원
+const restoreEmployee = (employeeId) => {
+  return apiClient.patch(`/member-service/member/${employeeId}/restore`);
+};
+
 export default {
   getEmployee,
   updateEmployee,
+  deleteEmployee,
+  restoreEmployee,
 };

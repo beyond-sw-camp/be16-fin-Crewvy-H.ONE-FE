@@ -34,6 +34,7 @@
           <el-option label="전체" value="" />
           <el-option label="재직" value="WORKING" />
           <el-option label="휴직" value="LEAVE" />
+          <el-option v-if="canDelete" label="삭제" value="DELETED" />
         </el-select>
       </div>
       <div class="filter-right">
@@ -71,18 +72,21 @@
               <h3>{{ employee.name }}</h3>
               <p>{{ employee.position }} • {{ employee.department }}</p>
               <el-tag 
-                :type="employee.status === 'WORKING' ? 'success' : 'info'"
+                :type="employee.status === 'WORKING' ? 'success' : (employee.status === 'LEAVE' ? 'warning' : (employee.status === 'DELETED' ? 'danger' : 'primary'))"
                 size="small"
               >
-                {{ employee.status === 'WORKING' ? '재직' : '휴직' }}
+                {{ formatMemberStatus(employee.status) }}
               </el-tag>
             </div>
             <div class="card-actions">
                 <el-button v-if="canUpdate" type="text" @click.stop="editEmployee(employee)">
                   <el-icon><Edit /></el-icon>
                 </el-button>
-                <el-button v-if="canDelete" type="text" @click.stop="deleteEmployee(employee)">
+                <el-button v-if="canDelete && employee.status !== 'DELETED'" type="text" @click.stop="deleteEmployee(employee)">
                   <el-icon><Delete /></el-icon>
+                </el-button>
+                <el-button v-if="canDelete && employee.status === 'DELETED'" type="text" @click.stop="restoreEmployee(employee)">
+                  <el-icon><Refresh /></el-icon>
                 </el-button>
             </div>
           </div>
@@ -128,10 +132,10 @@
           <el-table-column prop="status" label="상태" width="100">
             <template #default="scope">
               <el-tag 
-                :type="scope.row.status === 'WORKING' ? 'success' : 'info'"
+                :type="scope.row.status === 'WORKING' ? 'success' : (scope.row.status === 'LEAVE' ? 'warning' : (scope.row.status === 'DELETED' ? 'danger' : 'primary'))"
                 size="small"
               >
-                {{ scope.row.status === 'WORKING' ? '재직' : '휴직' }}
+                {{ formatMemberStatus(scope.row.status) }}
               </el-tag>
             </template>
           </el-table-column>
@@ -141,8 +145,11 @@
                 <el-button v-if="canUpdate" type="text" size="small" @click="editEmployee(scope.row)">
                   <el-icon><Edit /></el-icon>
                 </el-button>
-                <el-button v-if="canDelete" type="text" size="small" @click="deleteEmployee(scope.row)">
+                <el-button v-if="canDelete && scope.row.status !== 'DELETED'" type="text" size="small" @click="deleteEmployee(scope.row)">
                   <el-icon><Delete /></el-icon>
+                </el-button>
+                <el-button v-if="canDelete && scope.row.status === 'DELETED'" type="text" size="small" @click="restoreEmployee(scope.row)">
+                  <el-icon><Refresh /></el-icon>
                 </el-button>
               </div>
             </template>
@@ -163,8 +170,8 @@
           <div class="detail-info">
             <h3>{{ selectedEmployee.name }}</h3>
             <p>{{ selectedEmployee.memberPositionResList[0]?.title?.name || '-' }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
-            <el-tag :type="selectedEmployee.memberStatus === 'WORKING' ? 'success' : 'info'">
-              {{ formatMemberStatus(selectedEmployee.memberStatus) }}
+            <el-tag :type="selectedEmployee.memberStatusName === '재직' ? 'success' : (selectedEmployee.memberStatusName === '휴직' ? 'warning' : 'primary')">
+              {{ selectedEmployee.memberStatusName }}
             </el-tag>
           </div>
         </div>
@@ -219,11 +226,11 @@
                 </div>
                 <div class="info-item">
                   <span class="label">고용형태</span>
-                  <span class="value">{{ formatEmploymentType(selectedEmployee.employmentType) }}</span>
+                  <span class="value">{{ selectedEmployee.employmentTypeName }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">재직 상태</span>
-                  <span class="value">{{ formatMemberStatus(selectedEmployee.memberStatus) }}</span>
+                  <span class="value">{{ selectedEmployee.memberStatusName }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">계정 상태</span>
@@ -330,6 +337,13 @@ const canRead = ref(false);
 const canUpdate = ref(false);
 const canDelete = ref(false);
 
+const memberStatusEnumMapping = {
+  '재직': 'WORKING',
+  '휴직': 'LEAVE',
+  '파견': 'DETACHMENT',
+  '삭제': 'DELETED',
+};
+
 // API 호출
 const fetchEmployees = async () => {
   try {
@@ -348,10 +362,11 @@ const fetchEmployees = async () => {
         department: emp.organizationName,
         email: emp.email,
         phone: emp.phoneNumber,
-        status: emp.memberStatus,
+        status: memberStatusEnumMapping[emp.memberStatusName] || emp.memberStatusName,
         sabun: emp.sabun,
         joinDate: emp.joinDate,
         avatar: null,
+        employmentType: emp.employmentTypeName,
       }));
     } else {
       error(response.data.message || '직원 목록을 불러오는 데 실패했습니다.');
@@ -388,8 +403,12 @@ const filteredEmployees = computed(() => {
     const matchesDepartment = !selectedDepartment.value || 
       employee.department === selectedDepartment.value;
     
-    const matchesStatus = !selectedStatus.value || 
-      employee.status === selectedStatus.value;
+    let matchesStatus;
+    if (selectedStatus.value) {
+      matchesStatus = employee.status === selectedStatus.value;
+    } else {
+      matchesStatus = employee.status !== 'DELETED';
+    }
     
     return matchesSearch && matchesDepartment && matchesStatus;
   });
@@ -422,14 +441,36 @@ const editEmployee = (emp) => {
 const deleteEmployee = (employee) => {
   ElMessageBox.confirm('정말로 삭제하시겠습니까?', '확인', {
     confirmButtonText: '삭제',
-    cancelButtonText: '취소',
+    cancelButtonText: '취소', 
     type: 'warning'
-  }).then(() => {
-    // TODO: 삭제 API 연동 필요
-    console.log('Deleting employee:', employee.id);
-    success('삭제되었습니다.');
+  }).then(async () => {
+    try {
+      await employeeService.deleteEmployee(employee.id);
+      success('삭제되었습니다.');
+      await fetchEmployees(); // Refresh the list
+    } catch (err) {
+      error(err.response?.data?.message || '삭제에 실패했습니다.');
+    }
   }).catch(() => {
     info('삭제가 취소되었습니다.');
+  });
+};
+
+const restoreEmployee = (employee) => {
+  ElMessageBox.confirm('정말로 복원하시겠습니까?', '확인', {
+    confirmButtonText: '복원',
+    cancelButtonText: '취소',
+    type: 'info'
+  }).then(async () => {
+    try {
+      await employeeService.restoreEmployee(employee.id);
+      success('복원되었습니다.');
+      await fetchEmployees(); // Refresh the list
+    } catch (err) {
+      error(err.response?.data?.message || '복원에 실패했습니다.');
+    }
+  }).catch(() => {
+    info('복원이 취소되었습니다.');
   });
 };
 
@@ -450,19 +491,11 @@ const formatMemberStatus = (status) => {
     case 'WORKING': return '재직';
     case 'LEAVE': return '휴직';
     case 'DETACHMENT': return '파견';
+    case 'DELETED': return '삭제';
     default: return status;
   }
 };
 
-const formatEmploymentType = (type) => {
-  switch (type) {
-    case 'FULL': return '정규직';
-    case 'CONTRACT': return '계약직';
-    case 'INTERN': return '인턴';
-    case 'ETC': return '기타';
-    default: return type;
-  }
-};
 
 const formatAccountStatus = (status) => {
   switch (status) {

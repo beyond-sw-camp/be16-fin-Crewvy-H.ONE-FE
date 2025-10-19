@@ -137,26 +137,28 @@
         <div class="grade-history-list">
           <div v-for="(grade, index) in filteredGradeHistorySet" :key="grade.gradeHistoryId || index" class="grade-history-item">
             <el-row :gutter="24">
-              <el-col :span="12">
+              <el-col :span="11">
                 <el-form-item :label="`직급명 ${index + 1}`">
                   <el-select v-model="grade.gradeId" placeholder="직급 선택" style="width: 100%;">
                     <el-option v-for="g in allGrades" :key="g.id" :label="g.name" :value="g.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
+              <el-col :span="11">
                 <el-form-item :label="`진급일 ${index + 1}`">
                   <el-date-picker v-model="grade.promotionDate" type="date" placeholder="진급일 선택"
                     style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
-              <el-col :span="4" class="delete-grade-history-col">
-                <el-button type="danger" circle @click="removeGradeHistory(index)"
-                  v-if="filteredGradeHistorySet.length > 1">
-                  <el-icon>
-                    <Delete />
-                  </el-icon>
-                </el-button>
+              <el-col :span="2" class="delete-grade-history-col">
+                <el-form-item label="&nbsp;">
+                  <el-button type="danger" circle @click="removeGradeHistory(index)"
+                    v-if="filteredGradeHistorySet.length > 1">
+                    <el-icon>
+                      <Delete />
+                    </el-icon>
+                  </el-button>
+                </el-form-item>
               </el-col>
             </el-row>
             <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
@@ -339,8 +341,19 @@ export default {
       try {
         const response = await employeeService.getEmployee(id);
         const editData = response.data.data;
-        console.log('--- fetchEmployeeData - editData ---');
-        console.log(JSON.stringify(editData, null, 2));
+
+        const employmentTypeNameToValue = {
+          '정규직': 'FULL',
+          '계약직': 'CONTRACT',
+          '인턴': 'INTERN',
+          '기타': 'ETC',
+        };
+
+        const memberStatusNameToValue = {
+          '재직': 'WORKING',
+          '휴직': 'LEAVE',
+          '파견': 'DETACHMENT',
+        };
 
         // Map API response to form data
         this.form = {
@@ -357,8 +370,8 @@ export default {
           joinDate: editData.memberDetail.joinDate,
           lengthOfService: editData.memberDetail.lengthOfService,
           gradeName: editData.memberDetail.gradeName,
-          employmentType: editData.memberDetail.employmentType,
-          memberStatus: editData.memberDetail.memberStatus,
+          employmentType: employmentTypeNameToValue[editData.memberDetail.employmentTypeName],
+          memberStatus: memberStatusNameToValue[editData.memberDetail.memberStatusName],
           sabun: editData.memberDetail.sabun,
           accountStatus: editData.memberDetail.accountStatus,
           gradeHistorySet: editData.memberDetail.gradeHistoryList?.map(gh => ({
@@ -537,6 +550,7 @@ export default {
   font-size: 12px;
   color: #909399;
   margin-top: 8px;
+  margin-left: 8px;
 }
 
 .form-actions {

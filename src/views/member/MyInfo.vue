@@ -119,8 +119,8 @@ export default {
       switch (this.userInfo.member_status) {
         case '재직': return 'success';
         case '휴직': return 'warning';
-        case '파견': return 'info';
-        default: return 'info';
+        case '파견': return 'primary';
+        default: return 'primary';
       }
     },
     employmentTypeTag() {

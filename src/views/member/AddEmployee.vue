@@ -210,11 +210,9 @@ export default {
         password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }],
         name: [{ required: true, message: '이름을 입력해주세요.', trigger: 'blur' }],
         phone: [
-          { required: true, message: '휴대폰 번호를 입력해주세요.', trigger: 'blur' },
           { pattern: /^\d{3}-\d{3,4}-\d{4}$/, message: '올바른 휴대폰 번호 형식이 아닙니다.', trigger: 'blur' }
         ],
         emergencyContact: [
-          { required: true, message: '비상 연락처를 입력해주세요.', trigger: 'blur' },
           { pattern: /^\d{3}-\d{3,4}-\d{4}$/, message: '올바른 휴대폰 번호 형식이 아닙니다.', trigger: 'blur' }
         ],
         employmentType: [{ required: true, message: '고용형태를 선택해주세요.', trigger: 'change' }],
