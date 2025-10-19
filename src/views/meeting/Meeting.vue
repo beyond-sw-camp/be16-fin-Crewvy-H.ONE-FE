@@ -171,7 +171,7 @@
                   </div>
                 </div>
                 <div class="meeting-actions">
-                  <el-button type="text" @click="viewRecording(meeting)">
+                  <el-button type="text" @click="viewRecording(meeting)" v-if="meeting.url">
                     <el-icon><VideoPlay /></el-icon>
                     녹화 보기
                   </el-button>
@@ -365,8 +365,8 @@ export default {
       scheduledMeetings: [],
       meetingHistory: [],
       employees: [
-        { id: 'f6c1ca79-d6b1-46b5-97f0-432a99cbafe6', name: '김민준' },
-        { id: 'a87eed35-670f-4386-b8de-70c60e749352', name: '이서준' },
+        { id: 'ed723fc3-4ac9-4510-810a-4e71a7b7d6c9', name: '김민준' },
+        { id: '577bf0f7-447a-49a2-9530-dff78dc4c2a7', name: '이서준' },
         { id: '9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d', name: '이지은' },
         { id: '123e4567-e89b-12d3-a456-426614174000', name: '김영희' },
         { id: '550e8400-e29b-41d4-a716-446655440000', name: '정수진' }
@@ -434,6 +434,7 @@ export default {
         host: m.host || '주최자',
         duration: m.duration || '-',
         participants: m.participants || 0,
+        url: m.recordingUrl,
         status: '완료'
       }))
     },
@@ -547,7 +548,11 @@ export default {
       })
     },
     viewRecording(meeting) {
-      this.info(`${meeting.title} 녹화 보기`)
+      if (meeting.url) {
+        window.open(meeting.url, '_blank')
+      } else {
+        this.warning('녹화된 영상이 없습니다.')
+      }
     },
     downloadTranscript(meeting) {
       this.success(`${meeting.title} 회의록을 다운로드합니다.`)
@@ -625,16 +630,15 @@ export default {
       }
     }
     ,
-    openMeetingWindow(apiResult, title, videoConferenceId) {
+    openMeetingWindow(apiResult, title) {
       if (!apiResult) return
-      const sessionId = apiResult.sessionId || apiResult.sessionID || apiResult.id
-      const token = apiResult.token || apiResult.connectionToken || apiResult.accessToken
-      if (!sessionId || !token) {
-        this.warning('세션/토큰 정보를 찾지 못했습니다.')
+      const videoConferenceId = apiResult.videoConferenceId
+      const token = apiResult.token
+      if (!token) {
+        this.warning('토큰 정보를 찾지 못했습니다.')
         return
       }
       const params = new URLSearchParams({
-        sid: String(sessionId),
         token: String(token),
         title: String(title),
         vcid: String(videoConferenceId)
