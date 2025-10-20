@@ -9,41 +9,61 @@
       </div>
     </div>
 
-    <div class="organization-content">
-      <el-card class="org-tree-card">
-        <template #header>
-                  <div class="card-header">
-                    <span>조직도</span>
-                  </div>        </template>
-        <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
-        <el-tree
-          ref="orgTreeRef"
-          :data="orgTree"
-          :props="defaultProps"
-          node-key="id"
-          :default-expanded-keys="expandedKeys"
-          :expand-on-click-node="false"
-          :filter-node-method="filterNode"
-          draggable
-          :allow-drop="allowDrop"
-          @node-drop="handleNodeDrop"
-          @node-expand="handleNodeExpand"
-          @node-collapse="handleNodeCollapse"
-          class="org-tree"
-        >
-          <template #default="{ node, data }">
-            <div class="custom-tree-node">
-              <span>{{ node.label }}</span>
-              <span class="node-actions">
-                <el-button size="small" type="success" plain @click.stop="openAddModal(data)">추가</el-button>
-                <el-button size="small" plain @click.stop="openEditModal(data)">수정</el-button>
-                <el-button size="small" type="danger" plain @click.stop="deleteNode(data)">삭제</el-button>
-              </span>
+    <el-row :gutter="24" class="layout-row">
+      <el-col :span="8">
+        <el-card class="org-tree-card">
+          <template #header>
+            <div class="card-header">
+              <span>조직도</span>
             </div>
           </template>
-        </el-tree>
-      </el-card>
-    </div>
+          <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
+          <el-tree
+            ref="orgTreeRef"
+            :data="orgTree"
+            :props="defaultProps"
+            node-key="id"
+            :default-expanded-keys="expandedKeys"
+            :expand-on-click-node="false"
+            :filter-node-method="filterNode"
+            draggable
+            :allow-drop="allowDrop"
+            @node-drop="handleNodeDrop"
+            @node-expand="handleNodeExpand"
+            @node-collapse="handleNodeCollapse"
+            @node-click="handleNodeClick"
+            class="org-tree"
+          >
+            <template #default="{ node, data }">
+              <div class="custom-tree-node">
+                <span>{{ node.label }}</span>
+                <span class="node-actions">
+                  <el-button size="small" type="success" plain @click.stop="openAddModal(data)">추가</el-button>
+                  <el-button size="small" plain @click.stop="openEditModal(data)">수정</el-button>
+                  <el-button size="small" type="danger" plain @click.stop="deleteNode(data)">삭제</el-button>
+                </span>
+              </div>
+            </template>
+          </el-tree>
+        </el-card>
+      </el-col>
+      <el-col :span="16">
+        <el-card class="employee-list-card">
+          <template #header>
+            <div class="card-header">
+              <span>{{ selectedOrganization ? selectedOrganization.name : '전체 직원' }}</span>
+            </div>
+          </template>
+          <el-table :data="filteredEmployees" style="width: 100%">
+            <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="titleName" label="직책" width="120" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="memberStatus" label="재직상태" width="150" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="email" label="이메일" show-overflow-tooltip></el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <el-dialog v-model="dialogVisible" :title="modalTitle" width="400px" @opened="handleDialogOpened">
       <el-form :model="currentOrg" label-position="top" @submit.prevent="saveOrganization">
@@ -75,7 +95,21 @@ const currentOrg = reactive({ id: null, name: '' });
 const parentNode = ref(null);
 const expandedKeys = ref([]);
 const orgTreeRef = ref(null);
-const orgNameInput = ref(null); // ref 선언
+const orgNameInput = ref(null);
+const selectedOrganization = ref(null);
+const employees = ref([]);
+
+const filteredEmployees = computed(() => {
+  if (!selectedOrganization.value) {
+    return employees.value;
+  }
+  return employees.value.filter(emp => emp.organizationName === selectedOrganization.value.name);
+});
+
+const filterNode = (value, data) => {
+  if (!value) return true;
+  return data.name.toLowerCase().includes(value.toLowerCase());
+};
 
 const modalTitle = computed(() => (isEdit.value ? '조직 수정' : '조직 추가'));
 
@@ -109,9 +143,25 @@ const fetchOrganizations = async () => {
   }
 };
 
-const filterNode = (value, data) => {
-  if (!value) return true;
-  return data.name.toLowerCase().includes(value.toLowerCase());
+const fetchAllEmployees = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/list`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : null,
+        'X-User-UUID': localStorage.getItem('memberId'),
+        'X-User-MemberPositionId': localStorage.getItem('memberPositionId')
+      }
+    });
+    employees.value = response.data.data;
+  } catch (error) {
+    ElMessage.error('직원 목록을 불러오는 데 실패했습니다.');
+    console.error(error);
+  }
+};
+
+const handleNodeClick = (data) => {
+  selectedOrganization.value = data;
 };
 
 const openAddModal = (data) => {
@@ -236,10 +286,21 @@ const handleNodeCollapse = (data) => {
 
 onMounted(() => {
   fetchOrganizations();
+  fetchAllEmployees();
 });
 </script>
 
 <style scoped>
+.layout-row {
+  display: flex;
+}
+.layout-row .el-col {
+  display: flex;
+}
+.layout-row .el-card {
+  width: 100%;
+}
+
 .organizationView-page {
   max-width: 1200px;
   margin: 0 auto;

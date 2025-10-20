@@ -58,17 +58,29 @@
         <template #header><span>인사 정보</span></template>
         <el-row :gutter="24">
           <el-col :xs="24" :sm="12">
+            <el-form-item label="대표 직책">
+              <el-select v-model="form.defaultPositionId" placeholder="대표 직책을 선택하세요" style="width: 100%;">
+                <el-option
+                    v-for="position in memberPositionList"
+                    :key="position.id"
+                    :label="position.name"
+                    :value="position.id">
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
             <el-form-item label="은행명">
               <el-input v-model="form.bank"></el-input>
             </el-form-item>
           </el-col>
+        </el-row>
+        <el-row :gutter="24">
           <el-col :xs="24" :sm="12">
             <el-form-item label="계좌번호">
               <el-input v-model="form.bankAccount"></el-input>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="24">
           <el-col :xs="24" :sm="12">
             <el-form-item label="내선전화">
               <el-input v-model="form.extensionNumber"></el-input>
@@ -118,6 +130,7 @@ export default {
   data() {
     return {
       defaultAvatarSvg, // Expose to template
+      memberPositionList: [],
       form: {
         profileUrl: '',
         phoneNumber: '',
@@ -131,7 +144,8 @@ export default {
         bankAccount: '',
         currentPassword: '',
         newPassword: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        defaultPositionId: null,
       }
     };
   },
@@ -190,6 +204,8 @@ export default {
             this.form.isAddressDisclosure = data.addressDisclosure;
             this.form.bank = data.bank;
             this.form.bankAccount = data.bankAccount;
+            this.memberPositionList = data.memberPositionList;
+            this.form.defaultPositionId = data.defaultPositionId;
         } catch (error) {
             console.error("내 정보를 불러오는데 실패했습니다:", error);
             this.$message.error("정보를 불러오는데 실패했습니다.");

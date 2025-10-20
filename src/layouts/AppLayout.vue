@@ -319,12 +319,13 @@
               <el-input v-model="employeeSearch" placeholder="사원명 또는 부서명 입력" clearable @keyup.enter="searchEmployees" />
               <el-button type="primary" @click="searchEmployees">검색</el-button>
             </div>
-            <el-table :data="searchedEmployees" style="width: 100%" height="40vh" empty-text="검색된 사원이 없습니다.">
+            <el-table :data="searchedEmployees" style="width: 100%" empty-text="검색된 사원이 없습니다.">
               <el-table-column prop="name" label="이름" width="120"></el-table-column>
               <el-table-column prop="department" label="부서"></el-table-column>
-              <el-table-column prop="team" label="팀"></el-table-column>
               <el-table-column prop="position" label="직급" width="150"></el-table-column>
+              <el-table-column prop="phoneNumber" label="연락처" width="150"></el-table-column>
               <el-table-column prop="email" label="이메일"></el-table-column>
+              <el-table-column prop="status" label="재직상태" width="120"></el-table-column>
             </el-table>
           </div>
         </el-tab-pane>
@@ -1399,6 +1400,8 @@ export default {
 
 .organization-dialog .el-dialog__body {
   padding: 0 24px 24px;
+  max-height: calc(100vh - 180px); /* Adjust as needed based on dialog header/footer height */
+  overflow-y: auto;
 }
 
 .organization-tabs-modal {
@@ -1408,6 +1411,8 @@ export default {
 .organization-modal,
 .employee-search-modal {
   padding-top: 16px;
+  max-height: 65vh;
+  overflow-y: auto;
 }
 
 .org-tree-container-modal {
@@ -1421,11 +1426,9 @@ export default {
 
 .tree-container {
   flex: 1;
-  overflow-y: auto;
   border: 1px solid #e4e7ed;
   border-radius: 4px;
   padding: 8px;
-  max-height: 40vh;
 }
 
 .custom-tree-node-modal {

@@ -32,6 +32,19 @@ export default {
       throw error;
     }
   },
+
+  async restoreRole(memberPositionId, roleId) {
+    try {
+      const headers = getAuthHeadersFromToken();
+      if (!headers) throw new Error("Authentication headers not available.");
+      headers['X-User-MemberPositionId'] = memberPositionId;
+      const response = await axios.patch(`${API_URL}/role/${roleId}/restore`, {}, { headers });
+      return response.data.data;
+    } catch (error) {
+      console.error("Error restoring role:", error);
+      throw error;
+    }
+  },
   fetchAllPermissions() {
     return axios.get(`${API_URL}/permission`);
   },
