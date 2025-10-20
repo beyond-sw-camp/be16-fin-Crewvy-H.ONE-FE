@@ -163,16 +163,23 @@
       v-model="showEmployeeDetail"
       title="직원 정보"
       width="800px"
+      custom-class="custom-employee-detail-dialog"
     >
       <div v-if="selectedEmployee" class="employee-detail">
         <div class="detail-header">
-          <el-avatar :src="selectedEmployee.avatar || defaultAvatarSvg" :size="80" />
+          <el-avatar :src="selectedEmployee.avatar || defaultAvatarSvg" :size="60" />
           <div class="detail-info">
-            <h3>{{ selectedEmployee.name }}</h3>
+            <div class="name-and-status">
+              <h3>{{ selectedEmployee.name }}</h3>
+              <el-tag :type="selectedEmployee.memberStatusName === '재직' ? 'success' : (selectedEmployee.memberStatusName === '휴직' ? 'warning' : 'primary')" size="small">
+                {{ selectedEmployee.memberStatusName }}
+              </el-tag>
+            </div>
             <p>{{ selectedEmployee.memberPositionResList[0]?.title?.name || '-' }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
-            <el-tag :type="selectedEmployee.memberStatusName === '재직' ? 'success' : (selectedEmployee.memberStatusName === '휴직' ? 'warning' : 'primary')">
-              {{ selectedEmployee.memberStatusName }}
-            </el-tag>
+          </div>
+          <div class="detail-header-actions">
+            <el-button v-if="selectedEmployee && selectedEmployee.memberId" @click="goToEmployeeDetailPage(selectedEmployee.memberId)" type="primary" size="small">상세조회</el-button>
+            <el-button @click="showEmployeeDetail = false" size="small">닫기</el-button>
           </div>
         </div>
         
@@ -424,9 +431,13 @@ const goToAddEmployee = () => {
 };
 
 const selectEmployee = async (employee) => {
+  if (!employee || !employee.id) {
+    error('직원 ID가 유효하지 않습니다.');
+    return;
+  }
   try {
-    const response = await employeeService.getEmployee(employee.id); // Use getEmployee
-    selectedEmployee.value = response.data.data.memberDetail; // Extract memberDetail from MemberEditRes
+    const response = await employeeService.getEmployeeDetails(employee.id); // Use getEmployeeDetails
+    selectedEmployee.value = response.data.data; // Extract memberDetail from MemberEditRes
     showEmployeeDetail.value = true;
   } catch (err) {
     console.error('직원 상세 정보를 불러오는 데 실패했습니다:', err);
@@ -504,6 +515,12 @@ const formatAccountStatus = (status) => {
     case 'LOCK': return '잠금';
     default: return status;
   }
+};
+
+const goToEmployeeDetailPage = (employeeId) => {
+  console.log('goToEmployeeDetailPage 호출, employeeId:', employeeId); // Add this log
+  router.push(`/employee/detail/${employeeId}`);
+  showEmployeeDetail.value = false; // Close the modal
 };
 
 const formatDate = (dateString) => {
@@ -666,18 +683,32 @@ const formatDate = (dateString) => {
 
 .detail-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Align items to the top */
   gap: 20px;
   margin-bottom: 24px;
   padding-bottom: 20px;
   border-bottom: 1px solid #e9ecef;
+  justify-content: space-between; /* Push buttons to the right */
+}
+
+.detail-header-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto; /* Push actions to the far right */
+}
+
+.name-and-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px; /* To maintain spacing with the paragraph below */
 }
 
 .detail-info h3 {
   font-size: 20px;
   font-weight: 600;
   color: #2c3e50;
-  margin-bottom: 8px;
+  margin: 0; /* Remove margin-bottom as it's handled by parent .name-and-status */
 }
 
 .detail-info p {
@@ -691,6 +722,8 @@ const formatDate = (dateString) => {
 
 .detail-content {
   padding: 20px 0;
+  max-height: calc(100vh - 450px); /* Even further adjusted for a smaller height */
+  overflow-y: auto;
 }
 
 .info-grid {
@@ -719,5 +752,17 @@ const formatDate = (dateString) => {
 
 .info-item .value {
   color: #2c3e50;
+}
+
+/* Custom styles for employee detail dialog scrolling */
+.custom-employee-detail-dialog {
+  max-height: calc(100vh - 50px); /* Ensure the entire dialog doesn't exceed viewport height */
+  overflow-y: auto;
+}
+
+.custom-employee-detail-dialog .el-dialog__body {
+  padding: 0 24px 24px;
+  max-height: calc(100vh - 200px); /* Adjust based on actual header/footer height */
+  overflow-y: auto;
 }
 </style>

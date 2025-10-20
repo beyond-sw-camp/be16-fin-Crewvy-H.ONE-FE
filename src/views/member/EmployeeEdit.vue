@@ -339,7 +339,7 @@ export default {
   methods: {
     async fetchEmployeeData(id) {
       try {
-        const response = await employeeService.getEmployee(id);
+        const response = await employeeService.getEmployeeForEdit(id);
         const editData = response.data.data;
 
         const employmentTypeNameToValue = {
@@ -526,16 +526,32 @@ export default {
 
 <style scoped>
 .employee-edit-page {
-  max-width: 900px;
-  margin: auto;
-  padding: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2c3e50;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
+}
+
+.header-content h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
 }
 
 .form-section {

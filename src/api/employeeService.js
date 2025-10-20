@@ -1,8 +1,13 @@
 import apiClient from './index';
 
 // 직원 ID로 상세 정보 조회 (수정 페이지용)
-const getEmployee = (employeeId) => {
+const getEmployeeForEdit = (employeeId) => {
   return apiClient.get(`/member-service/member/${employeeId}/editpage`);
+};
+
+// 직원 ID로 상세 정보 조회 (상세 페이지용)
+const getEmployeeDetails = (employeeId) => {
+  return apiClient.get(`/member-service/member/detail/${employeeId}`);
 };
 
 // 직원 정보 업데이트
@@ -25,7 +30,8 @@ const restoreEmployee = (employeeId) => {
 };
 
 export default {
-  getEmployee,
+  getEmployeeForEdit,
+  getEmployeeDetails,
   updateEmployee,
   deleteEmployee,
   restoreEmployee,
