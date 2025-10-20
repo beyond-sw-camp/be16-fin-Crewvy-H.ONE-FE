@@ -15,7 +15,12 @@
     <div class="content">
       <!-- 비디오 영역 -->
       <div class="stage">
-        <div ref="videoContainer" class="videos"></div>
+        <div class="videos">
+          <div v-for="track in videoTracks" :key="track.sid" class="video-item">
+            <video :ref="el => { if (el) track.attach(el) }" autoplay playsinline :muted="track.isLocal"></video>
+            <div class="participant-name">{{ track.isLocal ? '나' : (track.participant ? track.participant.identity : '') }}</div>
+          </div>
+        </div>
         <!-- 하단 컨트롤 바 -->
         <div class="controls">
           <el-tooltip content="마이크" placement="top">
@@ -46,14 +51,14 @@
       <div class="chat" v-show="isChatOpen">
         <div class="chat-header">채팅</div>
         <div class="chat-body" ref="chatBody">
-          <div class="msg" v-for="(m, i) in messages" :key="i">
+          <div class="msg" v-for="(m, i) in messages" :key="m.createdAt + i">
             <div class="name">{{ m.name }}</div>
             <div class="content">{{ m.content }}</div>
             <div class="createdAt">{{ m.createdAt }}</div>
           </div>
         </div>
         <div class="chat-input">
-          <el-input v-model="chatText" placeholder="메시지를 입력하세요..." @keyup.enter="sendMessage">
+          <el-input v-model="chatText" placeholder="메시지를 입력하세요..." @keydown.enter="handleEnter">
             <template #append>
               <el-button type="primary" @click="sendMessage">전송</el-button>
             </template>
@@ -65,28 +70,32 @@
   </template>
 
 <script>
-import { OpenVidu } from 'openvidu-browser'
+
+import { Room, RoomEvent, Track, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
 import * as icons from '@element-plus/icons-vue'
-import { sendChatMessage, getChatMessages } from '@/api/videoConference'
+import { getChatMessages, sendChatMessage } from '@/api/videoConference'
 
 export default {
   name: 'MeetingRoom',
   // 아이콘은 :icon="icons.*"로 직접 참조하므로 컴포넌트 등록 불필요
   data() {
     return {
-      ov: null,
-      session: null,
-      publisher: null,
-      screenPublisher: null,
-      subscribers: [],
       title: '',
+      room: null,
+      localParticipant: null,
+      remoteParticipants: [],
+      localVideoTrack: null,
+      localAudioTrack: null,
+      screenSharePublication: null,
       videoConferenceId: null,
       audioEnabled: true,
       videoEnabled: true,
       screenShareActive: false,
       isChatOpen: true,
       messages: [],
+      videoTracks: [],
       chatText: '',
+      Track,
       icons,
       userInfo: {
         id: localStorage.getItem('memberId'),
@@ -96,50 +105,46 @@ export default {
   },
   computed: {
     participantCount() {
-      return (this.publisher ? 1 : 0) + this.subscribers.length
+      return this.room && this.room.participants ? this.room.participants.size : 0
     }
   },
   mounted() {
     // 기대 쿼리: ?sid=<sessionId>&token=<token>&title=<title>
     const q = new URLSearchParams(window.location.search)
-    const sessionId = q.get('sid')
     const token = q.get('token')
     this.title = q.get('title') || ''
     this.videoConferenceId = q.get('vcid')
-    if (!sessionId || !token) {
-      this.$message?.error?.('세션 정보가 없습니다.')
-      return
-    }
-    this.join(sessionId, token)
+    this.join(this.videoConferenceId, token)
   },
   beforeUnmount() {
     this.leaveSession()
   },
   methods: {
-    async join(sessionId, token) {
-      this.ov = new OpenVidu()
-      this.session = this.ov.initSession()
+    async join(videoConferenceId, token) {
+      this.room = new Room()
 
-      // 구독 스트림 생성 시 컨테이너에 즉시 부착
-      this.session.on('streamCreated', ({ stream }) => {
-        const container = this.$refs.videoContainer
-        const subscriber = this.session.subscribe(stream, container, { insertMode: 'APPEND' })
-        this.subscribers.push(subscriber)
-        subscriber.on('videoElementCreated', (event) => {
-          const el = event.element
-          if (el) {
-            el.setAttribute('playsinline', 'true')
-            el.autoplay = true
-          }
-        })
+      this.room.on(RoomEvent.ParticipantConnected, (participant) => {
+        this.remoteParticipants.push(participant)
+      })
+      this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        this.remoteParticipants = this.remoteParticipants.filter(p => p.sid !== participant.sid)
       })
 
-      this.session.on('streamDestroyed', ({ stream }) => {
-        this.subscribers = this.subscribers.filter((s) => s.stream.streamId !== stream.streamId)
+      this.room.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === Track.Kind.Video || track.kind === Track.Kind.ScreenShare) {
+          this.videoTracks.push(track)
+        }
       })
 
-      this.session.on('chat', (event) => {
-        const chatData = JSON.parse(event.data)
+      this.room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        if (track.kind === Track.Kind.Video || track.kind === Track.Kind.ScreenShare) {
+          this.videoTracks = this.videoTracks.filter(t => t.sid !== track.sid)
+        }
+      })
+
+      this.room.on(RoomEvent.DataReceived, (payload) => {
+        const decoder = new TextDecoder()
+        const chatData = JSON.parse(decoder.decode(payload))
         const now = new Date()
         const isMe = chatData.senderId === this.userInfo.id
         this.messages.push({
@@ -154,9 +159,16 @@ export default {
       })
 
       try {
-        // 사용자 정보를 포함한 연결
-        const userName = `${this.userInfo.id}:${this.userInfo.name}`
-        await this.session.connect(token, userName)
+        await this.room.connect(process.env.VUE_APP_LIVEKIT_URL, token)
+        this.localParticipant = this.room.localParticipant
+
+        // Publish local tracks
+        this.localAudioTrack = await createLocalAudioTrack()
+        await this.localParticipant.publishTrack(this.localAudioTrack)
+
+        this.localVideoTrack = await createLocalVideoTrack()
+        await this.localParticipant.publishTrack(this.localVideoTrack)
+        this.videoTracks.push(this.localVideoTrack)
 
         if (this.videoConferenceId) {
           getChatMessages(this.videoConferenceId)
@@ -171,95 +183,64 @@ export default {
               this.$message?.error?.('채팅 기록을 불러오지 못했습니다.')
             })
         }
-
-        // 퍼블리셔를 컨테이너에 직접 생성해 부착
-        const container = this.$refs.videoContainer
-        this.publisher = await this.ov.initPublisherAsync(container, {
-          audioSource: undefined,
-          videoSource: undefined,
-          publishAudio: true,
-          publishVideo: true,
-          resolution: '640x480',
-          frameRate: 30,
-          insertMode: 'APPEND',
-          mirror: true
-        })
-
-        // 자동재생/인라인 재생 보장
-        this.publisher.on('videoElementCreated', (event) => {
-          const el = event.element
-          if (el) {
-            el.muted = true
-            el.setAttribute('muted', '')
-            el.setAttribute('playsinline', 'true')
-            el.autoplay = true
-          }
-        })
-
-        await this.session.publish(this.publisher)
       } catch (e) {
         this.$message?.error?.('회의 연결에 실패했습니다.')
+        console.error(e)
       }
     },
     leaveSession() {
       try {
-        if (this.session) this.session.disconnect()
-      } finally {
-        this.session = null
-        this.publisher = null
-        this.screenPublisher = null
-        this.subscribers = []
+        if (this.room) {
+          this.room.disconnect()
+        }
+      }
+      finally {
+        this.room = null
+        this.localParticipant = null
+        this.remoteParticipants = []
+        this.videoTracks = []
+        this.localVideoTrack = null
+        this.localAudioTrack = null
+        this.screenSharePublication = null
         window.close()
       }
     },
     toggleAudio() {
-      if (!this.publisher) return
+      if (!this.localAudioTrack) return
       this.audioEnabled = !this.audioEnabled
-      this.publisher.publishAudio(this.audioEnabled)
+      this.localAudioTrack.mute(!this.audioEnabled)
     },
     toggleVideo() {
-      if (!this.publisher) return
+      if (!this.localVideoTrack) return
       this.videoEnabled = !this.videoEnabled
-      this.publisher.publishVideo(this.videoEnabled)
+      this.localVideoTrack.mute(!this.videoEnabled)
     },
     async toggleScreenShare() {
-      if (!this.session) return
+      if (!this.room || !this.localParticipant) return
       if (!this.screenShareActive) {
         try {
-          this.screenPublisher = await this.ov.initPublisherAsync(undefined, {
-            videoSource: 'screen',
-            publishAudio: false,
-            publishVideo: true,
-            mirror: false,
-            insertMode: 'APPEND'
-          })
-          this.screenPublisher.once('videoElementCreated', (e) => {
-            const el = e.element
-            if (el) {
-              el.setAttribute('playsinline', 'true')
-              el.autoplay = true
-            }
-          })
-          await this.session.publish(this.screenPublisher)
-          const track = this.screenPublisher.stream.getMediaStream().getVideoTracks()[0]
-          if (track) {
-            track.addEventListener('ended', () => {
-              this.stopScreenShare()
-            })
+          const screenTracks = await createLocalScreenTracks({ audio: true })
+          this.screenSharePublication = await this.localParticipant.publishTrack(screenTracks[0])
+          if (screenTracks.length > 1) {
+            await this.localParticipant.publishTrack(screenTracks[1])
           }
+          screenTracks[0].on(Track.Event.Ended, () => {
+            this.stopScreenShare()
+          })
           this.screenShareActive = true
         } catch (e) {
           this.$message?.error?.('화면 공유를 시작하지 못했습니다.')
+          console.error(e)
         }
       } else {
         this.stopScreenShare()
       }
     },
-    stopScreenShare() {
-      if (!this.screenPublisher || !this.session) return
+    async stopScreenShare() {
+      if (!this.room || !this.localParticipant || !this.screenSharePublication) return
       try {
-        this.session.unpublish(this.screenPublisher)
-        this.screenPublisher = null
+        await this.localParticipant.unpublishTrack(this.screenSharePublication.track)
+        this.screenSharePublication = null
       } finally {
         this.screenShareActive = false
       }
@@ -271,12 +252,16 @@ export default {
         if (el) el.scrollTop = el.scrollHeight
       })
     },
+    handleEnter(e) {
+      if (e.isComposing) return;
+      this.sendMessage();
+    },
     async sendMessage() {
       const text = (this.chatText || '').trim()
       if (!text) return
 
-      if (!this.videoConferenceId) {
-        this.$message?.error?.('화상회의 ID를 찾을 수 없어 메시지를 전송할 수 없습니다.');
+      if (!this.room || !this.localParticipant) {
+        this.$message?.error?.('회의에 연결되지 않아 메시지를 전송할 수 없습니다.');
         return;
       }
       
@@ -287,10 +272,18 @@ export default {
       };
 
       try {
-        await sendChatMessage(this.videoConferenceId, message);
+        // const encoder = new TextEncoder()
+        // await this.localParticipant.publishData(encoder.encode(JSON.stringify(message)), 0)
+
+        // Persist message
+        if (this.videoConferenceId) {
+          await sendChatMessage(this.videoConferenceId, message)
+        }
+
         this.chatText = ''
       } catch (error) {
-        this.$message?.error?.('메시지 전송에 실패했습니다.');
+        this.message?.error?.('메시지 전송에 실패했습니다.');
+        console.error(error)
       }
     },
     openSettings() {

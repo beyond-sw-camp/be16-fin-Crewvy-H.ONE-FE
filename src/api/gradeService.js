@@ -50,6 +50,18 @@ export default {
     }
   },
 
+  async restoreGrade(gradeId) {
+    try {
+      const headers = getAuthHeadersFromToken();
+      if (!headers) throw new Error("Authentication headers not available.");
+      const response = await apiClient.patch(`/member-service/member/grade/${gradeId}/restore`, {}, { headers });
+      return response.data.data;
+    } catch (error) {
+      console.error("Error restoring grade:", error);
+      throw error;
+    }
+  },
+
   async reorderGrade(memberPositionId, gradeIds) {
     try {
       const headers = getAuthHeadersFromToken();

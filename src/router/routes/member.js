@@ -1,5 +1,6 @@
 import EmployeeManagement from '@/views/member/EmployeeManagement.vue';
 import OrganizationView from '../../views/member/OrganizationView.vue'
+import EmployeeDetailView from '@/views/member/EmployeeDetailView.vue';
 
 const routes = [
   {
@@ -29,6 +30,13 @@ const routes = [
     path: '/employee/edit/:id',
     name: 'EmployeeEdit',
     component: () => import('../../views/member/EmployeeEdit.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/employee/detail/:id',
+    name: 'EmployeeDetailView',
+    component: EmployeeDetailView,
+    props: (route) => ({ memberId: route.params.id }), // Modified line
     meta: { requiresAuth: true }
   },
   {

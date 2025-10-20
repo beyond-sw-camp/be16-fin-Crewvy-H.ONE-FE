@@ -1,7 +1,7 @@
 <template>
   <div class="payroll-calculation">
     <div class="page-header">
-      <h1>급여 계산</h1>
+      <h1>급여 모의 계산</h1>
       <p>급여 계산 설정을 조정하고 임의로 급여를 계산해볼 수 있습니다.</p>
     </div>
     

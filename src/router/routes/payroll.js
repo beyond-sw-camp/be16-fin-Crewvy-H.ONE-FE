@@ -1,6 +1,7 @@
 import Payroll from '../../views/payroll/Payroll.vue'
 import PayrollBasicInfo from '../../views/payroll/PayrollBasicInfo.vue'
 import PayrollCalculation from '../../views/payroll/PayrollCalculation.vue'
+import PayrollActualCalculation from '../../views/payroll/PayrollActualCalculation.vue'
 import PayrollTransferOutput from '../../views/payroll/PayrollTransferOutput.vue'
 import PayrollStatementOutput from '../../views/payroll/PayrollStatementOutput.vue'
 import PayrollItemInquiry from '../../views/payroll/PayrollItemInquiry.vue'
@@ -14,68 +15,62 @@ const routes = [
   {
     path: '/payroll',
     name: 'Payroll',
-    component: Payroll,
-    meta: { requiresAuth: true }
+    component: Payroll
   },
   {
     path: '/payroll/item-management',
     name: 'PayrollItemManagement',
-    component: PayrollItemManagement,
-    meta: { requiresAuth: true }
+    component: PayrollItemManagement
   },
   {
     path: '/payroll/basic-info',
     name: 'PayrollBasicInfo',
-    component: PayrollBasicInfo,
-    meta: { requiresAuth: true }
+    component: PayrollBasicInfo
   },
   {
     path: '/payroll/calculation',
     name: 'PayrollCalculation',
-    component: PayrollCalculation,
-    meta: { requiresAuth: true }
+    component: PayrollCalculation
+  },
+  {
+    path: '/payroll/actual-calculation',
+    name: 'PayrollActualCalculation',
+    component: PayrollActualCalculation
   },
   {
     path: '/payroll/transfer-output',
     name: 'PayrollTransferOutput',
-    component: PayrollTransferOutput,
-    meta: { requiresAuth: true }
+    component: PayrollTransferOutput
   },
   {
     path: '/payroll/statement-output',
     name: 'PayrollStatementOutput',
-    component: PayrollStatementOutput,
-    meta: { requiresAuth: true }
+    component: PayrollStatementOutput
   },
   {
     path: '/payroll/item-inquiry',
     name: 'PayrollItemInquiry',
-    component: PayrollItemInquiry,
-    meta: { requiresAuth: true }
+    component: PayrollItemInquiry
   },
   {
     path: '/payroll/insurance-deduction',
     name: 'PayrollInsuranceDeduction',
-    component: PayrollInsuranceDeduction,
-    meta: { requiresAuth: true }
+    component: PayrollInsuranceDeduction
   },
   {
     path: '/payroll/status-output',
     name: 'PayrollStatusOutput',
-    component: PayrollStatusOutput,
-    meta: { requiresAuth: true }
+    component: PayrollStatusOutput
   },
   {
     path: '/payroll/withholding-report',
     name: 'PayrollWithholdingReport',
-    component: PayrollWithholdingReport,
-    meta: { requiresAuth: true }
+    component: PayrollWithholdingReport
   },
   {
     path: '/payroll/elderly-incentive',
     name: 'PayrollElderlyIncentive',
-    component: PayrollElderlyIncentive,
-    meta: { requiresAuth: true }
+    component: PayrollElderlyIncentive
   },
 ];
 
