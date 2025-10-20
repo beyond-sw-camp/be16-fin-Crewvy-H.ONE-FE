@@ -409,7 +409,7 @@
 import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
 import { useSnackbar } from '@/composables/useSnackbar';
 import SnackbarContainer from '../components/SnackbarContainer.vue';
-import organizationService from '@/api/organizationService';
+
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
