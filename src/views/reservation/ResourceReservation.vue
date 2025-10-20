@@ -61,12 +61,12 @@
       
       <div class="resource-card">
         <div class="card-icon">
-          <el-icon><User /></el-icon>
+          <el-icon><Calendar /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">활성 사용자</div>
-          <div class="card-value">{{ activeUsers }}</div>
-          <div class="card-subtitle">명</div>
+          <div class="card-title">이번 주 예약</div>
+          <div class="card-value">{{ thisWeekReservations }}</div>
+          <div class="card-subtitle">건</div>
         </div>
       </div>
     </div>
@@ -171,6 +171,7 @@
           <div class="resource-selection">
             <el-form-item label="자원 선택">
               <el-select v-model="reservationForm.resourceId" placeholder="자원을 선택하세요" @change="onResourceChange">
+                <el-option label="전체" value="" />
                 <el-option
                   v-for="resource in filteredAvailableResources"
                   :key="resource.id"
@@ -313,7 +314,7 @@
             <div class="form-row">
               <el-form-item label="비고">
                 <el-input
-                  v-model="reservationForm.notes"
+                  v-model="reservationForm.note"
                   type="textarea"
                   placeholder="추가 사항을 입력하세요."
                   :rows="2"
@@ -433,7 +434,12 @@
           <div class="reservation-item" v-for="reservation in sortedMyReservations" :key="reservation.id">
             <div class="reservation-info">
               <div class="reservation-header">
-                <div class="reservation-title">{{ reservation.resourceName }}</div>
+                <div class="reservation-title">
+                  <template v-if="reservation.isRepeated">
+                    <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>
+                  </template>
+                  {{ reservation.resourceName }}
+                </div>
                 <div class="reservation-date-large">{{ reservation.date }}</div>
               </div>
               <div class="reservation-details">
@@ -446,6 +452,9 @@
                   <div class="reservation-status">
                     <el-tag :type="getReservationStatusType(reservation.status)" size="small">
                       {{ getReservationStatusLabel(reservation.status) }}
+                    </el-tag>
+                    <el-tag v-if="reservation.isRepeated" size="small" type="primary" style="margin-left: 6px;">
+                      <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>정기
                     </el-tag>
                   </div>
                 </div>
@@ -461,6 +470,7 @@
                     <span>{{ reservation.purpose }}</span>
                   </div>
                 </div>
+                
               </div>
             </div>
             <div class="reservation-actions">
@@ -587,10 +597,19 @@
                 </div>
                 <div v-else class="reservation-list">
                   <div v-for="reservation in getTodayReservations(selectedResource.id)" :key="reservation.id" class="reservation-item">
-                    <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
-                    <el-tag :type="getReservationStatusType(reservation.status)" size="small">
-                      {{ getReservationStatusLabel(reservation.status) }}
-                    </el-tag>
+                    <div class="reservation-info">
+                      <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                      <span class="member">{{ reservation.memberName }}</span>
+                      <span v-if="reservation.purpose" class="purpose">{{ reservation.purpose }}</span>
+                    </div>
+                    <div class="reservation-tags">
+                      <el-tag :type="getReservationStatusType(reservation.status)" size="small">
+                        {{ getReservationStatusLabel(reservation.status) }}
+                      </el-tag>
+                      <el-tag v-if="reservation.isRepeated" size="small" type="primary">
+                        <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>정기
+                      </el-tag>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -603,11 +622,20 @@
                 </div>
                 <div v-else class="reservation-list">
                   <div v-for="reservation in getWeekReservations(selectedResource.id)" :key="reservation.id" class="reservation-item">
-                    <span class="date">{{ reservation.date }}</span>
-                    <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
-                    <el-tag :type="getReservationStatusType(reservation.status)" size="small">
-                      {{ getReservationStatusLabel(reservation.status) }}
-                    </el-tag>
+                    <div class="reservation-info">
+                      <span class="date">{{ reservation.date }}</span>
+                      <span class="time">{{ reservation.startTime }} - {{ reservation.endTime }}</span>
+                      <span class="member">{{ reservation.memberName }}</span>
+                      <span v-if="reservation.purpose" class="purpose">{{ reservation.purpose }}</span>
+                    </div>
+                    <div class="reservation-tags">
+                      <el-tag :type="getReservationStatusType(reservation.status)" size="small">
+                        {{ getReservationStatusLabel(reservation.status) }}
+                      </el-tag>
+                      <el-tag v-if="reservation.isRepeated" size="small" type="primary">
+                        <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>정기
+                      </el-tag>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -663,69 +691,6 @@
       </template>
     </el-dialog>
 
-    <!-- 이용 완료 모달 -->
-    <el-dialog
-      v-model="showUsageCompletion"
-      title="이용 완료"
-      width="600px"
-    >
-      <el-form :model="usageCompletionForm" label-width="120px">
-        <el-form-item label="자원명">
-          <el-input v-model="usageCompletionForm.resourceName" disabled />
-        </el-form-item>
-        <el-form-item label="이용 날짜">
-          <el-input v-model="usageCompletionForm.date" disabled />
-        </el-form-item>
-        <el-form-item label="이용 시간">
-          <el-input v-model="usageCompletionForm.timeRange" disabled />
-        </el-form-item>
-        <el-form-item label="유류비 (차량인 경우)">
-          <el-input-number 
-            v-model="usageCompletionForm.fuelCost" 
-            :min="0" 
-            :precision="0"
-            placeholder="유류비를 입력하세요"
-          />
-          <span style="margin-left: 8px;">원</span>
-        </el-form-item>
-        <el-form-item label="주행 거리 (차량인 경우)">
-          <el-input-number 
-            v-model="usageCompletionForm.distance" 
-            :min="0" 
-            :precision="1"
-            placeholder="주행 거리를 입력하세요"
-          />
-          <span style="margin-left: 8px;">km</span>
-        </el-form-item>
-        <el-form-item label="운행 기록">
-          <el-input
-            v-model="usageCompletionForm.drivingRecord"
-            type="textarea"
-            placeholder="운행 기록을 입력하세요"
-            :rows="3"
-          />
-        </el-form-item>
-        <el-form-item label="이용 후 상태">
-          <el-select v-model="usageCompletionForm.condition" placeholder="자원 상태를 선택하세요">
-            <el-option label="정상" value="normal" />
-            <el-option label="손상 있음" value="damaged" />
-            <el-option label="청소 필요" value="cleaning_needed" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="기타 사항">
-          <el-input
-            v-model="usageCompletionForm.notes"
-            type="textarea"
-            placeholder="기타 사항을 입력하세요"
-            :rows="3"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showUsageCompletion = false">취소</el-button>
-        <el-button type="primary" @click="submitUsageCompletion">완료</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -748,7 +713,6 @@ export default {
       showReservation: false,
       showMyReservations: false,
       showStatistics: false,
-      showUsageCompletion: false,
       showResourceDetail: false,
       selectedResource: null,
       isEditingMode: false,
@@ -765,7 +729,7 @@ export default {
         endTime: '',
         purpose: '',
         attendees: 1,
-        notes: '',
+        note: '',
         sharedUsers: [],
         sharedUserInput: '',
         isRecurring: false,
@@ -784,7 +748,6 @@ export default {
       selectionEndHour: null,
       reservations: [],
       todayReservations: 0,
-      activeUsers: 0,
       meetingRooms: [],
       vehicles: [],
       resources: [],
@@ -796,16 +759,6 @@ export default {
         noShow: 0,
         totalReservations: 0
       },
-      usageCompletionForm: {
-        resourceName: '',
-        date: '',
-        timeRange: '',
-        fuelCost: 0,
-        distance: 0,
-        drivingRecord: '',
-        condition: '',
-        notes: ''
-      }
     }
   },
   async mounted() {
@@ -838,6 +791,22 @@ export default {
     
     availableResources() {
       return this.resources.filter(resource => resource.status === 'available')
+    },
+    
+    thisWeekReservations() {
+      const today = new Date()
+      const startOfWeek = new Date(today)
+      startOfWeek.setDate(today.getDate() - today.getDay()) // 이번 주 월요일
+      startOfWeek.setHours(0, 0, 0, 0)
+      
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 6) // 이번 주 일요일
+      endOfWeek.setHours(23, 59, 59, 999)
+      
+      return this.allReservations.filter(reservation => {
+        const reservationDate = new Date(reservation.date)
+        return reservationDate >= startOfWeek && reservationDate <= endOfWeek
+      }).length
     },
     
     filteredAvailableResources() {
@@ -921,8 +890,8 @@ export default {
     async loadResources() {
       this.loadingResources = true
       try {
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list-available`, {
+          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -951,7 +920,7 @@ export default {
     async loadCategories() {
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
+          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -984,10 +953,11 @@ export default {
     async loadMyReservations() {
       this.loadingMyReservations = true
       try {
+        const memberId = localStorage.getItem('memberId')
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/myList`, {
           params: { 
-            memberId: 'a0c31eea-64fb-4c4f-adc2-f042e117d68d',
-            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' 
+            memberId: memberId,
+            companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' 
           }
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
@@ -1020,13 +990,18 @@ export default {
             status: status,
             startDateTime: item.startDateTime,
             endDateTime: item.endDateTime,
-            // [check] 이후 추가
             resourceName: resource ? resource.name : '알 수 없는 자원',
             date: startDateTime.toISOString().split('T')[0],
             startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
             endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5),
-            purpose: '사용 목적 없음',
-            attendees: 1 
+            // 예약 상세 정보
+            purpose: item.title || '사용 목적 없음',
+            attendees: item.number || 1,
+            note: item.note || '',
+            participant: item.participant || 0,
+            // 정기 예약 정보
+            isRepeated: item.isRepeated === true || item.isRepeated === 'TRUE',
+            recurringSetting: item.recurringSettingRes || null
           }
         })
       } catch (error) {
@@ -1039,9 +1014,13 @@ export default {
     
     async loadAllReservations() {
       try {
+        const memberPositionId = localStorage.getItem('memberPositionId')
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
           params: { 
-            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' 
+            companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' 
+          },
+          headers: {
+            'X-User-MemberPositionId': memberPositionId
           }
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
@@ -1074,7 +1053,16 @@ export default {
             endDateTime: item.endDateTime,
             date: startDateTime.toISOString().split('T')[0],
             startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
-            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            memberName: item.name || item.memberName || '알 수 없음',
+            // 예약 상세 정보
+            purpose: item.title || '사용 목적 없음',
+            attendees: item.number || 1,
+            note: item.note || '',
+            participant: item.participant || 0,
+            // 정기 예약 정보
+            isRepeated: item.isRepeated === true || item.isRepeated === 'TRUE',
+            recurringSetting: item.recurringSettingRes || null
           }
         })
         
@@ -1092,12 +1080,40 @@ export default {
     
     async submitReservationToServer(reservationData, reservationId = null) {
       try {
+        const memberId = localStorage.getItem('memberId')
         const requestData = {
           reservationTypeId: reservationData.resourceId,
-          memberId: 'a0c31eea-64fb-4c4f-adc2-f042e117d68d',
-          companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9',
+          memberId: memberId,
+          companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab',
           startDateTime: `${reservationData.date}T${reservationData.startTime}:00`,
-          endDateTime: `${reservationData.date}T${reservationData.endTime}:00`
+          endDateTime: `${reservationData.date}T${reservationData.endTime}:00`,
+          // reservation-details 확장 필드
+          title: reservationData.purpose || '',
+          number: reservationData.attendees || 1,
+          note: reservationData.note || '',
+          participant: Array.isArray(reservationData.sharedUsers) ? reservationData.sharedUsers.length : 0,
+          isRepeated: reservationData.isRecurring ? 'TRUE' : 'FALSE',
+          repeatCreateReq: reservationData.isRecurring
+            ? {
+                // 백엔드 스키마: RepeatCycle cycle, int repeatInterval, List<DayOfWeek> dayOfWeek, LocalDate endDate
+                cycle: (() => {
+                  const t = (reservationData.recurrenceType || '').toString().toLowerCase()
+                  const map = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
+                  return map[t]
+                })(),
+                repeatInterval: reservationData.recurrenceInterval,
+                dayOfWeek: (() => {
+                  // 선택된 요일들을 List<DayOfWeek> 형태로 전송
+                  if (!Array.isArray(reservationData.recurrenceDays) || reservationData.recurrenceDays.length === 0) return []
+                  const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY']
+                  return reservationData.recurrenceDays.map(day => {
+                    const idx = typeof day === 'string' ? parseInt(day, 10) : Number(day)
+                    return days[idx]
+                  })
+                })(),
+                endDate: reservationData.recurrenceEndDate
+              }
+            : null
         }
         
         let response
@@ -1153,6 +1169,60 @@ export default {
         'USED': '이용 완료'
       }
       return statusMap[status] || status
+    },
+    
+    getRecurringPatternLabel(recurringSetting) {
+      if (!recurringSetting) return ''
+      
+      const cycleMap = {
+        'DAILY': '매일',
+        'WEEKLY': '매주',
+        'MONTHLY': '매월',
+        'YEARLY': '매년'
+      }
+      
+      const cycle = cycleMap[recurringSetting.cycle] || recurringSetting.cycle
+      const interval = recurringSetting.repeatInterval || 1
+      
+      if (interval === 1) {
+        return cycle
+      } else {
+        return `${interval}${cycle.replace('매', '')}마다`
+      }
+    },
+    
+    // 정기 예약 cycle을 폼의 recurrenceType으로 매핑
+    mapRecurringCycleToType(cycle) {
+      const cycleMap = {
+        'DAILY': 'daily',
+        'WEEKLY': 'weekly', 
+        'MONTHLY': 'monthly',
+        'YEARLY': 'yearly'
+      }
+      return cycleMap[cycle] || 'weekly'
+    },
+    
+    // 정기 예약 요일 정보를 폼의 recurrenceDays로 매핑
+    // dayOrList는 'MONDAY' 같은 문자열 또는 ['MONDAY','WEDNESDAY'] 같은 배열을 허용
+    mapRecurringDays(dayOrList) {
+      if (!dayOrList) return []
+      const dayMap = {
+        'MONDAY': '1',
+        'TUESDAY': '2',
+        'WEDNESDAY': '3',
+        'THURSDAY': '4',
+        'FRIDAY': '5',
+        'SATURDAY': '6',
+        'SUNDAY': '0'
+      }
+      if (Array.isArray(dayOrList)) {
+        return dayOrList
+          .map(d => dayMap[d])
+          .filter(v => v !== undefined)
+          .sort((a, b) => Number(a) - Number(b))
+      }
+      const dayNumber = dayMap[dayOrList]
+      return dayNumber !== undefined ? [dayNumber] : []
     },
     // 캘린더 관련 메서드들
     generateTimeSlots() {
@@ -1353,9 +1423,9 @@ export default {
         return false
       }
       
-      // 자원이 선택되지 않았으면 모든 자원의 예약을 확인
+      // 자원이 선택되지 않았으면 필터링된 자원들의 예약을 확인
       if (!this.reservationForm.resourceId) {
-        // 모든 자원의 예약 확인 (수정 중인 예약은 제외)
+        // 필터링된 자원들의 예약 확인 (수정 중인 예약은 제외)
         return this.allReservations.some(reservation => {
           if (reservation.date !== date || reservation.status === 'CANCELLED') {
             return false
@@ -1364,6 +1434,14 @@ export default {
           // 수정 모드에서는 현재 수정 중인 예약을 제외
           if (this.isEditingMode && reservation.id === this.editingReservationId) {
             return false
+          }
+          
+          // 자원 유형이 선택된 경우 해당 유형의 자원만 필터링
+          if (this.reservationForm.resourceType) {
+            const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+            if (!resource || resource.categoryName !== this.reservationForm.resourceType) {
+              return false
+            }
           }
           
           const startHour = parseInt(reservation.startTime.split(':')[0])
@@ -1401,7 +1479,7 @@ export default {
       
       // 특정 시간대의 예약 정보 반환
       if (!this.reservationForm.resourceId) {
-        // 자원이 선택되지 않았으면 모든 자원의 예약 확인 (수정 중인 예약은 제외)
+        // 자원이 선택되지 않았으면 필터링된 자원들의 예약 확인 (수정 중인 예약은 제외)
         return this.allReservations.filter(reservation => {
           if (reservation.date !== date || reservation.status === 'CANCELLED') {
             return false
@@ -1410,6 +1488,14 @@ export default {
           // 수정 모드에서는 현재 수정 중인 예약을 제외
           if (this.isEditingMode && reservation.id === this.editingReservationId) {
             return false
+          }
+          
+          // 자원 유형이 선택된 경우 해당 유형의 자원만 필터링
+          if (this.reservationForm.resourceType) {
+            const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+            if (!resource || resource.categoryName !== this.reservationForm.resourceType) {
+              return false
+            }
           }
           
           const startHour = parseInt(reservation.startTime.split(':')[0])
@@ -1473,7 +1559,7 @@ export default {
           const group = groupedReservations[resourceName]
           group.reservations.forEach(reservation => {
             const timeRange = `${reservation.startTime}-${reservation.endTime}`
-            const reserverName = reservation.memberId || '알 수 없음'
+            const reserverName = reservation.memberName || '알 수 없음'
             tooltipLines.push(`${resourceName}: ${timeRange} (${reserverName})`)
           })
         })
@@ -1481,9 +1567,9 @@ export default {
         return tooltipLines.join('<br>')
       }
       
-      // 특정 자원이 선택된 경우 (단일 객체 반환) - '예약자 : {memberId}' 형태
+      // 특정 자원이 선택된 경우 (단일 객체 반환) - '예약자 : {memberName}' 형태
       if (reservationInfo) {
-        const reserverName = reservationInfo.memberId || '알 수 없음'
+        const reserverName = reservationInfo.memberName || '알 수 없음'
         return `예약자: ${reserverName}`
       }
       
@@ -1608,7 +1694,7 @@ export default {
         endTime: '',
         purpose: '',
         attendees: 1,
-        notes: '',
+        note: '',
         sharedUsers: [],
         sharedUserInput: '',
         isRecurring: false,
@@ -1734,24 +1820,14 @@ export default {
       }
 
       try {
-        // 백엔드로 예약 데이터 전송
-        for (const reservation of reservations) {
-          await this.submitReservationToServer(reservation, this.isEditingMode ? this.editingReservationId : null)
-        }
+        await this.submitReservationToServer(this.reservationForm, this.isEditingMode ? this.editingReservationId : null);
         
-        // 승인이 필요한 자원인지 확인
-        const resource = this.resources.find(r => r.id == this.reservationForm.resourceId)
-        if (resource && resource.requiresApproval) {
-          this.info('승인이 필요한 자원입니다. 결재함으로 이동합니다.')
-          this.$router.push('/approval')
+        if (this.isEditingMode) {
+          this.success('예약이 수정되었습니다.')
+        } else if (this.reservationForm.isRecurring) {
+          this.success(`정기 예약이 완료되었습니다.`)
         } else {
-          if (this.isEditingMode) {
-            this.success('예약이 수정되었습니다.')
-          } else if (this.reservationForm.isRecurring) {
-            this.success(`${reservations.length}개의 정기 예약이 완료되었습니다.`)
-          } else {
-            this.success('예약이 완료되었습니다.')
-          }
+          this.success('예약이 완료되었습니다.')
         }
         
         // 예약 목록 새로고침
@@ -1872,6 +1948,10 @@ export default {
       // 자원 정보 찾기
       const resource = this.resources.find(r => r.name === reservation.resourceName)
       
+      // 정기 예약 정보 처리
+      const isRepeated = reservation.isRepeated === true || reservation.isRepeated === 'TRUE'
+      const recurringSetting = reservation.recurringSetting || {}
+      
       this.reservationForm = {
         resourceType: resource ? resource.categoryName : '',
         resourceId: this.getResourceIdByName(reservation.resourceName),
@@ -1880,14 +1960,15 @@ export default {
         endTime: reservation.endTime,
         purpose: reservation.purpose === '사용 목적 없음' ? '' : reservation.purpose,
         attendees: reservation.attendees,
-        notes: '',
+        note: reservation.note || '',
         sharedUsers: [],
         sharedUserInput: '',
-        isRecurring: false,
-        recurrenceType: 'weekly',
-        recurrenceInterval: 1,
-        recurrenceEndDate: '',
-        recurrenceDays: []
+        isRecurring: isRepeated,
+        recurrenceType: this.mapRecurringCycleToType(recurringSetting.cycle) || 'weekly',
+        recurrenceInterval: recurringSetting.repeatInterval || 1,
+        recurrenceEndDate: recurringSetting.endDate || '',
+        // repeatDayList(배열)이 있으면 우선 사용, 없으면 단일 dayOfWeek 사용
+        recurrenceDays: this.mapRecurringDays(recurringSetting.repeatDayList || recurringSetting.dayOfWeek) || []
       }
       this.showReservation = true
       this.generateTimeSlots()
@@ -2117,12 +2198,6 @@ export default {
       const reservations = this.allReservations
       const resourceCounts = {}
       
-      console.log('카테고리별 차트 데이터 생성:', {
-        reservations: reservations.length,
-        resources: this.resources.length,
-        resourceIds: this.resources.map(r => ({ id: r.id, name: r.name, category: r.categoryName }))
-      })
-      
       // 카테고리별 예약 수 계산
       reservations.forEach(reservation => {
         // 자원 정보 찾기
@@ -2234,30 +2309,22 @@ export default {
         this.resourceChartInstance = null
       }
     },
-    completeUsage(reservation) {
-      this.usageCompletionForm = {
-        reservationId: reservation.id, // 예약 ID 저장
-        resourceName: reservation.resourceName,
-        date: reservation.date,
-        timeRange: `${reservation.startTime} - ${reservation.endTime}`,
-        fuelCost: 0,
-        distance: 0,
-        drivingRecord: '',
-        condition: '',
-        notes: ''
-      }
-      this.showUsageCompletion = true
-    },
-    async submitUsageCompletion() {
+    async completeUsage(reservation) {
       try {
-        if (!this.usageCompletionForm.reservationId) {
-          this.error('예약 정보를 찾을 수 없습니다.')
-          return
-        }
+        // 확인 창 표시
+        await this.$confirm(
+          `"${reservation.resourceName}" 자원의 이용을 완료하시겠습니까?`,
+          '이용 완료 확인',
+          {
+            confirmButtonText: '완료',
+            cancelButtonText: '취소',
+            type: 'warning'
+          }
+        )
 
         // API 요청으로 예약 상태를 USED로 변경
         const response = await axios.put(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/status/${this.usageCompletionForm.reservationId}`,
+          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/status/${reservation.id}`,
           {
             reservationStatus: 'USED'
           }
@@ -2265,33 +2332,20 @@ export default {
 
         if (response.data && response.data.success) {
           // 로컬 상태 업데이트
-          const index = this.myReservations.findIndex(r => r.id === this.usageCompletionForm.reservationId)
+          const index = this.myReservations.findIndex(r => r.id === reservation.id)
           if (index > -1) {
             this.myReservations[index].status = 'USED'
           }
           
           this.success('이용 완료가 처리되었습니다.')
-          this.showUsageCompletion = false
-          this.resetUsageCompletionForm()
         } else {
           throw new Error(response.data?.message || '이용 완료 처리에 실패했습니다.')
         }
       } catch (error) {
-        console.error('이용 완료 처리 실패:', error)
-        this.error(`이용 완료 처리 중 오류가 발생했습니다: ${error.message}`)
-      }
-    },
-    resetUsageCompletionForm() {
-      this.usageCompletionForm = {
-        reservationId: '',
-        resourceName: '',
-        date: '',
-        timeRange: '',
-        fuelCost: 0,
-        distance: 0,
-        drivingRecord: '',
-        condition: '',
-        notes: ''
+        if (error.message !== 'cancel') { // 사용자가 취소한 경우가 아닌 경우
+          console.error('이용 완료 처리 실패:', error)
+          this.error(`이용 완료 처리 중 오류가 발생했습니다: ${error.message}`)
+        }
       }
     },
     addSharedUser() {
@@ -2387,7 +2441,7 @@ export default {
         endTime: this.reservationForm.endTime,
         purpose: this.reservationForm.purpose,
         attendees: this.reservationForm.attendees,
-        notes: this.reservationForm.notes,
+        note: this.reservationForm.note,
         sharedUsers: [...this.reservationForm.sharedUsers],
         isRecurring: this.reservationForm.isRecurring,
         recurrenceType: this.reservationForm.recurrenceType,
@@ -3432,6 +3486,49 @@ export default {
   font-size: 13px;
   color: #2c3e50;
   font-weight: 600;
+}
+
+/* 정기 예약 관련 스타일 */
+.reservation-recurring {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.reservation-end-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.reservation-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.reservation-tags {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.reservation-item .member {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.reservation-item .purpose {
+  font-size: 12px;
+  color: #909399;
+  font-style: italic;
 }
 
 .no-reservation {

@@ -986,15 +986,15 @@ export default {
         }
       }, 1000)
     },
-    handleSessionExpiry() {
-      clearInterval(this.sessionTimer)
-      this.error('세션이 만료되었습니다. 다시 로그인해주세요.')
-      // 실제로는 로그인 페이지로 리다이렉트
-      this.info('로그인 페이지로 이동합니다.')
-    },
-    showSessionWarning() {
-      this.warning('세션이 곧 만료됩니다. (5분 남음)')
-    },
+    // handleSessionExpiry() {
+    //   clearInterval(this.sessionTimer)
+    //   this.error('세션이 만료되었습니다. 다시 로그인해주세요.')
+    //   // 실제로는 로그인 페이지로 리다이렉트
+    //   this.info('로그인 페이지로 이동합니다.')
+    // },
+    // showSessionWarning() {
+    //   this.warning('세션이 곧 만료됩니다. (5분 남음)')
+    // },
     extendSession() {
       // 세션 연장 (30분 추가)
       this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
