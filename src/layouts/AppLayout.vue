@@ -233,38 +233,7 @@
           </el-button>
 
           <!-- 알림 -->
-          <el-popover placement="bottom-end" :width="320" trigger="click">
-            <template #reference>
-              <el-badge :value="notifications.length" class="notification-badge">
-                <el-button type="text" class="notification-btn">
-                  <el-icon>
-                    <Bell />
-                  </el-icon>
-                </el-button>
-              </el-badge>
-            </template>
-
-            <div class="notification-panel">
-              <div class="notification-header">
-                <h3>알림</h3>
-                <el-button type="text" size="small">모두 읽음</el-button>
-              </div>
-              <div class="notification-list">
-                <div v-for="notification in notifications" :key="notification.id" class="notification-item">
-                  <div class="notification-content">
-                    <div class="notification-title">{{ notification.title }}</div>
-                    <div class="notification-message">{{ notification.message }}</div>
-                    <div class="notification-time">{{ notification.time }}</div>
-                  </div>
-                  <el-button type="text" size="small" @click="removeNotification(notification.id)">
-                    <el-icon>
-                      <Close />
-                    </el-icon>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </el-popover>
+          <notification-bell />
 
           <!-- 사용자 메뉴 -->
           <el-dropdown @command="handleUserCommand">
@@ -437,18 +406,33 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
-
-import { useSnackbar } from '@/composables/useSnackbar'
-import SnackbarContainer from '../components/SnackbarContainer.vue'
+import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
+import { useSnackbar } from '@/composables/useSnackbar';
+import SnackbarContainer from '../components/SnackbarContainer.vue';
+import organizationService from '@/api/organizationService';
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
+import { onMounted, onBeforeUnmount } from 'vue';
+import { useSse } from '@/composables/useSse.js';
+import NotificationBell from '@/components/NotificationBell.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer },
+  components: { SnackbarContainer, NotificationBell },
   setup() {
-    const { success, error, warning, info } = useSnackbar()
-    return { success, error, warning, info }
+    const { success, error, warning, info } = useSnackbar();
+    const { connect, disconnect } = useSse();
+    const store = useStore();
+
+    onMounted(() => {
+      store.dispatch('notification/fetchNotifications');
+      connect();
+    });
+
+    onBeforeUnmount(() => {
+      disconnect();
+    });
+
+    return { success, error, warning, info };
   },
   data() {
     return {
@@ -693,7 +677,8 @@ export default {
     userAvatarUrl() {
       return this.user?.avatar || this.defaultAvatarSvg;
     },
-    ...mapState(['user', 'notifications']),
+    ...mapState(['user']),
+    ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
       if (path.startsWith('/payroll')) {
