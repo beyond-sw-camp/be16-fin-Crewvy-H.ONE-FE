@@ -3,17 +3,15 @@
     <!-- 사이드바 -->
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <router-link to="/" class="logo-link">
-          <div class="logo">
-            <div class="logo-icon">
-              <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
-            </div>
-            <div v-if="!sidebarCollapsed" class="logo-text-container">
-              <div class="logo-text">H.ONE</div>
-              <div class="logo-subtitle">HR MANAGEMENT</div>
-            </div>
+        <div class="logo" @click="sidebarCollapsed ? toggleSidebar() : null" :class="{ 'clickable': sidebarCollapsed }">
+          <div class="logo-icon">
+            <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
           </div>
-        </router-link>
+          <div v-if="!sidebarCollapsed" class="logo-text-container">
+            <div class="logo-text">H.ONE</div>
+            <div class="logo-subtitle">HR MANAGEMENT</div>
+          </div>
+        </div>
         <el-button v-if="!sidebarCollapsed" type="text" @click="toggleSidebar" class="collapse-btn">
           <el-icon>
             <Fold />
@@ -51,20 +49,20 @@
           <el-menu-item index="/organization">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/title">
+          <el-menu-item index="/employee/titles">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grade">
+          <el-menu-item index="/employee/grades">
             <span>직급 관리</span>
           </el-menu-item>
-          <el-sub-menu index="role">
+          <el-sub-menu index="roles">
             <template #title>
               <span>역할 관리</span>
             </template>
-            <el-menu-item index="/employee/role">
+            <el-menu-item index="/employee/roles">
               <span>역할 목록</span>
             </el-menu-item>
-            <el-menu-item index="/employee/role/create">
+            <el-menu-item index="/employee/roles/create">
               <span>역할 생성</span>
             </el-menu-item>
           </el-sub-menu>
@@ -132,8 +130,11 @@
             <el-menu-item index="/payroll/basic-info">
               <span>급여 기본 정보</span>
             </el-menu-item>
-            <el-menu-item index="/payroll/calculation">
+            <el-menu-item index="/payroll/actual-calculation">
               <span>급여 계산</span>
+            </el-menu-item>
+            <el-menu-item index="/payroll/calculation">
+              <span>급여 모의 계산</span>
             </el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="payroll-inquiry">
@@ -266,7 +267,7 @@
           </el-popover>
 
           <!-- 사용자 메뉴 -->
-          <el-dropdown v-if="user" @command="handleUserCommand">
+          <el-dropdown @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="userAvatarUrl" :size="32" />
               <span class="user-name">{{ userName }}</span>
@@ -435,10 +436,10 @@
 </template>
 
 <script>
-import { mapState, mapMutations, mapGetters } from 'vuex'
+import { mapState, mapMutations } from 'vuex'
+
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
-import organizationService from '@/api/organizationService';
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 
 export default {
@@ -692,7 +693,6 @@ export default {
       return this.user?.avatar || this.defaultAvatarSvg;
     },
     ...mapState(['user', 'notifications']),
-    ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
       if (path.startsWith('/payroll')) {
@@ -771,26 +771,11 @@ export default {
   },
   methods: {
     ...mapMutations(['removeNotification']),
-    async fetchOrganizationTree() {
-      try {
-        if (!this.memberId) {
-          console.error('User UUID not found in store.');
-          return;
-        }
-        const response = await organizationService.getOrganizationTreeWithMembers(this.memberId);
-        this.orgTreeData = response.data.data;
-        this.allEmployees = this.flattenOrgTree(this.orgTreeData);
-        this.searchedEmployees = this.allEmployees;
-      } catch (error) {
-        console.error('Failed to fetch organization tree:', error);
-        this.$message.error('조직도 데이터를 불러오는데 실패했습니다.');
-      }
-    },
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
     getPageTitle() {
-      const title = {
+      const titles = {
         '/': '대시보드',
         '/organization': '조직/사원',
         '/employee': '직원 관리',
@@ -821,7 +806,7 @@ export default {
         '/board': '게시판',
         '/resource': '예약'
       }
-      return title[this.$route.path] || 'H.ONE'
+      return titles[this.$route.path] || 'H.ONE'
     },
     handleUserCommand(command) {
       switch (command) {
@@ -829,15 +814,14 @@ export default {
           this.$router.push('/my-info');
           break;
         case 'logout':
-          this.$store.dispatch('logout');
           this.$router.push('/landing');
           break
       }
     },
     showOrganizationModal() {
       this.showOrgModal = true
-      this.activeOrgTab = 'org',
-        this.orgSearch = ''
+      this.activeOrgTab = 'org'
+      this.orgSearch = ''
       this.employeeSearch = ''
       this.searchedEmployees = this.allEmployees
     },
@@ -1043,10 +1027,9 @@ export default {
       })
     }
   },
-  async created() {
-    await this.fetchOrganizationTree();
-    this.initSessionTimer();
-    this.updatePayrollMenuState();
+  created() {
+    this.allEmployees = this.flattenOrgTree(this.orgTreeData);
+    this.searchedEmployees = this.allEmployees;
   },
   mounted() {
     this.initSessionTimer()
@@ -1062,14 +1045,6 @@ export default {
 
 <style scoped>
 /* ... (existing styles) */
-.logo-link {
-  text-decoration: none;
-}
-
-.logo {
-  cursor: pointer;
-}
-
 .main-layout {
   display: flex;
   height: 100vh;

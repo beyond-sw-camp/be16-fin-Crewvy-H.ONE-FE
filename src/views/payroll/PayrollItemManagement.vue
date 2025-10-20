@@ -6,6 +6,10 @@
         <p>급여 지급 및 공제 항목을 관리합니다.</p>
       </div>
       <div class="header-actions">
+        <el-button type="info" @click="loadPayrollItems" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          새로고침
+        </el-button>
         <el-button type="primary" @click="addNewItem">
           <el-icon><Plus /></el-icon>
           행 추가
@@ -68,6 +72,7 @@
                   placeholder="선택하세요"
                   size="small"
                   style="width: 100%"
+                  @change="(value) => handleTypeChange(scope.row, value)"
                 >
                   <el-option label="지급" value="ALLOWANCE" />
                   <el-option label="공제" value="DEDUCTION" />
@@ -77,11 +82,30 @@
             
             <el-table-column label="항목명" min-width="200">
               <template #default="scope">
-                <el-input 
-                  v-model="scope.row.itemName" 
-                  placeholder="항목명을 입력하세요"
-                  size="small"
-                />
+                <div class="item-name-container">
+                  <el-select 
+                    v-model="scope.row.itemName" 
+                    placeholder="항목명을 선택하세요"
+                    size="small"
+                    style="width: 100%"
+                    @change="(value) => handleItemNameChange(scope.row, value)"
+                  >
+                    <el-option 
+                      v-for="option in getItemNameOptions(scope.row.type)" 
+                      :key="option.value" 
+                      :label="option.label" 
+                      :value="option.value" 
+                    />
+                  </el-select>
+                  <el-input 
+                    v-if="scope.row.itemName === '기타항목'"
+                    v-model="scope.row.customItemName" 
+                    placeholder="직접 입력하세요"
+                    size="small"
+                    style="width: 100%; margin-top: 8px;"
+                    @input="(value) => handleCustomItemNameChange(scope.row, value)"
+                  />
+                </div>
               </template>
             </el-table-column>
             
@@ -89,7 +113,7 @@
               <template #default="scope">
                 <el-input 
                   v-model="scope.row.description" 
-                  placeholder="항목 설명을 입력하세요"
+                  :placeholder="'항목 설명을 입력하세요'"
                   size="small"
                 />
               </template>
@@ -178,16 +202,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import axios from 'axios'
-import { 
-  Plus, 
-  Document, 
-  RefreshLeft, 
-  Money, 
-  Remove, 
-  Check, 
-  Close, 
-  Delete 
-} from '@element-plus/icons-vue'
+import { Plus, Document, RefreshLeft, Money, Remove, Check, Close, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'PayrollItemManagement',
@@ -208,7 +223,7 @@ export default {
   data() {
     return {
       payrollItems: [],
-      originalData: [], // 원본 데이터를 저장할 배열
+      originalPayrollItems: [], // 원본 데이터 저장
       loading: false,
     }
   },
@@ -260,6 +275,7 @@ export default {
     await this.loadPayrollItems()
   },
   methods: {
+    // 백엔드에서 급여 항목 목록 로드
     async loadPayrollItems() {
       try {
         this.loading = true
@@ -268,6 +284,7 @@ export default {
           params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
         })
         
+        // API 응답에 따라 데이터 구조 조정
         let items = []
         if (response.data) {
           if (Array.isArray(response.data)) {
@@ -280,67 +297,112 @@ export default {
         }
         
         // 백엔드 데이터를 프론트엔드 형식으로 변환
-        this.payrollItems = items.map(item => ({
-          id: item.id,
-          type: item.salaryType || item.type, // salaryType을 type으로 매핑
-          itemName: item.name || item.itemName, // name 필드 사용
-          description: item.description || '',
-          isActive: item.isActive === 'TRUE' || item.isActive === true,
-          createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-          isNew: false
-        }))
+        const convertedItems = items.map((item, index) => {
+          const type = item.salaryType === 'ALLOWANCE' ? 'payment' : 'deduction'
+          const availableOptions = this.getItemNameOptions(type)
+          const isStandardItem = availableOptions.some(option => option.value === item.name)
+          
+          return {
+            id: index + 1, // 화면에 보여줄 번호 (1부터 시작)
+            uuid: item.id, // 실제 UUID는 내부적으로만 사용
+            type: type,
+            itemName: isStandardItem ? item.name : '기타항목',
+            customItemName: isStandardItem ? '' : item.name,
+            description: item.description || '',
+            isActive: item.isActive === 'TRUE' || item.isActive === true,
+            createdAt: item.createdAt
+          }
+        })
         
-        this.saveOriginalData()
+        // 지급 항목을 상위에, 공제 항목을 하위에 정렬
+        // 각 구분 내에서 기타항목은 하단에 위치
+        this.payrollItems = convertedItems.sort((a, b) => {
+          // 먼저 구분별로 정렬 (지급 > 공제)
+          if (a.type === 'payment' && b.type === 'deduction') return -1
+          if (a.type === 'deduction' && b.type === 'payment') return 1
+          
+          // 같은 구분 내에서는 기타항목을 하단에 배치
+          if (a.type === b.type) {
+            if (a.itemName === '기타항목' && b.itemName !== '기타항목') return 1
+            if (a.itemName !== '기타항목' && b.itemName === '기타항목') return -1
+          }
+          
+          return 0
+        })
         
-        this.success('급여 항목 목록을 불러왔습니다.')
+        // 정렬 후 ID 재정렬 (1부터 순차적으로)
+        this.payrollItems.forEach((item, index) => {
+          item.id = index + 1
+        })
+        
+        // 원본 데이터 저장 (깊은 복사)
+        this.originalPayrollItems = JSON.parse(JSON.stringify(this.payrollItems))
+        
       } catch (error) {
         console.error('급여 항목 로드 실패:', error)
-        this.error('급여 항목 목록을 불러오는데 실패했습니다.')
-        // 에러 시 빈 배열로 초기화
         this.payrollItems = []
-        this.saveOriginalData()
+        this.originalPayrollItems = []
+        this.error('급여 항목을 불러오는데 실패했습니다.')
       } finally {
         this.loading = false
       }
     },
 
-    saveOriginalData() {
-      // 현재 데이터를 깊은 복사하여 원본 데이터로 저장
-      this.originalData = JSON.parse(JSON.stringify(this.payrollItems))
-    },
     addNewItem() {
       const today = new Date()
-        const newItem = {
-          id: null, // 새 항목은 ID가 null
-          type: 'ALLOWANCE', // 기본값을 ALLOWANCE로 설정
-          itemName: '',
-          description: '',
-          isActive: true,
-          createdAt: today,
-          isNew: true // 새로 추가된 항목임을 표시
-        }
+      // 현재 존재하는 항목들 중 가장 큰 ID를 찾아서 +1
+      const maxId = this.payrollItems.length > 0 ? Math.max(...this.payrollItems.map(item => item.id)) : 0
+      const newItem = {
+        id: maxId + 1,
+        uuid: null, // 새 항목은 UUID가 없음
+        type: '',
+        itemName: '',
+        customItemName: '',
+        description: '',
+        isActive: true,
+        createdAt: today
+      }
       this.payrollItems.push(newItem)
       this.info('새로운 항목이 추가되었습니다. 내용을 입력한 후 저장해주세요.')
     },
     async deleteItem(index) {
       const item = this.payrollItems[index]
       
+      // 새로 추가된 항목(uuid가 null)인 경우 백엔드 요청 없이 로컬에서만 삭제
+      if (!item.uuid) {
+        this.$confirm('이 항목을 삭제하시겠습니까?', '삭제 확인', {
+          confirmButtonText: '삭제',
+          cancelButtonText: '취소',
+          type: 'warning'
+        }).then(() => {
+          this.payrollItems.splice(index, 1)
+          this.reorderIds()
+          this.success('항목이 삭제되었습니다.')
+        }).catch(() => {
+          this.info('삭제가 취소되었습니다.')
+        })
+        return
+      }
+
+      // 기존 항목인 경우 백엔드 삭제 요청
       this.$confirm('이 항목을 삭제하시겠습니까?', '삭제 확인', {
         confirmButtonText: '삭제',
         cancelButtonText: '취소',
         type: 'warning'
       }).then(async () => {
         try {
-          // 서버에 저장된 항목인 경우 API 호출
-          if (item.id && !item.isNew) {
-            await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/${item.id}`)
-          }
+          // axios delete 요청으로 RequestBody에 항목의 uuid 배열로 전송 (일괄 삭제 대응)
+          await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, {
+            data: [item.uuid]
+          })
           
+          // 백엔드 삭제 성공 시 로컬에서도 삭제
           this.payrollItems.splice(index, 1)
+          this.reorderIds()
           this.success('항목이 삭제되었습니다.')
         } catch (error) {
           console.error('항목 삭제 실패:', error)
-          this.error('항목 삭제에 실패했습니다.')
+          this.error('항목 삭제 중 오류가 발생했습니다.')
         }
       }).catch(() => {
         this.info('삭제가 취소되었습니다.')
@@ -365,69 +427,99 @@ export default {
         this.info('편집을 계속합니다.')
       })
     },
+
+    // 개별 항목의 변경사항 확인
+    hasItemChanged(originalItem, currentItem) {
+      const fieldsToCompare = ['type', 'itemName', 'customItemName', 'description', 'isActive']
+      
+      for (const field of fieldsToCompare) {
+        if (currentItem[field] !== originalItem[field]) {
+          return true
+        }
+      }
+      
+      return false
+    },
+
     async saveItems() {
-      // 변경사항이 없으면 저장하지 않음 (추가 안전장치)
-      if (!this.hasChanges) {
-        this.warning('저장할 변경사항이 없습니다.')
+      // 변경사항이 없으면 저장하지 않음
+      if (!this.hasChanges()) {
+        this.info('변경된 내용이 없습니다.')
         return
       }
       
       // 유효성 검사
-      const invalidItems = this.payrollItems.filter(item => !item.type || !item.itemName.trim())
+      const invalidItems = this.payrollItems.filter(item => {
+        if (!item.type || !item.itemName.trim()) return true
+        // 기타항목인 경우 커스텀 항목명이 필수
+        if (item.itemName === '기타항목' && !item.customItemName.trim()) return true
+        return false
+      })
       
       if (invalidItems.length > 0) {
-        this.error('구분과 항목명은 필수 입력 항목입니다.')
+        this.error('구분과 항목명은 필수 입력 항목입니다. 기타항목을 선택한 경우 직접 입력도 필요합니다.')
         return
       }
       
+      // 저장 로직 (실제로는 API 호출)
       try {
-        this.loading = true
+        // 새 항목과 변경된 기존 항목을 구분
+        const newItems = []
+        const changedItems = []
         
-        // 새로 추가된 항목들과 수정된 항목들을 분리
-        const newItems = this.payrollItems.filter(item => item.isNew)
-        const updatedItems = this.payrollItems.filter(item => !item.isNew && item.id)
-        
-        // 새 항목들 추가
-        for (const item of newItems) {
+        this.payrollItems.forEach(item => {
+          const finalItemName = item.itemName === '기타항목' ? item.customItemName : item.itemName
+          const finalSalaryType = item.type === 'payment' ? 'ALLOWANCE' : 'DEDUCTION'
+          
           const itemData = {
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
-            memberId: '00000000-0000-0000-0000-000000000000', // [check]임시 memberId
-            salaryType: item.type,
-            name: item.itemName,
-            description: item.description,
-            isActive: item.isActive ? 'TRUE' : 'FALSE'
+            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e', // 회사 UUID
+            memberId: item.uuid, // 기존 항목의 UUID (새 항목은 null)
+            salaryType: finalSalaryType,
+            name: finalItemName, // 기타항목인 경우 입력 필드의 실제 값
+            isActive: item.isActive ? 'TRUE' : 'FALSE',
+            description: item.description
           }
           
-          const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, itemData)
-          // 응답에서 받은 ID로 업데이트
-          item.id = response.data.id || response.data.data?.id
-          item.isNew = false
-        }
-        
-        // 수정된 항목들 업데이트
-        for (const item of updatedItems) {
-          const itemData = {
-            id: item.id,
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
-            memberId: '00000000-0000-0000-0000-000000000000', // 임시 memberId
-            salaryType: item.type,
-            name: item.itemName,
-            description: item.description,
-            isActive: item.isActive ? 'TRUE' : 'FALSE'
+          // 새 항목인 경우 (uuid가 null)
+          if (!item.uuid) {
+            newItems.push(itemData)
+          } else {
+            // 기존 항목인 경우 변경사항 확인
+            const originalItem = this.originalPayrollItems.find(orig => orig.uuid === item.uuid)
+            if (originalItem && this.hasItemChanged(originalItem, item)) {
+              changedItems.push({
+                id: item.uuid,
+                salaryType: finalSalaryType,
+                name: finalItemName,
+                isActive: item.isActive ? 'TRUE' : 'FALSE',
+                description: item.description
+              })
+            }
           }
-          
-          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, itemData)
+        })
+        
+        // 새 항목 저장 (POST)
+        if (newItems.length > 0) {
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, newItems)
         }
         
-        this.success(`${newItems.length + updatedItems.length}개의 항목이 성공적으로 저장되었습니다.`, {
+        // 변경된 기존 항목 수정 (PUT)
+        if (changedItems.length > 0) {
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, changedItems)
+        }
+        
+        this.success('급여 항목이 성공적으로 저장되었습니다.', {
           title: '저장 완료',
           duration: 3000
         })
         
-        // 저장 성공 후 원본 데이터 업데이트
-        this.saveOriginalData()
+        // 저장 후 원본 데이터 업데이트
+        this.originalPayrollItems = JSON.parse(JSON.stringify(this.payrollItems))
+        
+        // 저장 후 데이터 다시 로드
+        await this.loadPayrollItems()
       } catch (error) {
-        console.error('저장 실패:', error)
+        console.error('급여 항목 저장 실패:', error)
         this.error('저장 중 오류가 발생했습니다.')
       } finally {
         this.loading = false
@@ -440,7 +532,79 @@ export default {
         month: '2-digit',
         day: '2-digit'
       })
+    },
+    
+    // 구분에 따른 항목명 옵션 반환
+    getItemNameOptions(type) {
+      if (type === 'payment') {
+        return [
+          { label: '기본급', value: '기본급' },
+          { label: '연장수당', value: '연장수당' },
+          { label: '야간수당', value: '야간수당' },
+          { label: '직책수당', value: '직책수당' },
+          { label: '식대', value: '식대' },
+          { label: '기타항목', value: '기타항목' }
+        ]
+      } else if (type === 'deduction') {
+        return [
+          { label: '국민연금', value: '국민연금' },
+          { label: '건강보험', value: '건강보험' },
+          { label: '고용보험', value: '고용보험' },
+          { label: '장기요양보험', value: '장기요양보험' },
+          { label: '기타항목', value: '기타항목' }
+        ]
+      }
+      return []
+    },
+    
+    // 구분 변경 시 처리
+    handleTypeChange(row) {
+      // 구분이 변경되면 항목명과 커스텀 항목명 초기화
+      row.itemName = ''
+      row.customItemName = ''
+      row.description = ''
+    },
+    
+    // 항목명 변경 시 처리
+    handleItemNameChange(row, newItemName) {
+      // 기타항목이 아닌 경우 커스텀 항목명 초기화
+      if (newItemName !== '기타항목') {
+        row.customItemName = ''
+        // 기타항목이 아닌 경우에만 기본 설명 설정
+        this.updateDescriptionByItemName(row, newItemName)
+      } else {
+        // 기타항목 선택 시 설명 필드는 비워둠 (placeholder만 표시)
+        row.description = ''
+      }
+    },
+    
+    // 커스텀 항목명 변경 시 처리
+    handleCustomItemNameChange() {
+      // 커스텀 항목명 변경 시에는 설명을 자동으로 설정하지 않음
+      // 사용자가 직접 설명을 입력하도록 함
+    },
+    
+    // 항목명에 따른 설명 자동 설정
+    updateDescriptionByItemName(row, itemName) {
+      const descriptions = {
+        '기본급': '정규 직원 기본 급여',
+        '연장수당': '정규 근무 시간 초과시 발생하는 수당',
+        '야간수당': '야간 근무 수당',
+        '직책수당': '직책에 따른 추가 수당',
+        '식대': '직원 식대 지원금',
+        '국민연금': '국민연금 보험료 공제',
+        '건강보험': '건강보험료 공제',
+        '고용보험': '고용보험료 공제',
+        '장기요양보험': '장기요양보험료 공제',
+        '기타항목': '기타 항목'
+      }
+      
+      row.description = descriptions[itemName] || ''
     }
+  },
+  async created() {
+    // 컴포넌트 생성 시 급여 항목 목록 로드
+    await this.loadPayrollItems()
   }
 }
 </script>
@@ -596,6 +760,13 @@ export default {
 
 .table-container :deep(.el-table tr:hover > td) {
   background: #f8f9fa;
+}
+
+/* 항목명 컨테이너 스타일 */
+.item-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* 반응형 디자인 */
