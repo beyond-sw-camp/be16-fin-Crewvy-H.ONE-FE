@@ -1,224 +1,276 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="결재라인 편집"
-    width="800px"
-    top="10vh"
+    title="결재 라인 편집"
+    width="80%"
+    top="5vh"
     @update:modelValue="$emit('update:visible', $event)"
-    @closed="resetState"
   >
-    <div class="modal-body">
-      <el-row :gutter="24">
-        <!-- Left: Organization Tree -->
-        <el-col :span="10">
-          <el-input
-            v-model="searchQuery"
-            placeholder="직원 검색..."
-            clearable
-            class="search-input"
-          />
-          <div class="org-tree-container">
-            <div v-if="filteredOrgData.length === 0" class="empty-list">검색 결과가 없습니다.</div>
-            <div v-for="dept in filteredOrgData" :key="dept.name" class="org-section">
-              <div class="dept-title">{{ dept.name }}</div>
-              <div
-                v-for="member in dept.members"
-                :key="member.name"
-                class="member-item"
-                @click="addApprover(member)"
-              >
-                <el-avatar size="small">{{ member.name[0] }}</el-avatar>
-                <div class="member-info">
-                  <strong>{{ member.name }}</strong>
-                  <span>{{ member.position }}</span>
-                </div>
+    <div class="editor-layout">
+      <!-- Left: Organization Chart -->
+      <div class="org-chart-section">
+        <el-card class="box-card">
+          <template #header>
+            <div class="card-header">
+              <span>조직도 (더블클릭하여 추가)</span>
+            </div>
+          </template>
+          <div>
+            <el-tree
+              :data="orgChartData"
+              :props="defaultProps"
+              node-key="id"
+              @node-dblclick="handleNodeDoubleClick"
+            >
+              <template #default="{ node, data }">
+                <span class="custom-tree-node" @dblclick="() => handleNodeDoubleClick(data)">
+                  <span>{{ node.label }}</span>
+                </span>
+              </template>
+            </el-tree>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- Right: Applied Approval Line -->
+      <div class="approval-line-section">
+        <el-card class="box-card">
+          <template #header>
+            <div class="card-header">
+              <span>결재 라인 (드래그하여 순서 변경)</span>
+            </div>
+          </template>
+          <div>
+            <!-- Static First Approver -->
+            <div v-if="firstApprover" class="approver-item locked">
+              <div class="approver-info">
+                <el-icon><User /></el-icon>
+                <span>1. {{ firstApprover.name }} ({{ firstApprover.department }} / {{ firstApprover.position }})</span>
               </div>
             </div>
-          </div>
-        </el-col>
 
-        <!-- Right: Approval Line -->
-        <el-col :span="14">
-           <div class="approval-line-header">결재 순서</div>
-           <div class="approver-list">
-              <div v-if="localApprovers.length === 0" class="empty-list">
-                좌측 조직도에서 결재자를 추가하세요.
-              </div>
-              <div
-                v-for="(approver, index) in localApprovers"
-                :key="approver.name"
-                class="approver-card"
-              >
-                <div class="approver-info">
-                  <strong>{{ index + 1 }}. {{ approver.name }}</strong>
-                  <span>{{ approver.position }}</span>
+            <!-- Draggable List for the rest -->
+            <draggable
+              v-model="draggableApprovers"
+              item-key="id"
+              class="drag-area"
+              handle=".approver-info"
+            >
+              <template #item="{ element, index }">
+                <div class="approver-item">
+                  <div class="approver-info">
+                    <el-icon><Rank /></el-icon>
+                    <span>{{ index + 2 }}. {{ element.name }} ({{ element.department }} / {{ element.position }})</span>
+                  </div>
+                  <el-button type="danger" size="small" plain @click="removeApprover(index)">삭제</el-button>
                 </div>
-                <el-button 
-                  @click="removeApprover(index)" 
-                  type="danger" 
-                  :icon="Delete" 
-                  circle 
-                  plain 
-                />
-              </div>
-           </div>
-           <el-alert title="결재자를 드래그하여 순서를 변경할 수 있습니다." type="info" :closable="false" show-icon class="tip-alert" />
-        </el-col>
-      </el-row>
+              </template>
+            </draggable>
+            
+            <div v-if="approvalLine.length === 0" class="empty-state">
+              <p>조직도에서 결재자를 더블클릭하여 추가하세요.</p>
+            </div>
+          </div>
+        </el-card>
+      </div>
     </div>
-
     <template #footer>
       <el-button @click="$emit('update:visible', false)">취소</el-button>
-      <el-button type="primary" @click="save">저장</el-button>
+      <el-button type="primary" @click="saveApprovalLine">저장</el-button>
     </template>
   </el-dialog>
 </template>
 
-<script setup>
-import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { Delete } from '@element-plus/icons-vue';
+<script>
+import { ref, onMounted, computed, watch } from 'vue';
+import draggable from 'vuedraggable';
+import { Rank, User } from '@element-plus/icons-vue';
+import apiClient from '@/api/http';
 
-const props = defineProps({
-  visible: Boolean,
-  currentApprovers: {
-    type: Array,
-    default: () => []
-  }
-});
-
-const emit = defineEmits(['update:visible', 'update:approvers']);
-
-const searchQuery = ref('');
-const localApprovers = ref([]);
-
-const orgData = ref([
-  { name: "영업부", members: [{ name: "김대리", position: "대리" }, { name: "박과장", position: "과장" }, { name: "이부장", position: "부장" }] },
-  { name: "마케팅부", members: [{ name: "최대리", position: "대리" }, { name: "정과장", position: "과장" }] },
-  { name: "인사부", members: [{ name: "한대리", position: "대리" }, { name: "윤과장", position: "과장" }] },
-  { name: "개발부", members: [{ name: "강사원", position: "사원" }, { name: "오팀장", position: "팀장" }] },
-]);
-
-const filteredOrgData = computed(() => {
-  if (!searchQuery.value) return orgData.value;
-  const lowerCaseQuery = searchQuery.value.toLowerCase();
-  const filtered = [];
-  orgData.value.forEach(dept => {
-    const filteredMembers = dept.members.filter(m => m.name.toLowerCase().includes(lowerCaseQuery));
-    if (filteredMembers.length > 0) {
-      filtered.push({ ...dept, members: filteredMembers });
+export default {
+  name: 'ApprovalLineEditorModal',
+  components: {
+    draggable,
+    Rank,
+    User,
+  },
+  props: {
+    visible: Boolean,
+    initialLine: {
+      type: Array,
+      default: () => []
     }
-  });
-  return filtered;
-});
+  },
+  emits: ['update:visible', 'save'],
+  setup(props, { emit }) {
+    const orgChartData = ref([]);
 
-watch(() => props.visible, (newVal) => {
-  if (newVal) {
-    localApprovers.value = JSON.parse(JSON.stringify(props.currentApprovers));
-  }
-});
+    const defaultProps = {
+      children: 'children',
+      label: 'label',
+      isLeaf: 'isLeaf',
+    };
 
-const addApprover = (member) => {
-  if (!localApprovers.value.find((a) => a.name === member.name)) {
-    localApprovers.value.push(member);
-  }
+    const approvalLine = ref([]);
+
+    const firstApprover = computed(() => approvalLine.value[0]);
+
+    const draggableApprovers = computed({
+      get() {
+        return approvalLine.value.slice(1);
+      },
+      set(newValue) {
+        approvalLine.value = [firstApprover.value, ...newValue];
+      }
+    });
+
+    const transformOrgData = (nodes) => {
+      if (!nodes) return [];
+      return nodes.map(node => {
+        const childDepartments = transformOrgData(node.children);
+
+        let memberNodes = [];
+        if (node.members && node.members.length > 0) {
+          memberNodes = node.members.map(member => ({
+            id: member.id,
+            label: `${member.name} (${member.position})`,
+            isLeaf: true,
+            memberData: member,
+          }));
+        }
+
+        const combinedChildren = [...memberNodes, ...childDepartments];
+
+        return {
+          id: node.id,
+          label: node.label,
+          children: combinedChildren,
+        };
+      });
+    };
+
+
+    const fetchOrgChartData = async () => {
+      try {
+        const response = await apiClient.get('/member-service/organization/tree-with-members');
+        const transformedData = transformOrgData(response.data.data);
+        orgChartData.value = transformedData;
+      } catch (error) {
+        console.error("Failed to fetch organization chart data:", error);
+      }
+    };
+
+    onMounted(async () => {
+      await fetchOrgChartData();
+    });
+
+    watch(() => props.visible, (newValue) => {
+      if (newValue) {
+        // Deep copy to avoid mutating prop
+        approvalLine.value = JSON.parse(JSON.stringify(props.initialLine));
+      }
+    });
+
+    const handleNodeDoubleClick = (data) => {
+      if (data.isLeaf && !approvalLine.value.some(a => a.id === data.id)) {
+        approvalLine.value.push({
+          id: data.id,
+          name: data.memberData.name,
+          department: data.memberData.department,
+          position: data.memberData.position,
+          memberPositionId: data.memberData.memberPositionId,
+        });
+      }
+    };
+
+    const removeApprover = (index) => {
+      approvalLine.value.splice(index + 1, 1);
+    };
+
+    const saveApprovalLine = () => {
+      const lineToSave = approvalLine.value.map(item => ({
+        id: item.id,
+        name: item.name,
+        department: item.department,
+        position: item.position,
+        memberPositionId: item.memberPositionId,
+      }));
+      emit('save', lineToSave);
+      emit('update:visible', false);
+    };
+
+    return {
+      orgChartData,
+      defaultProps,
+      approvalLine,
+      firstApprover,
+      draggableApprovers,
+      handleNodeDoubleClick,
+      removeApprover,
+      saveApprovalLine,
+    };
+  },
 };
-
-const removeApprover = (index) => {
-  localApprovers.value.splice(index, 1);
-};
-
-const save = () => {
-  emit('update:approvers', localApprovers.value);
-  emit('update:visible', false);
-};
-
-const resetState = () => {
-  searchQuery.value = '';
-}
-
 </script>
-
 <style scoped>
-.search-input {
-  margin-bottom: 12px;
-}
-
-.org-tree-container,
-.approver-list {
-  height: 55vh;
-  overflow-y: auto;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
-  padding: 10px;
-}
-
-.empty-list {
+.editor-layout {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
+  gap: 20px;
+  height: 60vh;
 }
-
-.dept-title {
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--el-text-color-primary);
-  margin: 10px 0 5px 5px;
-}
-
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.member-item:hover {
-  background-color: var(--el-color-primary-light-9);
-}
-
-.member-info {
+.org-chart-section, .approval-line-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  font-size: 14px;
 }
-.member-info span {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+.box-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
-
-.approval-line-header {
-  font-size: 16px;
-  font-weight: 600;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
+.org-chart-section :deep(.el-card__body),
+.approval-line-section :deep(.el-card__body) {
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
-
-.approver-card {
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.custom-tree-node {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 10px 15px;
-  margin-bottom: 10px;
-  background-color: #fafafa;
+  font-size: 14px;
+  padding-right: 8px;
 }
-
+.drag-area {
+  min-height: 100px; /* Ensure drop area is available */
+}
+.approver-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background-color: #fff;
+}
+.approver-item.locked {
+  background-color: #f5f7fa;
+  cursor: not-allowed;
+}
 .approver-info {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
 }
-
-.approver-info span {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.tip-alert {
-  margin-top: 12px;
+.empty-state {
+  text-align: center;
+  color: #909399;
+  padding-top: 40px;
 }
 </style>

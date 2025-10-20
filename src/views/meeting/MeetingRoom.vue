@@ -1,0 +1,405 @@
+<template>
+  <div class="meeting-room">
+    <!-- 상단 헤더 -->
+    <div class="header">
+      <div class="header-left">
+        <div class="title">{{ title || '회의실' }}</div>
+        <div class="subtitle">참가자 {{ participantCount }}명</div>
+      </div>
+      <div class="header-right">
+        <el-button circle @click="toggleChat" :type="isChatOpen ? 'primary' : 'default'" :icon="icons.ChatDotRound" />
+        <el-button circle type="danger" @click="leaveSession" :icon="icons.Close" />
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 비디오 영역 -->
+      <div class="stage">
+        <div class="videos">
+          <div v-for="track in videoTracks" :key="track.sid" class="video-item">
+            <video :ref="el => { if (el) track.attach(el) }" autoplay playsinline :muted="track.isLocal"></video>
+            <div class="participant-name">{{ track.isLocal ? '나' : (track.participant ? track.participant.identity : '') }}</div>
+          </div>
+        </div>
+        <!-- 하단 컨트롤 바 -->
+        <div class="controls">
+          <el-tooltip content="마이크" placement="top">
+            <el-button circle :type="audioEnabled ? 'primary' : 'default'" @click="toggleAudio" :icon="icons.Microphone" />
+          </el-tooltip>
+          <el-tooltip content="카메라" placement="top">
+            <el-button circle :type="videoEnabled ? 'primary' : 'default'" @click="toggleVideo" :icon="icons.VideoCameraFilled" />
+          </el-tooltip>
+          <el-tooltip content="화면 공유" placement="top">
+            <el-button circle :type="screenShareActive ? 'primary' : 'default'" @click="toggleScreenShare" :icon="icons.Monitor" />
+          </el-tooltip>
+          <el-tooltip content="설정" placement="top">
+            <el-button circle :icon="icons.Setting" @click="openSettings" />
+          </el-tooltip>
+          <el-tooltip content="참가자" placement="top">
+            <el-button circle :icon="icons.User" />
+          </el-tooltip>
+          <el-tooltip content="채팅" placement="top">
+            <el-button circle :type="isChatOpen ? 'primary' : 'default'" @click="toggleChat" :icon="icons.ChatDotRound" />
+          </el-tooltip>
+          <el-tooltip content="나가기" placement="top">
+            <el-button circle type="danger" :icon="icons.Phone" @click="leaveSession" />
+          </el-tooltip>
+        </div>
+      </div>
+
+      <!-- 채팅 패널 -->
+      <div class="chat" v-show="isChatOpen">
+        <div class="chat-header">채팅</div>
+        <div class="chat-body" ref="chatBody">
+          <div class="msg" v-for="(m, i) in messages" :key="m.createdAt + i">
+            <div class="name">{{ m.name }}</div>
+            <div class="content">{{ m.content }}</div>
+            <div class="createdAt">{{ m.createdAt }}</div>
+          </div>
+        </div>
+        <div class="chat-input">
+          <el-input v-model="chatText" placeholder="메시지를 입력하세요..." @keydown.enter="handleEnter">
+            <template #append>
+              <el-button type="primary" @click="sendMessage">전송</el-button>
+            </template>
+          </el-input>
+        </div>
+      </div>
+    </div>
+  </div>
+  </template>
+
+<script>
+
+import { Room, RoomEvent, Track, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
+import * as icons from '@element-plus/icons-vue'
+import { getChatMessages, sendChatMessage } from '@/api/videoConference'
+
+export default {
+  name: 'MeetingRoom',
+  // 아이콘은 :icon="icons.*"로 직접 참조하므로 컴포넌트 등록 불필요
+  data() {
+    return {
+      title: '',
+      room: null,
+      localParticipant: null,
+      remoteParticipants: [],
+      localVideoTrack: null,
+      localAudioTrack: null,
+      screenSharePublication: null,
+      videoConferenceId: null,
+      audioEnabled: true,
+      videoEnabled: true,
+      screenShareActive: false,
+      isChatOpen: true,
+      messages: [],
+      videoTracks: [],
+      chatText: '',
+      Track,
+      icons,
+      userInfo: {
+        id: localStorage.getItem('memberId'),
+        name: localStorage.getItem('userName')
+      }
+    }
+  },
+  computed: {
+    participantCount() {
+      return this.room && this.room.participants ? this.room.participants.size : 0
+    }
+  },
+  mounted() {
+    // 기대 쿼리: ?sid=<sessionId>&token=<token>&title=<title>
+    const q = new URLSearchParams(window.location.search)
+    const token = q.get('token')
+    this.title = q.get('title') || ''
+    this.videoConferenceId = q.get('vcid')
+    this.join(this.videoConferenceId, token)
+  },
+  beforeUnmount() {
+    this.leaveSession()
+  },
+  methods: {
+    async join(videoConferenceId, token) {
+      this.room = new Room()
+
+      this.room.on(RoomEvent.ParticipantConnected, (participant) => {
+        this.remoteParticipants.push(participant)
+      })
+      this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        this.remoteParticipants = this.remoteParticipants.filter(p => p.sid !== participant.sid)
+      })
+
+      this.room.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === Track.Kind.Video || track.kind === Track.Kind.ScreenShare) {
+          this.videoTracks.push(track)
+        }
+      })
+
+      this.room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        if (track.kind === Track.Kind.Video || track.kind === Track.Kind.ScreenShare) {
+          this.videoTracks = this.videoTracks.filter(t => t.sid !== track.sid)
+        }
+      })
+
+      this.room.on(RoomEvent.DataReceived, (payload) => {
+        const decoder = new TextDecoder()
+        const chatData = JSON.parse(decoder.decode(payload))
+        const now = new Date()
+        const isMe = chatData.senderId === this.userInfo.id
+        this.messages.push({
+          name: isMe ? '나' : chatData.name,
+          content: chatData.content,
+          createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+        })
+        this.$nextTick(() => {
+          const el = this.$refs.chatBody
+          if (el) el.scrollTop = el.scrollHeight
+        })
+      })
+
+      try {
+        await this.room.connect(process.env.VUE_APP_LIVEKIT_URL, token)
+        this.localParticipant = this.room.localParticipant
+
+        // Publish local tracks
+        this.localAudioTrack = await createLocalAudioTrack()
+        await this.localParticipant.publishTrack(this.localAudioTrack)
+
+        this.localVideoTrack = await createLocalVideoTrack()
+        await this.localParticipant.publishTrack(this.localVideoTrack)
+        this.videoTracks.push(this.localVideoTrack)
+
+        if (this.videoConferenceId) {
+          getChatMessages(this.videoConferenceId)
+            .then((messages) => {
+              this.messages = messages
+                .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .map(m => ({ ...m, createdAt: m.createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+            })
+            .catch((err) => {
+              console.error('채팅 기록을 불러오는데 실패했습니다.', err)
+              this.$message?.error?.('채팅 기록을 불러오지 못했습니다.')
+            })
+        }
+      } catch (e) {
+        this.$message?.error?.('회의 연결에 실패했습니다.')
+        console.error(e)
+      }
+    },
+    leaveSession() {
+      try {
+        if (this.room) {
+          this.room.disconnect()
+        }
+      }
+      finally {
+        this.room = null
+        this.localParticipant = null
+        this.remoteParticipants = []
+        this.videoTracks = []
+        this.localVideoTrack = null
+        this.localAudioTrack = null
+        this.screenSharePublication = null
+        window.close()
+      }
+    },
+    toggleAudio() {
+      if (!this.localAudioTrack) return
+      this.audioEnabled = !this.audioEnabled
+      this.localAudioTrack.mute(!this.audioEnabled)
+    },
+    toggleVideo() {
+      if (!this.localVideoTrack) return
+      this.videoEnabled = !this.videoEnabled
+      this.localVideoTrack.mute(!this.videoEnabled)
+    },
+    async toggleScreenShare() {
+      if (!this.room || !this.localParticipant) return
+      if (!this.screenShareActive) {
+        try {
+          const screenTracks = await createLocalScreenTracks({ audio: true })
+          this.screenSharePublication = await this.localParticipant.publishTrack(screenTracks[0])
+          if (screenTracks.length > 1) {
+            await this.localParticipant.publishTrack(screenTracks[1])
+          }
+          screenTracks[0].on(Track.Event.Ended, () => {
+            this.stopScreenShare()
+          })
+          this.screenShareActive = true
+        } catch (e) {
+          this.$message?.error?.('화면 공유를 시작하지 못했습니다.')
+          console.error(e)
+        }
+      } else {
+        this.stopScreenShare()
+      }
+    },
+    async stopScreenShare() {
+      if (!this.room || !this.localParticipant || !this.screenSharePublication) return
+      try {
+        await this.localParticipant.unpublishTrack(this.screenSharePublication.track)
+        this.screenSharePublication = null
+      } finally {
+        this.screenShareActive = false
+      }
+    },
+    toggleChat() {
+      this.isChatOpen = !this.isChatOpen
+      this.$nextTick(() => {
+        const el = this.$refs.chatBody
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    },
+    handleEnter(e) {
+      if (e.isComposing) return;
+      this.sendMessage();
+    },
+    async sendMessage() {
+      const text = (this.chatText || '').trim()
+      if (!text) return
+
+      if (!this.room || !this.localParticipant) {
+        this.$message?.error?.('회의에 연결되지 않아 메시지를 전송할 수 없습니다.');
+        return;
+      }
+      
+      const message = {
+        senderId: this.userInfo.id,
+        name: this.userInfo.name,
+        content: text
+      };
+
+      try {
+        // const encoder = new TextEncoder()
+        // await this.localParticipant.publishData(encoder.encode(JSON.stringify(message)), 0)
+
+        // Persist message
+        if (this.videoConferenceId) {
+          await sendChatMessage(this.videoConferenceId, message)
+        }
+
+        this.chatText = ''
+      } catch (error) {
+        this.message?.error?.('메시지 전송에 실패했습니다.');
+        console.error(error)
+      }
+    },
+    openSettings() {
+      this.$message?.info?.('설정은 추후 제공됩니다.')
+    }
+  }
+}
+  </script>
+
+<style scoped>
+.meeting-room {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f10;
+}
+.header {
+  height: 64px;
+  padding: 0 16px;
+  border-bottom: 1px solid #1e1f24;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1a1b20;
+  color: #fff;
+}
+.header-left .title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.header-left .subtitle {
+  font-size: 12px;
+  color: #bbb;
+}
+.content {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  overflow: hidden;
+}
+.stage {
+  position: relative;
+  background: #0d0d0e;
+}
+.videos {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+  padding: 10px;
+}
+.videos video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  border-radius: 8px;
+}
+.controls {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  background: rgba(26, 27, 32, 0.9);
+  padding: 10px 12px;
+  border-radius: 28px;
+  backdrop-filter: saturate(120%) blur(6px);
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #1e1f24;
+  background: #141519;
+  color: #e5e7eb;
+}
+.chat-header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid #1e1f24;
+  font-weight: 600;
+}
+.chat-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msg {
+  background: #1a1b20;
+  border: 1px solid #23242a;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.msg .name {
+  font-size: 12px;
+  color: #93c5fd;
+}
+.msg .content {
+  font-size: 13px;
+}
+.msg .createdAt {
+  font-size: 11px;
+  color: #a3a3a3;
+  text-align: right;
+}
+.chat-input {
+  padding: 10px;
+  border-top: 1px solid #1e1f24;
+}
+</style>
+

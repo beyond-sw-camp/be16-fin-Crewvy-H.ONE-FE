@@ -11,6 +11,11 @@
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
             <p class="goal-description">{{ goal.contents }}</p>
+          </div>
+          <div class="goal-meta">
+            <div class="goal-author">
+              <span>{{ goal.memberName }} ({{ goal.memberPosition }})</span>
+            </div>
             <div class="goal-period">
               <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
             </div>
@@ -25,16 +30,12 @@
           <el-input v-model="form.title" placeholder="예: 2024년 하반기 매출 20% 증대"></el-input>
         </el-form-item>
         <el-form-item label="목표에 대한 설명">
-          <el-input v-model="form.contents" type="textarea" :rows="6" placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
+          <el-input v-model="form.contents" type="textarea" :rows="6"
+            placeholder="예: 신규 고객 확보 및 기존 고객 대상 프로모션을 통해 매출 증대를 목표로 합니다."></el-input>
         </el-form-item>
         <el-form-item label="목표 설정 기간">
-          <el-date-picker
-            v-model="form.dateRange"
-            type="daterange"
-            range-separator="-"
-            start-placeholder="Start date"
-            end-placeholder="End date"
-          >
+          <el-date-picker v-model="form.dateRange" type="daterange" range-separator="-" start-placeholder="Start date"
+            end-placeholder="End date">
           </el-date-picker>
         </el-form-item>
       </el-form>
@@ -49,7 +50,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'TeamGoal',
@@ -68,8 +69,8 @@ export default {
     async fetchTeamGoals() {
       try {
         // In a real environment, you would uncomment the following lines:
-        const response = await axios.get('http://localhost:8080/performance/team-goal');
-        this.teamGoals = response.data;
+        const response = await apiClient.get('/workforce-service/performance/team-goal');
+        this.teamGoals = response.data.data;
 
         // Using mock data provided by the user:
         // this.teamGoals = [
@@ -100,10 +101,10 @@ export default {
         let day = '' + d.getDate();
         const year = d.getFullYear();
 
-        if (month.length < 2) 
-            month = '0' + month;
-        if (day.length < 2) 
-            day = '0' + day;
+        if (month.length < 2)
+          month = '0' + month;
+        if (day.length < 2)
+          day = '0' + day;
 
         return [year, month, day].join('-');
       }
@@ -116,7 +117,7 @@ export default {
       };
 
       try {
-        await axios.post('http://localhost:8080/performance/create-team-goal', payload);
+        await apiClient.post('/workforce-service/performance/create-team-goal', payload);
         this.$message.success('팀 목표가 성공적으로 추가되었습니다.');
         this.dialogVisible = false;
         await this.fetchTeamGoals(); // Refresh the list
@@ -178,13 +179,13 @@ export default {
 }
 
 .goal-title {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .goal-description {
-  font-size: 14px;
+  font-size: 16px;
   color: #606266;
 }
 
@@ -194,6 +195,13 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.goal-author {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
 }
 
 .user-info {
@@ -219,7 +227,7 @@ export default {
 }
 
 .goal-period {
-  font-size: 12px;
+  font-size: 14px;
   color: #909399;
 }
 </style>

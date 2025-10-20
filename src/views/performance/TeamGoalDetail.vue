@@ -22,6 +22,10 @@
             <div class="sub-goal-details">
               <h4 class="sub-goal-title">{{ goal.title }}</h4>
               <p class="sub-goal-description">{{ goal.contents }}</p>
+              <div class="sub-goal-user-info">
+                <span class="user-name">{{ goal.memberName }}</span>
+                <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+              </div>
               <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
             </div>
             <div class="sub-goal-meta">
@@ -35,7 +39,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'TeamGoalDetail',
@@ -58,8 +62,8 @@ export default {
       const goalId = this.$route.params.id;
       try {
         // In a real environment, you would use the actual API call:
-        const response = await axios.get(`http://localhost:8080/performance/team-goal/${goalId}`);
-        this.teamGoalDetail = response.data;
+        const response = await apiClient.get(`/workforce-service/performance/team-goal/${goalId}`);
+        this.teamGoalDetail = response.data.data;
 
         // Using mock data provided by the user for demonstration:
         // this.teamGoalDetail = {
@@ -159,16 +163,33 @@ export default {
   flex: 1;
 }
 
-.sub-goal-title {
-  font-size: 16px;
+.sub-goal-user-info {
+  margin-bottom: 8px; /* Changed from 12px */
+  display: flex;
+  align-items: center;
+}
+
+.user-name {
   font-weight: 600;
-  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.user-details {
+  font-size: 13px;
+  color: #909399;
+  margin-left: 8px;
+}
+
+.sub-goal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px; /* Changed from 4px */
 }
 
 .sub-goal-description {
   font-size: 14px;
   color: #606266;
-  margin-bottom: 8px;
+  margin-bottom: 12px; /* Changed from 8px */
 }
 
 .sub-goal-period,

@@ -11,6 +11,10 @@
           <label>목표 설명</label>
           <p>{{ goalDetail.contents }}</p>
         </div>
+        <div class="detail-item" v-if="goalDetail.memberName">
+          <label>담당자</label>
+          <p>{{ goalDetail.memberName }} ({{ goalDetail.memberOrganization }} / {{ goalDetail.memberPostion }})</p>
+        </div>
         <div class="detail-item">
           <label>기간</label>
           <p>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</p>
@@ -97,7 +101,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 
 export default {
@@ -139,11 +143,11 @@ export default {
     async fetchGoalDetail() {
       const goalId = this.$route.params.memberGoalId;
       try {
-        const response = await axios.get(`http://localhost:8080/performance/get-goal-detail/${goalId}`);
-        this.goalDetail = response.data;
+        const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
+        this.goalDetail = response.data.data;
 
-        if (response.data.evidenceList && response.data.evidenceList.length > 0) {
-          this.fileList = response.data.evidenceList.map(evidence => {
+        if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
+          this.fileList = response.data.data.evidenceList.map(evidence => {
             const url = evidence.evidenceUrl;
             const firstUnderscoreIndex = url.indexOf('_');
             const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
@@ -197,7 +201,7 @@ export default {
           goalId: this.goalDetail.goalId,
           status: 'APPROVED'
         };
-        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+        await apiClient.patch('/workforce-service/performance/update-status', null, { params: payload });
 
         this.goalDetail.status = 'APPROVED';
         this.$message({
@@ -228,7 +232,7 @@ export default {
           status: 'REJECTED',
           comment: this.rejectForm.reason
         };
-        await axios.patch('http://localhost:8080/performance/update-status', null, { params: payload });
+        await apiClient.patch('/workforce-service/performance/update-status', null, { params: payload });
 
         this.goalDetail.status = 'REJECTED';
         this.rejectDialogVisible = false;
@@ -249,11 +253,11 @@ export default {
           goalId: this.goalDetail.goalId,
           type: 'SUPERVISOR'
         };
-        const response = await axios.get('http://localhost:8080/performance/find-evaluation', { params });
+        const response = await apiClient.get('/workforce-service/performance/find-evaluation', { params });
 
-        if (response.data) {
-          this.evaluateForm.rating = response.data.grade;
-          this.evaluateForm.comment = response.data.comment;
+        if (response.data.data) {
+          this.evaluateForm.rating = response.data.data.grade;
+          this.evaluateForm.comment = response.data.data.comment;
         }
 
       } catch (error) {
@@ -278,7 +282,7 @@ export default {
           comment: this.evaluateForm.comment
         };
 
-        await axios.post('http://localhost:8080/performance/create-evaluation', null, { params: payload });
+        await apiClient.post('/workforce-service/performance/create-evaluation', null, { params: payload });
 
         this.evaluateDialogVisible = false;
         this.$message.success('평가가 저장되었습니다.');
@@ -325,7 +329,7 @@ export default {
 }
 
 .description-item p {
-    min-height: 100px;
+    min-height: 50px;
 }
 
 .detail-item label {
