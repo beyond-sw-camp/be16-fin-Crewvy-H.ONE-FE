@@ -45,9 +45,12 @@
       <div class="filter-section">
         <el-select v-model="selectedStatus" placeholder="상태" clearable @change="handleFilter">
           <el-option label="전체" value="" />
-          <el-option label="사용가능" value="available" />
-          <el-option label="사용중" value="in_use" />
-          <el-option label="점검중" value="maintenance" />
+          <el-option 
+            v-for="status in statusOptions" 
+            :key="status.value" 
+            :label="status.label" 
+            :value="status.value" 
+          />
         </el-select>
       </div>
     </div>
@@ -62,7 +65,7 @@
         :reserve-selection="true"
         :row-key="row => row.id"
       >
-        <el-table-column label="ID" width="80">
+        <el-table-column label="ID" width="50">
           <template #default="{ $index }">
             {{ $index + 1 }}
           </template>
@@ -71,13 +74,13 @@
         <el-table-column prop="reservationCategoryName" label="카테고리" width="120">
           <template #default="{ row }">
             <el-tag :type="getCategoryTagTypeByName(row.reservationCategoryName)">
-              {{ row.reservationCategoryName || getCategoryLabel(row.reservationCategoryId) }}
+              {{ row.reservationCategoryName || '카테고리 없음' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="location" label="위치" min-width="120" />
-        <el-table-column prop="capacity" label="수용인원" width="100" />
-        <el-table-column prop="status" label="상태" width="100">
+        <el-table-column prop="capacity" label="인원" width="50" />
+        <el-table-column prop="status" label="상태" width="130">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">
               {{ getStatusLabel(row.status) }}
@@ -142,9 +145,12 @@
         </el-form-item>
         <el-form-item v-if="isEditMode" label="상태" prop="status">
           <el-select v-model="resourceForm.status" placeholder="상태를 선택하세요">
-            <el-option label="사용가능" value="available" />
-            <el-option label="사용중" value="in_use" />
-            <el-option label="점검중" value="maintenance" />
+            <el-option 
+              v-for="status in statusOptions" 
+              :key="status.value" 
+              :label="status.label" 
+              :value="status.value" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="설명" prop="description">
@@ -288,17 +294,15 @@ export default {
       selectedCategory: '',
       selectedStatus: '',
       
+      // 상태 옵션
+      statusOptions: [],
+      
       // 카테고리 관리
       categoryDialogVisible: false,
       categorySaving: false,
       isCategoryEditMode: false,
       editingCategoryIndex: -1,
-      categories: [
-        { id: 1, name: '회의실', value: 'meeting_room' },
-        { id: 2, name: '차량', value: 'vehicle' },
-        { id: 3, name: '장비', value: 'equipment' },
-        { id: 4, name: '기타', value: 'other' }
-      ],
+      categories: [],
       categoryForm: {
         name: ''
       },
@@ -350,6 +354,7 @@ export default {
   mounted() {
     this.loadResourceList()
     this.loadCategories()
+    this.loadStatusOptions()
   },
   computed: {
     filteredResources() {
@@ -382,7 +387,7 @@ export default {
       this.loading = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
+          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -395,10 +400,23 @@ export default {
           location: item.location || '',
           capacity: item.capacity ?? 1,
           facilities: item.facilities || '',
-          status: item.status || 'available',
+          status: item.reservationTypeStatus || 'available',
           description: item.description || '',
           createdAt: item.createdAt || ''
-        }))
+        })).sort((a, b) => {
+          // 먼저 카테고리명으로 정렬
+          const categoryA = a.reservationCategoryName || ''
+          const categoryB = b.reservationCategoryName || ''
+          
+          if (categoryA !== categoryB) {
+            return categoryA.localeCompare(categoryB, 'ko')
+          }
+          
+          // 같은 카테고리 내에서는 자원명으로 정렬
+          const nameA = a.name || ''
+          const nameB = b.name || ''
+          return nameA.localeCompare(nameB, 'ko')
+        })
       } catch (e) {
         this.error('자원 목록 조회 실패')
         // eslint-disable-next-line no-console
@@ -421,8 +439,9 @@ export default {
     showAddDialog() {
       this.isEditMode = false
       this.resetForm()
-      // 카테고리 목록 최신화
+      // 카테고리 및 상태 목록 최신화
       this.loadCategories()
+      this.loadStatusOptions()
       this.dialogVisible = true
     },
     
@@ -447,8 +466,9 @@ export default {
         category: categoryValue,
         facilities: resource.facilities || ''
       }
-      // 카테고리 목록 최신화
+      // 카테고리 및 상태 목록 최신화
       this.loadCategories()
+      this.loadStatusOptions()
       this.dialogVisible = true
     },
     
@@ -499,7 +519,8 @@ export default {
             location: this.resourceForm.location,
             capacity: this.resourceForm.capacity,
             facilities: this.resourceForm.facilities || '',
-            description: this.resourceForm.description
+            description: this.resourceForm.description,
+            reservationTypeStatus: this.resourceForm.status
           }
           
           await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData)
@@ -557,16 +578,6 @@ export default {
       }
     },
     
-    // 카테고리 라벨 반환
-    getCategoryLabel(category) {
-      const labels = {
-        meeting_room: '회의실',
-        vehicle: '차량',
-        equipment: '장비',
-        other: '기타'
-      }
-      return labels[category] || category
-    },
     
     // 카테고리 이름을 기반으로 태그 타입 반환
     getCategoryTagTypeByName(categoryName) {
@@ -609,22 +620,58 @@ export default {
     
     // 상태 라벨 반환
     getStatusLabel(status) {
-      const labels = {
-        available: '사용가능',
-        in_use: '사용중',
-        maintenance: '점검중'
-      }
-      return labels[status] || status
+      const statusOption = this.statusOptions.find(option => option.value === status)
+      return statusOption ? statusOption.label : status
     },
     
     // 상태 태그 타입 반환
     getStatusTagType(status) {
-      const types = {
-        available: 'success',
-        in_use: 'warning',
-        maintenance: 'danger'
+      const statusOption = this.statusOptions.find(option => option.value === status)
+      return statusOption ? statusOption.type : 'info'
+    },
+
+    // 상태명을 기반으로 태그 타입 반환 (API 응답 매핑용)
+    getStatusTagTypeFromCode(statusName) {
+      if (!statusName) return 'info'
+      
+      const upperStatusName = statusName.toUpperCase()
+      const typeMapping = {
+        // 사용 가능 상태
+        'AVAILABLE': 'success',
+        'ACTIVE': 'success',
+        'READY': 'success',
+        
+        // 사용 중 상태
+        'IN_USE': 'warning',
+        'USING': 'warning',
+        'OCCUPIED': 'warning',
+        'BUSY': 'warning',
+        
+        // 점검/유지보수 상태
+        'MAINTENANCE': 'danger',
+        'REPAIR': 'danger',
+        'OUT_OF_ORDER': 'danger',
+        'DISABLED': 'danger',
+        
+        // 예약/대기 상태
+        'BEFORE': 'primary',
+        'RESERVED': 'primary',
+        'PENDING': 'primary',
+        'SCHEDULED': 'primary',
+        
+        // 완료/사용됨 상태
+        'USED': 'info',
+        'COMPLETED': 'info',
+        'FINISHED': 'info',
+        
+        // 취소 상태
+        'CANCELLED': 'info',
+        
+        // 비활성/정지 상태
+        'INACTIVE': 'warning',
+        'SUSPENDED': 'warning'
       }
-      return types[status] || 'info'
+      return typeMapping[upperStatusName] || 'info'
     },
     
     // 날짜 포맷팅
@@ -644,7 +691,7 @@ export default {
       this.categorySaving = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9' }
+          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -659,6 +706,27 @@ export default {
         console.error(e)
       } finally {
         this.categorySaving = false
+      }
+    },
+
+    async loadStatusOptions() {
+      try {
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/status-list`)
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        
+        // 백엔드 응답을 statusOptions 형식으로 매핑
+        this.statusOptions = list.map(status => ({
+          value: status.statusName,
+          label: status.codeName,
+          type: this.getStatusTagTypeFromCode(status.statusName)
+        }))
+        
+      } catch (e) {
+        this.error('상태 목록 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+        // API 실패 시 빈 배열로 설정
+        this.statusOptions = []
       }
     },
     
@@ -680,7 +748,7 @@ export default {
           // 추가: POST /register
           await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
             name: this.categoryForm.name,
-            companyId: 'd3c461d5-2ff2-44fe-a747-5e999b878fd9'
+            companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab'
           })
           this.success('카테고리가 추가되었습니다.')
         }
@@ -812,6 +880,7 @@ export default {
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 400px;
 }
 
 .dialog-footer {
@@ -869,6 +938,7 @@ export default {
 :deep(.el-table) {
   border-radius: 8px;
   overflow: hidden;
+  min-height: 400px;
 }
 
 :deep(.el-table th) {
@@ -882,6 +952,19 @@ export default {
 
 :deep(.el-table .cell) {
   padding: 0 12px;
+}
+
+/* 빈 상태 스타일 개선 */
+:deep(.el-table__empty-block) {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.el-table__empty-text) {
+  color: #909399;
+  font-size: 14px;
 }
 
 /* 태그 스타일 */
@@ -1001,6 +1084,7 @@ export default {
 .category-list .el-table {
   border-radius: 6px;
   overflow: hidden;
+  min-height: 200px;
 }
 
 .category-list :deep(.el-table th) {
