@@ -50,6 +50,17 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/admin/policy-management/create',
+    name: 'PolicyCreate',
+    component: () => import('@/views/attendance/PolicyEditor.vue')
+  },
+  {
+    path: '/admin/policy-management/edit/:policyId',
+    name: 'PolicyEdit',
+    component: () => import('@/views/attendance/PolicyEditor.vue'),
+    props: true // URL 파라미터를 컴포넌트의 props로 전달
+  },
+  {
     path: '/admin/work-location-management',
     name: 'WorkLocationManagement',
     component: WorkLocationManagement,

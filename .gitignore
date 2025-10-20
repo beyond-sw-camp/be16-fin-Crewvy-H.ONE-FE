@@ -1,5 +1,4 @@
 .DS_Store
-.gitmessage.txt
 node_modules
 /dist
 
@@ -21,6 +20,8 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+.env
 
 /node_modules
 /package-lock.json

@@ -8,20 +8,8 @@ export default createStore({
       domain: 'company.com'
     },
     notifications: [
-      {
-        id: 1,
-        title: '휴가 신청 승인',
-        message: '김영희님의 휴가 신청이 승인되었습니다.',
-        time: '2시간 전',
-        type: 'success'
-      },
-      {
-        id: 2,
-        title: '새로운 결재 요청',
-        message: '월간 보고서 결재가 요청되었습니다.',
-        time: '4시간 전',
-        type: 'info'
-      }
+      { id: 1, title: '결재 요청', message: '휴가 신청서가 도착했습니다.', time: '10분 전' },
+      { id: 2, title: '공지사항', message: '새로운 공지사항이 등록되었습니다.', time: '1시간 전' }
     ]
   },
   mutations: {

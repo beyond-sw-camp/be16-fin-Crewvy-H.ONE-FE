@@ -14,9 +14,21 @@
           <el-icon><Plus /></el-icon>
           행 추가
         </el-button>
-        <el-button type="success" @click="saveItems">
+        <el-button 
+          type="success" 
+          @click="saveItems"
+          :class="{ 'disabled-button': !hasChanges }"
+        >
           <el-icon><Document /></el-icon>
           저장
+        </el-button>
+        <el-button 
+          type="info" 
+          @click="cancelChanges"
+          :class="{ 'disabled-button': !hasChanges }"
+        >
+          <el-icon><RefreshLeft /></el-icon>
+          취소
         </el-button>
       </div>
     </div>
@@ -31,9 +43,27 @@
           </div>
         </template>
         
-        <div class="table-container">
-          <el-table :data="payrollItems" border style="width: 100%">
-            <el-table-column prop="id" label="번호" width="80" align="center" />
+        <!-- 테이블이 비어있을 때 -->
+        <div v-if="payrollItems.length === 0" class="empty-state">
+          <el-empty description="등록된 급여 항목이 없습니다">
+            <el-button type="primary" @click="addNewItem">첫 번째 항목 추가</el-button>
+          </el-empty>
+        </div>
+        
+        <!-- 테이블이 있을 때 -->
+        <div v-else class="table-container">
+          <el-table 
+            :data="payrollItems" 
+            border 
+            style="width: 100%"
+            v-loading="loading"
+            element-loading-text="데이터를 불러오는 중..."
+          >
+            <el-table-column label="번호" width="80" align="center">
+              <template #default="scope">
+                {{ scope.$index + 1 }}
+              </template>
+            </el-table-column>
             
             <el-table-column label="구분" width="150" align="center">
               <template #default="scope">
@@ -44,8 +74,8 @@
                   style="width: 100%"
                   @change="(value) => handleTypeChange(scope.row, value)"
                 >
-                  <el-option label="지급항목" value="payment" />
-                  <el-option label="공제항목" value="deduction" />
+                  <el-option label="지급" value="ALLOWANCE" />
+                  <el-option label="공제" value="DEDUCTION" />
                 </el-select>
               </template>
             </el-table-column>
@@ -112,18 +142,12 @@
                   size="small" 
                   @click="deleteItem(scope.$index)"
                 >
+                  <el-icon><Delete /></el-icon>
                   삭제
                 </el-button>
               </template>
             </el-table-column>
           </el-table>
-        </div>
-        
-        <!-- 테이블이 비어있을 때 -->
-        <div v-if="payrollItems.length === 0" class="empty-state">
-          <el-empty description="등록된 급여 항목이 없습니다">
-            <el-button type="primary" @click="addNewItem">첫 번째 항목 추가</el-button>
-          </el-empty>
         </div>
       </el-card>
     </div>
@@ -136,7 +160,7 @@
             <el-icon><Money /></el-icon>
           </div>
           <div class="stats-content">
-            <div class="stats-label">지급항목</div>
+            <div class="stats-label">지급</div>
             <div class="stats-value">{{ paymentItemsCount }}개</div>
           </div>
         </div>
@@ -146,7 +170,7 @@
             <el-icon><Remove /></el-icon>
           </div>
           <div class="stats-content">
-            <div class="stats-label">공제항목</div>
+            <div class="stats-label">공제</div>
             <div class="stats-value">{{ deductionItemsCount }}개</div>
           </div>
         </div>
@@ -178,9 +202,20 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import axios from 'axios'
+import { Plus, Document, RefreshLeft, Money, Remove, Check, Close, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'PayrollItemManagement',
+  components: {
+    Plus,
+    Document,
+    RefreshLeft,
+    Money,
+    Remove,
+    Check,
+    Close,
+    Delete
+  },
   setup() {
     const { success, error, warning, info } = useSnackbar()
     return { success, error, warning, info }
@@ -194,17 +229,50 @@ export default {
   },
   computed: {
     paymentItemsCount() {
-      return this.payrollItems.filter(item => item.type === 'payment').length
+      return this.payrollItems.filter(item => item.type === 'ALLOWANCE').length
     },
     deductionItemsCount() {
-      return this.payrollItems.filter(item => item.type === 'deduction').length
+      return this.payrollItems.filter(item => item.type === 'DEDUCTION').length
     },
     activeItemsCount() {
       return this.payrollItems.filter(item => item.isActive).length
     },
     inactiveItemsCount() {
       return this.payrollItems.filter(item => !item.isActive).length
+    },
+    hasChanges() {
+      if (this.originalData.length !== this.payrollItems.length) {
+        return true
+      }
+      
+      return this.payrollItems.some((item, index) => {
+        const original = this.originalData[index]
+        if (!original) return true
+        
+        return (
+          item.type !== original.type ||
+          item.itemName !== original.itemName ||
+          item.description !== original.description ||
+          item.isActive !== original.isActive
+        )
+      })
+    },
+    changedItems() {
+      return this.payrollItems.filter((item, index) => {
+        const original = this.originalData[index]
+        if (!original) return true
+        
+        return (
+          item.type !== original.type ||
+          item.itemName !== original.itemName ||
+          item.description !== original.description ||
+          item.isActive !== original.isActive
+        )
+      })
     }
+  },
+  async mounted() {
+    await this.loadPayrollItems()
   },
   methods: {
     // 백엔드에서 급여 항목 목록 로드
@@ -340,35 +408,24 @@ export default {
         this.info('삭제가 취소되었습니다.')
       })
     },
-    reorderIds() {
-      // 모든 항목의 ID를 1부터 순차적으로 재정렬
-      this.payrollItems.forEach((item, index) => {
-        item.id = index + 1
+    cancelChanges() {
+      // 변경사항이 없으면 취소하지 않음 (추가 안전장치)
+      if (!this.hasChanges) {
+        this.warning('취소할 변경사항이 없습니다.')
+        return
+      }
+      
+      this.$confirm('변경사항을 취소하시겠습니까?', '취소 확인', {
+        confirmButtonText: '취소',
+        cancelButtonText: '계속 편집',
+        type: 'warning'
+      }).then(() => {
+        // 원본 데이터로 복원
+        this.payrollItems = JSON.parse(JSON.stringify(this.originalData))
+        this.info('변경사항이 취소되었습니다.')
+      }).catch(() => {
+        this.info('편집을 계속합니다.')
       })
-    },
-    // 변경사항이 있는지 확인
-    hasChanges() {
-      if (this.payrollItems.length !== this.originalPayrollItems.length) {
-        return true // 항목 개수가 다름
-      }
-      
-      for (let i = 0; i < this.payrollItems.length; i++) {
-        const current = this.payrollItems[i]
-        const original = this.originalPayrollItems[i]
-        
-        if (!original) return true
-        
-        // 비교할 필드들
-        const fieldsToCompare = ['type', 'itemName', 'customItemName', 'description', 'isActive']
-        
-        for (const field of fieldsToCompare) {
-          if (current[field] !== original[field]) {
-            return true
-          }
-        }
-      }
-      
-      return false
     },
 
     // 개별 항목의 변경사항 확인
@@ -464,6 +521,8 @@ export default {
       } catch (error) {
         console.error('급여 항목 저장 실패:', error)
         this.error('저장 중 오류가 발생했습니다.')
+      } finally {
+        this.loading = false
       }
     },
     formatDate(date) {
@@ -731,5 +790,43 @@ export default {
   .stats-cards {
     grid-template-columns: 1fr;
   }
+}
+
+/* 버튼 스타일링 */
+.disabled-button {
+  opacity: 0.5 !important;
+  filter: grayscale(50%);
+}
+
+.disabled-button:hover {
+  transform: none !important;
+}
+
+/* 저장 버튼 활성화 상태 */
+.header-actions .el-button--success:not(.disabled-button) {
+  background-color: #67c23a;
+  border-color: #67c23a;
+  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.3);
+}
+
+.header-actions .el-button--success:not(.disabled-button):hover {
+  background-color: #85ce61;
+  border-color: #85ce61;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(103, 194, 58, 0.4);
+}
+
+/* 취소 버튼 활성화 상태 */
+.header-actions .el-button--info:not(.disabled-button) {
+  background-color: #909399;
+  border-color: #909399;
+  box-shadow: 0 2px 4px rgba(144, 147, 153, 0.3);
+}
+
+.header-actions .el-button--info:not(.disabled-button):hover {
+  background-color: #a6a9ad;
+  border-color: #a6a9ad;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(144, 147, 153, 0.4);
 }
 </style>

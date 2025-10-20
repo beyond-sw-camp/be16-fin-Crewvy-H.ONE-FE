@@ -171,7 +171,7 @@
                   </div>
                 </div>
                 <div class="meeting-actions">
-                  <el-button type="text" @click="viewRecording(meeting)">
+                  <el-button type="text" @click="viewRecording(meeting)" v-if="meeting.url">
                     <el-icon><VideoPlay /></el-icon>
                     녹화 보기
                   </el-button>
@@ -365,8 +365,8 @@ export default {
       scheduledMeetings: [],
       meetingHistory: [],
       employees: [
-        { id: 'a3b6f1de-2c9b-4a6e-9c3f-1d2e3f4a5b6c', name: '김철수' },
-        { id: '0f1e2d3c-4b5a-6978-8c9d-0e1f2a3b4c5d', name: '박민수' },
+        { id: 'ed723fc3-4ac9-4510-810a-4e71a7b7d6c9', name: '김민준' },
+        { id: '577bf0f7-447a-49a2-9530-dff78dc4c2a7', name: '이서준' },
         { id: '9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d', name: '이지은' },
         { id: '123e4567-e89b-12d3-a456-426614174000', name: '김영희' },
         { id: '550e8400-e29b-41d4-a716-446655440000', name: '정수진' }
@@ -434,6 +434,7 @@ export default {
         host: m.host || '주최자',
         duration: m.duration || '-',
         participants: m.participants || 0,
+        url: m.recordingUrl,
         status: '완료'
       }))
     },
@@ -480,7 +481,7 @@ export default {
         const res = await joinVideoConference(meeting.id)
         this.success('회의에 참여합니다.')
         // 새 창으로 실제 회의실 오픈
-        this.openMeetingWindow(res, meeting.title)
+        this.openMeetingWindow(res, meeting.title, meeting.id)
       } catch (e) {
         this.error('회의 참여에 실패했습니다.')
       }
@@ -506,7 +507,7 @@ export default {
       try {
         const res = await startVideoConference(meet.id)
         this.success(`${meet.title}을 시작합니다.`)
-        this.openMeetingWindow(res, meet.title)
+        this.openMeetingWindow(res, meet.title, meet.id)
         this.loadMeetingLists()
       } catch (e) {
         this.error('회의 시작에 실패했습니다.')
@@ -547,7 +548,11 @@ export default {
       })
     },
     viewRecording(meeting) {
-      this.info(`${meeting.title} 녹화 보기`)
+      if (meeting.url) {
+        window.open(meeting.url, '_blank')
+      } else {
+        this.warning('녹화된 영상이 없습니다.')
+      }
     },
     downloadTranscript(meeting) {
       this.success(`${meeting.title} 회의록을 다운로드합니다.`)
@@ -563,7 +568,7 @@ export default {
         }
         const res = await createVideoConference(payload)
         this.success('회의가 시작되었습니다.')
-        this.openMeetingWindow(res, this.meetingForm.title)
+        this.openMeetingWindow(res, this.meetingForm.title, res.videoConferenceId)
         this.showStartMeeting = false
         this.meetingForm = { title: '', description: '', participants: [], recording: false }
         this.loadMeetingLists()
@@ -617,7 +622,7 @@ export default {
       try {
         const res = await joinVideoConference(this.joinForm.meetingId)
         this.success('회의에 참여합니다.')
-        this.openMeetingWindow(res, '')
+        this.openMeetingWindow(res, '', this.joinForm.meetingId)
         this.showJoinMeeting = false
         this.joinForm = { meetingId: '', password: '' }
       } catch (e) {
@@ -627,13 +632,17 @@ export default {
     ,
     openMeetingWindow(apiResult, title) {
       if (!apiResult) return
-      const sessionId = apiResult.sessionId || apiResult.sessionID || apiResult.id
-      const token = apiResult.token || apiResult.connectionToken || apiResult.accessToken
-      if (!sessionId || !token) {
-        this.warning('세션/토큰 정보를 찾지 못했습니다.')
+      const videoConferenceId = apiResult.videoConferenceId
+      const token = apiResult.token
+      if (!token) {
+        this.warning('토큰 정보를 찾지 못했습니다.')
         return
       }
-      const params = new URLSearchParams({ sid: String(sessionId), token: String(token), title: String(title || '') })
+      const params = new URLSearchParams({
+        token: String(token),
+        title: String(title),
+        vcid: String(videoConferenceId)
+      })
       const base = (process.env.BASE_URL || '/').replace(/\/+$/, '')
       const url = `${window.location.origin}${base}/meeting/room?${params.toString()}`
       window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')

@@ -10,6 +10,7 @@
         <div class="goal-content">
           <div class="goal-details">
             <h3 class="goal-title">{{ goal.title }}</h3>
+            <p class="team-goal-title"><strong>팀 목표:</strong> {{ goal.teamGoalTitle }}</p>
             <p class="goal-description">{{ goal.contents }}</p>
             <p class="goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
             <p v-if="goal.grade" class="goal-grade">평가 등급: {{ goal.grade }}</p>
@@ -103,7 +104,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import apiClient from '@/api/http';
 
 export default {
   name: 'MyGoal',
@@ -119,15 +120,16 @@ export default {
         comment: ''
       },
       rejectionReasonDialogVisible: false,
-      selectedRejectedGoal: {}
+      selectedRejectedGoal: {},
+      evaluatingGoalId: null
     };
   },
   methods: {
     async fetchMyGoals() {
       try {
         // In a real environment, you would use the actual API call:
-        const response = await axios.get('http://localhost:8080/performance/get-my-goal');
-        this.myGoals = response.data;
+        const response = await apiClient.get('/workforce-service/performance/get-my-goal');
+        this.myGoals = response.data.data;
 
         // Using mock data provided by the user for demonstration:
         // this.myGoals = [
@@ -162,8 +164,8 @@ export default {
       if (this.teamGoalsForSelection.length === 0) {
         try {
           // For demonstration, using mock data. In real environment, use axios call.
-          const response = await axios.get('http://localhost:8080/performance/team-goal');
-          this.teamGoalsForSelection = response.data;
+          const response = await apiClient.get('/workforce-service/performance/team-goal');
+          this.teamGoalsForSelection = response.data.data;
           // this.teamGoalsForSelection = [
           //   {
           //       "teamGoalId": "36e7c5a6-8df6-4c0a-9efa-c5f66377b431",
@@ -194,12 +196,34 @@ export default {
       return '';
     },
     selfEvaluate(id) {
+      this.evaluatingGoalId = id;
       this.selfEvaluateDialogVisible = true;
       console.log('Evaluating goal:', id);
     },
-    handleSelfEvaluate() {
-      console.log('Self Evaluation:', this.selfEvaluateForm);
-      this.selfEvaluateDialogVisible = false;
+    async handleSelfEvaluate() {
+      if (!this.selfEvaluateForm.rating) {
+        this.$message.warning('등급을 선택해주세요.');
+        return;
+      }
+
+      try {
+        const payload = {
+          goalId: this.evaluatingGoalId, 
+          grade: this.selfEvaluateForm.rating,
+          type: 'SELF',
+          comment: this.selfEvaluateForm.comment
+        };
+
+        await apiClient.post('/workforce-service/performance/create-evaluation', payload);
+
+        this.$message.success('본인 평가가 저장되었습니다.');
+        this.selfEvaluateDialogVisible = false;
+        await this.fetchMyGoals();
+
+      } catch (error) {
+        console.error('Error saving self evaluation:', error);
+        this.$message.error('평가 저장에 실패했습니다.');
+      }
     },
     viewRejectionReason(goal) {
       this.selectedRejectedGoal = goal;
@@ -212,9 +236,8 @@ export default {
   created() {
     this.fetchMyGoals();
   },
-};
+}; 
 </script>
-
 <style scoped>
 .my-goal-container {
   padding: 24px;
@@ -265,6 +288,13 @@ export default {
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.team-goal-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 12px;
+  font-weight: 500;
 }
 
 .goal-description {
