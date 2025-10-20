@@ -222,7 +222,7 @@ export default {
           });
 
           if (positionResponse.data.data) {
-            const positionDataMap = new Map(positionResponse.data.data.map(p => [p.memberId, p]));
+            const positionDataMap = new Map(positionResponse.data.data.map(p => [p.memberPositionId, p]));
 
             const policyApprovers = sortedPolicy.map(p => {
               const positionInfo = positionDataMap.get(p.approverId);
@@ -361,6 +361,7 @@ export default {
         memberPositionId: approver.memberPositionId,
         lineIndex: index + 1,
       }));
+      console.log(lineDtoList);
 
       const approvalData = {
         documentId: documentId.value,
@@ -368,6 +369,7 @@ export default {
         contents: formData.value,
         lineDtoList: lineDtoList,
       };
+      console.log(approvalData);
 
       if (draftApprovalId.value) {
         approvalData.approvalId = draftApprovalId.value;
