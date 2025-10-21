@@ -8,8 +8,8 @@
       </template>
       <el-card-body>
         <el-table :data="settings" style="width: 100%">
-          <el-table-column prop="type" label="알림 유형"></el-table-column>
-          <el-table-column label="활성화">
+          <el-table-column prop="type" label="알림 유형" header-align="center" align="center"></el-table-column>
+          <el-table-column label="활성화" header-align="center" align="center">
             <template #default="scope">
               <el-switch
                 v-model="scope.row.isActive"
