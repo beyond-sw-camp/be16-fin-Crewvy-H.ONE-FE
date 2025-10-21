@@ -81,6 +81,12 @@ const routes = [
     component: () => import('../../views/member/MyInfoEdit.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/my-info/notification-settings',
+    name: 'NotificationSettings',
+    component: () => import('@/views/member/NotificationSettings.vue'),
+    meta: { requiresAuth: true }
+  },
 ];
 
 export default routes;
