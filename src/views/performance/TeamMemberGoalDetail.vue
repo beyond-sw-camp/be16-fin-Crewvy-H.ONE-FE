@@ -55,8 +55,8 @@
     </div>
 
     <div class="actions-container">
-        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== 'REQUESTED'">승인</el-button>
-        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== 'REQUESTED'">반려</el-button>
+        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== 'REQUESTED' || !isManagerForGoal">승인</el-button>
+        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== 'REQUESTED' || !isManagerForGoal">반려</el-button>
         <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== 'APPROVED'">평가</el-button>
     </div>
 
@@ -115,7 +115,8 @@ export default {
         contents: '',
         startDate: '',
         endDate: '',
-        status: ''
+        status: '',
+        teamGoalMemberPositionId: null, // Added this
       },
       fileList: [],
       rejectDialogVisible: false,
@@ -133,8 +134,14 @@ export default {
         { grade: 'B+', description: '' },
         { grade: 'B', description: '' },
         { grade: 'F', description: '' }
-      ]
+      ],
+      myMemberPositionId: null, // Added this
     };
+  },
+  computed: {
+    isManagerForGoal() {
+      return this.myMemberPositionId === this.goalDetail.teamGoalMemberPositionId;
+    },
   },
   methods: {
     goBack() {
@@ -295,6 +302,7 @@ export default {
     },
   },
   created() {
+    this.myMemberPositionId = localStorage.getItem('memberPositionId'); // Added this
     this.fetchGoalDetail();
   },
 };

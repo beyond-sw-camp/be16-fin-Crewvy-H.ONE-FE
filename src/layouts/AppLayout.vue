@@ -954,9 +954,9 @@ export default {
         const diff = expiry - now
 
         if (diff <= 0) {
-          this.handleSessionExpiry()
+          // this.handleSessionExpiry()
         } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
-          this.showSessionWarning()
+          // this.showSessionWarning()
         }
       }, 1000)
     },
