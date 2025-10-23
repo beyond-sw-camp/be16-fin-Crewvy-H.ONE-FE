@@ -93,6 +93,12 @@
           <el-menu-item index="/admin/policy-management">
             <span>근태 정책 관리</span>
           </el-menu-item>
+          <el-menu-item index="/admin/policy-assignment">
+            <span>정책 할당</span>
+          </el-menu-item>
+          <el-menu-item index="/team-attendance-status">
+            <span>팀원 근태 현황</span>
+          </el-menu-item>
           <el-menu-item index="/admin/work-location-management">
             <span>근무지 관리</span>
           </el-menu-item>
@@ -409,7 +415,7 @@
 import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
 import { useSnackbar } from '@/composables/useSnackbar';
 import SnackbarContainer from '../components/SnackbarContainer.vue';
-import organizationService from '@/api/organizationService';
+
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
