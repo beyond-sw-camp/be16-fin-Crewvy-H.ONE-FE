@@ -145,8 +145,8 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { ref, computed, onMounted } from 'vue'; // watch 제거
+// import { useStore } from 'vuex'; // TODO: 토큰에 companyId 추가되면 복구
 import { useRouter, useRoute } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
 import WorkTimeRuleBlock from './components/WorkTimeRuleBlock.vue';
@@ -166,7 +166,6 @@ export default {
     BreakRuleBlock, ExpenseRuleBlock, LatenessRuleBlock
   },
   setup() {
-    const store = useStore();
     const router = useRouter();
     const route = useRoute();
     const { success, error } = useSnackbar();
@@ -175,7 +174,7 @@ export default {
     const policyTypes = ref([]);
     const policy = ref({
       name: '',
-      typeCode: null, // policyTypeId -> typeCode
+      typeCode: null,
       effectiveFrom: null,
       effectiveTo: null,
       isPaid: false,
@@ -187,15 +186,21 @@ export default {
 
     const policyId = computed(() => route.params.policyId || null);
     const isEditMode = computed(() => !!policyId.value);
-    const user = computed(() => store.state.user);
 
     const fetchPolicyTypes = async () => {
-      if (!user.value?.companyId) return;
       try {
-        const params = { companyId: user.value.companyId };
-        policyTypes.value = await getPolicyTypes(params);
+        const response = await getPolicyTypes();
+        console.log('✅ Policy Types API Response:', response);
+        policyTypes.value = response;
+
+        if (policyTypes.value && policyTypes.value.length > 0) {
+          success(`정책 유형 ${policyTypes.value.length}개를 불러왔습니다.`);
+        } else {
+          error('정책 유형이 없습니다. 백엔드에 PolicyType 데이터가 있는지 확인하세요.');
+        }
       } catch (err) {
-        error('정책 유형 목록을 불러오는 데 실패했습니다.');
+        console.error('❌ Policy Types API Error:', err);
+        error(err.response?.data?.message || '정책 유형 목록을 불러오는 데 실패했습니다.');
       }
     };
 
@@ -204,7 +209,7 @@ export default {
       try {
         const fetchedPolicy = await getPolicyById(policyId.value);
         policy.value.name = fetchedPolicy.name;
-        policy.value.typeCode = fetchedPolicy.typeCode; // policyTypeId -> typeCode
+        policy.value.typeCode = fetchedPolicy.typeCode;
         policy.value.isPaid = fetchedPolicy.isPaid;
         policy.value.effectiveFrom = fetchedPolicy.effectiveFrom;
         policy.value.effectiveTo = fetchedPolicy.effectiveTo;
@@ -212,6 +217,11 @@ export default {
           workTimeRule: null, authRule: null, goOutRuleDto: null, leaveRule: null,
           tripRule: null, breakRule: null, expenseRule: null, latenessRule: null,
         }, fetchedPolicy.ruleDetails);
+
+        // authRule이 존재하지만 methods 배열이 없을 경우를 대비한 방어 코드
+        if (policy.value.ruleDetails.authRule && !policy.value.ruleDetails.authRule.methods) {
+          policy.value.ruleDetails.authRule.methods = [];
+        }
       } catch (err) {
         error(err.message || '정책 정보를 불러오는 데 실패했습니다.');
       } finally {
@@ -219,13 +229,8 @@ export default {
       }
     };
 
-    watch(user, (newUser) => {
-      if (newUser && newUser.companyId) {
-        fetchPolicyTypes();
-      }
-    }, { immediate: true });
-
     onMounted(() => {
+      fetchPolicyTypes();
       if (isEditMode.value) {
         fetchPolicy();
       }
@@ -256,13 +261,9 @@ export default {
     };
 
     const savePolicy = async () => {
-      if (!user.value || !user.value.companyId) {
-        error('회사 정보가 없습니다.');
-        return;
-      }
       const requestData = {
         name: policy.value.name,
-        typeCode: policy.value.typeCode, // policyTypeId -> typeCode
+        typeCode: policy.value.typeCode,
         isPaid: policy.value.isPaid,
         effectiveFrom: policy.value.effectiveFrom,
         effectiveTo: policy.value.effectiveTo,
@@ -273,8 +274,7 @@ export default {
           await updatePolicy(policyId.value, requestData);
           success('정책이 성공적으로 수정되었습니다.');
         } else {
-          const params = { companyId: user.value.companyId };
-          await createPolicy(params, requestData);
+          await createPolicy(requestData);
           success('새로운 정책이 성공적으로 생성되었습니다.');
         }
         router.push({ name: 'PolicyManagement' });
