@@ -441,7 +441,7 @@ defineExpose({ goBack, editEmployee, printToPdf });
 <style scoped>
 /* Base font for consistency */
 .employee-detail-view {
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif; /* Apply a consistent font */
+  /* font-family: 'Pretendard', 'Noto Sans KR', sans-serif; */ /* Apply a consistent font */
   font-size: 14px; /* Base font size for the component */
   max-width: 1000px;
   margin: 0 auto;
@@ -532,14 +532,14 @@ defineExpose({ goBack, editEmployee, printToPdf });
 
 /* Font consistency for Element Plus Table within info-section */
 .info-section :deep(.el-table__header-cell .cell) {
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important;
+  /* font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important; */
   font-size: 14px !important; /* Match .label font size */
   color: #2c3e50 !important; /* Ensure consistent text color */
   font-weight: 500 !important; /* Match .label font weight */
 }
 
 .info-section :deep(.el-table__cell .cell) {
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important;
+  /* font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important; */
   font-size: 16px !important; /* Match .value font size */
   color: #2c3e50 !important; /* Ensure consistent text color */
   font-weight: 600 !important; /* Match .value font weight */
@@ -547,7 +547,7 @@ defineExpose({ goBack, editEmployee, printToPdf });
 
 /* Also ensure the table header itself uses the correct font */
 .info-section :deep(.el-table__header) {
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important;
+  /* font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important; */
 }
 
 .info-grid-page {

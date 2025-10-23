@@ -49,20 +49,20 @@
           <el-menu-item index="/organization">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/titles">
+          <el-menu-item index="/employee/title">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grades">
+          <el-menu-item index="/employee/grade">
             <span>직급 관리</span>
           </el-menu-item>
           <el-sub-menu index="roles">
             <template #title>
               <span>역할 관리</span>
             </template>
-            <el-menu-item index="/employee/roles">
+            <el-menu-item index="/employee/role">
               <span>역할 목록</span>
             </el-menu-item>
-            <el-menu-item index="/employee/roles/create">
+            <el-menu-item index="/employee/role/create">
               <span>역할 생성</span>
             </el-menu-item>
           </el-sub-menu>
@@ -203,7 +203,7 @@
           <el-icon>
             <OfficeBuilding />
           </el-icon>
-          <span v-if="!sidebarCollapsed">조직/사원</span>
+          <span v-if="!sidebarCollapsed">직원 찾기</span>
         </el-button>
       </div>
     </div>
@@ -292,7 +292,7 @@
     </div>
 
     <!-- 조직도 모달 -->
-    <el-dialog v-model="showOrgModal" title="조직/사원" width="800px" :before-close="handleClose"
+    <el-dialog v-model="showOrgModal" title="직원 찾기" width="800px" :before-close="handleClose"
       class="organization-dialog">
       <el-tabs v-model="activeOrgTab" class="organization-tabs-modal">
         <el-tab-pane label="조직" name="org">
@@ -316,17 +316,39 @@
         <el-tab-pane label="사원" name="employee">
           <div class="employee-search-modal">
             <div class="employee-search-bar-modal">
-              <el-input v-model="employeeSearch" placeholder="사원명 또는 부서명 입력" clearable @keyup.enter="searchEmployees" />
-              <el-button type="primary" @click="searchEmployees">검색</el-button>
+              <el-input v-model="employeeSearch" placeholder="사원명, 부서, 연락처 등으로 검색" clearable @keyup.enter="searchEmployees" class="search-input-field" />
+              <el-button type="primary" @click="searchEmployees" class="search-button">검색</el-button>
             </div>
-            <el-table :data="searchedEmployees" style="width: 100%" empty-text="검색된 사원이 없습니다.">
-              <el-table-column prop="name" label="이름" width="120"></el-table-column>
-              <el-table-column prop="department" label="부서"></el-table-column>
-              <el-table-column prop="position" label="직급" width="150"></el-table-column>
-              <el-table-column prop="phoneNumber" label="연락처" width="150"></el-table-column>
-              <el-table-column prop="email" label="이메일"></el-table-column>
-              <el-table-column prop="status" label="재직상태" width="120"></el-table-column>
-            </el-table>
+            <div class="employee-search-results">
+              <el-table v-if="searchedEmployees.length > 0" :data="searchedEmployees" style="width: 100%" stripe :header-cell-style="{ 'text-align': 'center' }" :cell-style="{ 'text-align': 'center' }" :row-key="row => row.memberId">
+                <el-table-column prop="name" label="이름" width="120" show-overflow-tooltip></el-table-column>
+                <el-table-column label="부서">
+                  <template #default="{ row }">
+                    <div class="multi-line-cell">
+                      <div v-for="org in row.organizationName" :key="org" class="line-item">
+                        {{ org }}
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="직책" width="150">
+                  <template #default="{ row }">
+                    <div class="multi-line-cell">
+                      <div v-for="title in row.titleName" :key="title" class="line-item">
+                        {{ title }}
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip></el-table-column>
+                <el-table-column prop="memberStatus" label="상태" width="100"></el-table-column>
+              </el-table>
+              <div v-else class="empty-state">
+                <el-icon><Search /></el-icon>
+                <span v-if="!hasSearched">검색어를 입력하여 직원을 찾아보세요.</span>
+                <span v-else>검색 결과가 없습니다.</span>
+              </div>
+            </div>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -442,6 +464,7 @@ import { mapState, mapMutations } from 'vuex'
 import { useSnackbar } from '@/composables/useSnackbar'
 import SnackbarContainer from '../components/SnackbarContainer.vue'
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
+import employeeService from '@/api/employeeService';
 
 export default {
   name: 'MainLayout',
@@ -532,6 +555,7 @@ export default {
       },
       allEmployees: [],
       searchedEmployees: [],
+      hasSearched: false, // 검색 실행 여부 상태
       events: [
         {
           id: 1,
@@ -778,7 +802,7 @@ export default {
     getPageTitle() {
       const titles = {
         '/': '대시보드',
-        '/organization': '조직/사원',
+        '/organization': '직원 찾기',
         '/employee': '직원 관리',
         '/employee/titles': '직책 관리',
         '/employee/grades': '직급 관리',
@@ -818,13 +842,6 @@ export default {
           this.$router.push('/landing');
           break
       }
-    },
-    showOrganizationModal() {
-      this.showOrgModal = true
-      this.activeOrgTab = 'org'
-      this.orgSearch = ''
-      this.employeeSearch = ''
-      this.searchedEmployees = this.allEmployees
     },
     handleClose(done) {
       this.showOrgModal = false
@@ -883,20 +900,41 @@ export default {
       nodes.forEach(node => traverse(node, '', ''));
       return employees;
     },
-    searchEmployees() {
-      if (!this.employeeSearch) {
+    showOrganizationModal() {
+      this.showOrgModal = true;
+      this.activeOrgTab = 'employee'; // 사원 탭을 기본으로 설정
+      this.orgSearch = '';
+      this.employeeSearch = '';
+      this.searchedEmployees = []; // 직원 목록 초기화
+      this.hasSearched = false; // 검색 상태 초기화
+    },
+    async fetchAllEmployees() {
+      try {
+        const response = await employeeService.getAllEmployees();
+        console.log('fetchAllEmployees response:', response);
+        this.allEmployees = response.data.data; // Corrected to access nested 'data' property
         this.searchedEmployees = this.allEmployees;
+      } catch (error) {
+        console.error('Failed to fetch all employees:', error);
+        this.error('직원 목록을 불러오는데 실패했습니다.');
+      }
+    },
+    async searchEmployees() {
+      this.hasSearched = true; // 검색이 실행되었음을 표시
+      if (!this.employeeSearch) {
+        this.searchedEmployees = [];
         return;
       }
-      const searchTerm = this.employeeSearch.toLowerCase();
-      this.searchedEmployees = this.allEmployees.filter(emp => {
-        return (
-          (emp.name && emp.name.toLowerCase().includes(searchTerm)) ||
-          (emp.department && emp.department.toLowerCase().includes(searchTerm)) ||
-          (emp.team && emp.team.toLowerCase().includes(searchTerm))
-        );
-      });
+      try {
+        const response = await employeeService.searchEmployees(this.employeeSearch);
+        this.searchedEmployees = response.data;
+      } catch (error) {
+        console.error('Failed to search employees:', error);
+        this.error('직원 검색에 실패했습니다.');
+        this.searchedEmployees = [];
+      }
     },
+
     openCalendarModal() {
       this.showCalendarModal = true
     },
@@ -1029,8 +1067,6 @@ export default {
     }
   },
   created() {
-    this.allEmployees = this.flattenOrgTree(this.orgTreeData);
-    this.searchedEmployees = this.allEmployees;
   },
   mounted() {
     this.initSessionTimer()
@@ -1235,7 +1271,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 16px 20px;
+  padding: 12px 20px;
   border-top: 1px solid #e4e7ed;
   background: white;
   z-index: 10;
@@ -1246,7 +1282,7 @@ export default {
   justify-content: flex-start;
   color: #606266;
   font-size: 14px;
-  padding: 12px 16px;
+  /* padding: 12px 16px; */
   border-radius: 8px;
   transition: all 0.3s ease;
 }
@@ -1655,7 +1691,91 @@ export default {
   font-size: 14px;
   font-weight: 600;
   color: #0c4a6e;
-  font-family: 'Courier New', monospace;
+}
+
+.employee-search-modal {
+  display: flex;
+  flex-direction: column;
+  height: 50vh; /* 고정 높이 부여 (뷰포트 높이의 50%) */
+}
+
+.employee-search-bar-modal {
+  padding-bottom: 16px;
+}
+
+.search-input-field .el-input__inner {
+  height: 40px;
+}
+
+.search-button {
+  height: 40px;
+}
+
+.employee-search-results {
+  flex-grow: 1; /* 남은 공간을 모두 차지 */
+  position: relative; /* 자식 요소(empty-state)를 중앙 정렬하기 위함 */
+  overflow-y: auto; /* 내용이 많을 경우 스크롤 생성 */
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+  text-align: center;
+}
+
+.empty-state .el-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #c0c4cc;
+}
+
+.empty-state span {
+  font-size: 16px;
+}
+
+/* el-table 스크롤바 디자인 개선 */
+.employee-search-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employee-search-results::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.employee-search-results::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.employee-search-results::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.employee-search-results .el-table .el-table__cell {
+  padding: 12px 0;
+}
+
+.employee-search-results .el-table--enable-row-hover .el-table__body tr:hover > td {
+  background-color: #f0f9ff !important;
+}
+
+.employee-search-results .el-table__body tr.current-row>td {
+    background-color: #d9ecff !important;
+}
+
+.multi-line-cell .line-item {
+  padding: 4px 0;
+}
+
+.multi-line-cell .line-item:not(:last-child) {
+  border-bottom: 1px solid #f0f0f0;
 }
 </style>
 
