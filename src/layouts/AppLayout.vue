@@ -253,6 +253,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="my-info">내 정보</el-dropdown-item>
+                <el-dropdown-item command="notification-settings">알림 설정</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>로그아웃</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -804,6 +805,9 @@ export default {
       switch (command) {
         case 'my-info':
           this.$router.push('/my-info');
+          break;
+        case 'notification-settings':
+          this.$router.push('/my-info/notification-settings');
           break;
         case 'logout':
           this.$router.push('/landing');
