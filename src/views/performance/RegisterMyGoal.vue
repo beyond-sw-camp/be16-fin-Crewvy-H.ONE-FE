@@ -12,6 +12,9 @@
         </template>
         <h2>{{ teamGoal.title }}</h2>
         <p>{{ teamGoal.contents }}</p>
+        <div class="meta">
+            <span>{{ teamGoal.startDate }} ~ {{ teamGoal.endDate }}</span>
+        </div>
     </el-card>
 
     <el-card class="my-goal-card">
@@ -35,6 +38,7 @@
                     start-placeholder="시작일"
                     end-placeholder="종료일"
                     value-format="YYYY-MM-DD"
+                    :disabled-date="disabledDate"
                 />
             </el-form-item>
 
@@ -86,6 +90,16 @@ export default {
   methods: {
     goBack() {
       this.$router.push('/performance/my-goal');
+    },
+    disabledDate(time) {
+      if (this.teamGoal.startDate && this.teamGoal.endDate) {
+        const startDate = new Date(this.teamGoal.startDate);
+        const endDate = new Date(this.teamGoal.endDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        return time.getTime() < startDate.getTime() || time.getTime() > endDate.getTime();
+      }
+      return true; // Disable all dates if team goal dates are not available
     },
     async registerGoal() {
       if (!this.myGoalForm.title || !this.myGoalForm.contents || !this.myGoalForm.dateRange || this.myGoalForm.dateRange.length === 0) {
@@ -194,5 +208,12 @@ export default {
   font-weight: 600;
   margin-right: 16px;
   flex-shrink: 0;
+}
+.meta {
+  display: flex;
+  justify-content: flex-start;
+  color: #909399;
+  font-size: 14px;
+  margin-top: 8px;
 }
 </style>

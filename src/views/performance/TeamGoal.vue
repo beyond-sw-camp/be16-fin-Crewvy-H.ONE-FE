@@ -9,7 +9,10 @@
       <el-card v-for="goal in teamGoals" :key="goal.teamGoalId" class="goal-card" @click="goToDetail(goal.teamGoalId)">
         <div class="goal-content">
           <div class="goal-details">
-            <h3 class="goal-title">{{ goal.title }}</h3>
+            <div class="goal-title-line">
+              <h3 class="goal-title">{{ goal.title }}</h3>
+              <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">{{ goal.status }}</el-tag>
+            </div>
             <p class="goal-description">{{ goal.contents }}</p>
           </div>
           <div class="goal-meta">
@@ -64,6 +67,13 @@ export default {
     goToDetail(id) {
       this.$router.push(`/performance/team-goal/${id}`);
     },
+    getStatusType(status) {
+      if (status === '평가완료') return 'success';
+      if (status === '진행중') return 'warning';
+      if (status === '삭제') return 'info';
+      if (status === '평가대기') return 'primary';
+      return '';
+    },
   },
   created() {
     this.fetchTeamGoals();
@@ -113,10 +123,20 @@ export default {
   flex: 1;
 }
 
+.goal-title-line {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 .goal-title {
   font-size: 22px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin: 0;
+}
+
+.status-tag {
+  margin-left: 12px;
 }
 
 .goal-description {
