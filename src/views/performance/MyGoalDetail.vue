@@ -50,7 +50,7 @@
         </div>
     </el-card>
 
-    <el-card class="card-section" v-if="goalDetail.status === 'APPROVED'">
+    <el-card class="card-section" v-if="goalDetail.status !== '반려' && goalDetail.status !== '취소'">
         <template #header>
             <span>증적 자료</span>
         </template>
@@ -75,7 +75,7 @@
 
     <div class="actions-container">
         <el-button @click="goBack">취소</el-button>
-        <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!['요청', '승인'].includes(goalDetail.status)">저장</el-button>
+        <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!['요청', '승인', '평가 대기'].includes(goalDetail.status)">저장</el-button>
         <el-button v-if="isFromReviewPage" type="primary" @click="selfEvaluateDialogVisible = true">본인 평가</el-button>
     </div>
 
