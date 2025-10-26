@@ -270,7 +270,7 @@
           <el-dropdown @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="userAvatarUrl" :size="32" />
-              <span class="user-name">{{ userName }}</span>
+              <span class="user-name">{{ user.userName }}</span>
               <el-icon>
                 <ArrowDown />
               </el-icon>
@@ -301,11 +301,12 @@
               <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
               <div class="tree-container">
                 <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" @node-click="handleOrgNodeClick"
-                  :filter-node-method="filterNode" default-expand-all :expand-on-click-node="false" class="org-tree">
+                  :filter-node-method="filterNode" :expand-on-click-node="false" class="org-tree">
                   <template #default="{ node, data }">
                     <div class="custom-tree-node-modal">
                       <span>{{ node.label }}</span>
-                      <span class="member-count">{{ data.members.length }}명</span>
+                      <span v-if="data.members && data.members.length > 0" class="member-count">{{ data.members.length
+                        }}명</span>
                     </div>
                   </template>
                 </el-tree>
@@ -316,22 +317,25 @@
         <el-tab-pane label="사원" name="employee">
           <div class="employee-search-modal">
             <div class="employee-search-bar-modal">
-              <el-input v-model="employeeSearch" placeholder="사원명, 부서, 연락처 등으로 검색" clearable @keyup.enter="searchEmployees" class="search-input-field" />
+              <el-input v-model="employeeSearch" placeholder="사원명, 부서, 연락처 등으로 검색" clearable
+                @keyup.enter="searchEmployees" class="search-input-field" />
               <el-button type="primary" @click="searchEmployees" class="search-button">검색</el-button>
             </div>
             <div class="employee-search-results">
-              <el-table v-if="searchedEmployees.length > 0" :data="searchedEmployees" style="width: 100%" stripe :header-cell-style="{ 'text-align': 'center' }" :cell-style="{ 'text-align': 'center' }" :row-key="row => row.memberId">
+              <el-table v-if="searchedEmployees.length > 0" :data="searchedEmployees" style="width: 100%" stripe
+                :header-cell-style="{ 'text-align': 'center' }" :cell-style="{ 'text-align': 'center' }"
+                :row-key="row => row.memberId">
                 <el-table-column prop="name" label="이름" width="120" show-overflow-tooltip></el-table-column>
-                <el-table-column label="부서">
+                <el-table-column label="부서" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="multi-line-cell">
-                      <div v-for="org in row.organizationName" :key="org" class="line-item">
-                        {{ org }}
+                      <div v-for="orgItem in row.organizationList || []" :key="orgItem.id" class="line-item">
+                        {{ orgItem.name }}
                       </div>
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="직책" width="150">
+                <el-table-column label="직책" width="150" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="multi-line-cell">
                       <div v-for="title in row.titleName" :key="title" class="line-item">
@@ -344,7 +348,9 @@
                 <el-table-column prop="memberStatus" label="상태" width="100"></el-table-column>
               </el-table>
               <div v-else class="empty-state">
-                <el-icon><Search /></el-icon>
+                <el-icon>
+                  <Search />
+                </el-icon>
                 <span v-if="!hasSearched">검색어를 입력하여 직원을 찾아보세요.</span>
                 <span v-else>검색 결과가 없습니다.</span>
               </div>
@@ -466,6 +472,8 @@ import SnackbarContainer from '../components/SnackbarContainer.vue'
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import employeeService from '@/api/employeeService';
 
+import organizationService from '@/api/organizationService';
+
 export default {
   name: 'MainLayout',
   components: { SnackbarContainer },
@@ -492,63 +500,7 @@ export default {
         management: false,
         sales: true
       },
-      orgTreeData: [
-        {
-          id: 1,
-          label: 'H.ONE',
-          type: 'company',
-          members: [],
-          children: [
-            {
-              id: 2,
-              label: '경영팀',
-              type: 'department',
-              members: [
-                { id: 101, name: '김경영', position: '팀장', email: 'ky.kim@h.one' },
-                { id: 102, name: '이경영', position: '사원', email: 'ky.lee@h.one' },
-              ],
-              children: [],
-            },
-            {
-              id: 3,
-              label: '개발팀',
-              type: 'department',
-              members: [],
-              children: [
-                {
-                  id: 5,
-                  label: '프론트엔드',
-                  type: 'team',
-                  members: [
-                    { id: 201, name: '박프론', position: '과장', email: 'front.park@h.one' },
-                    { id: 202, name: '최프론', position: '대리', email: 'front.choi@h.one' },
-                  ],
-                  children: []
-                },
-                {
-                  id: 6,
-                  label: '백엔드',
-                  type: 'team',
-                  members: [
-                    { id: 301, name: '정보백', position: '차장', email: 'back.jung@h.one' },
-                    { id: 302, name: '강백엔', position: '주임', email: 'back.kang@h.one' },
-                  ],
-                  children: []
-                },
-              ],
-            },
-            {
-              id: 4,
-              label: '디자인팀',
-              type: 'department',
-              members: [
-                { id: 401, name: '오디자인', position: '팀장', email: 'design.oh@h.one' },
-              ],
-              children: [],
-            },
-          ],
-        },
-      ],
+      orgTreeData: [],
       defaultProps: {
         children: 'children',
         label: 'label',
@@ -839,6 +791,10 @@ export default {
           this.$router.push('/my-info');
           break;
         case 'logout':
+          localStorage.removeItem('accessToken');
+          // Add other localStorage items to clear if necessary
+          // localStorage.removeItem('refreshToken');
+          // localStorage.removeItem('userSettings');
           this.$router.push('/landing');
           break
       }
@@ -859,14 +815,23 @@ export default {
       this.searchedEmployees = this.getAllMembersFromNode(data);
       this.activeOrgTab = 'employee';
     },
-    getAllMembersFromNode(node) {
+    getAllMembersFromNode(node, parentOrganizations = []) {
       let members = [];
+      const currentOrganizationInfo = { id: node.id, name: node.label, parentId: node.parentId };
+      const organizationsForMembers = [...parentOrganizations, currentOrganizationInfo];
+
       if (node.members && node.members.length > 0) {
-        members.push(...node.members);
+        node.members.forEach(member => {
+          members.push({
+            ...member,
+            organizationList: organizationsForMembers // Attach the full organization path
+          });
+        });
       }
+
       if (node.children && node.children.length > 0) {
         node.children.forEach(child => {
-          members = members.concat(this.getAllMembersFromNode(child));
+          members = members.concat(this.getAllMembersFromNode(child, organizationsForMembers)); // Pass current path to children
         });
       }
       return members;
@@ -900,13 +865,49 @@ export default {
       nodes.forEach(node => traverse(node, '', ''));
       return employees;
     },
+    buildOrganizationTree(flatList) {
+      const map = {};
+      flatList.forEach(org => {
+        map[org.id] = { ...org, children: [] };
+      });
+      console.log('buildOrganizationTree - map:', map);
+
+      const tree = [];
+      flatList.forEach(org => {
+        if (org.parentId) {
+          if (map[org.parentId]) {
+            map[org.parentId].children.push(map[org.id]);
+          }
+        } else {
+          tree.push(map[org.id]);
+        }
+      });
+      console.log('buildOrganizationTree - tree:', tree);
+      return tree;
+    },
+    async fetchOrganizationTree() {
+      try {
+        const response = await organizationService.getOrganizationTree();
+        console.log('Backend response data:', response.data);
+        this.orgTreeData = this.buildOrganizationTree(response.data);
+        console.log('Constructed tree data:', this.orgTreeData);
+      } catch (error) {
+        console.error('Failed to fetch organization tree:', error);
+        this.error('조직도를 불러오는데 실패했습니다.');
+      }
+    },
     showOrganizationModal() {
       this.showOrgModal = true;
-      this.activeOrgTab = 'employee'; // 사원 탭을 기본으로 설정
+      this.activeOrgTab = 'org'; // 조직 탭을 기본으로 설정
       this.orgSearch = '';
       this.employeeSearch = '';
       this.searchedEmployees = []; // 직원 목록 초기화
       this.hasSearched = false; // 검색 상태 초기화
+
+      // Ensure orgTreeData is fetched
+      if (this.orgTreeData.length === 0) {
+        this.fetchOrganizationTree();
+      }
     },
     async fetchAllEmployees() {
       try {
@@ -1067,6 +1068,7 @@ export default {
     }
   },
   created() {
+    this.fetchOrganizationTree();
   },
   mounted() {
     this.initSessionTimer()
@@ -1079,7 +1081,6 @@ export default {
   }
 }
 </script>
-
 <style scoped>
 /* ... (existing styles) */
 .main-layout {
@@ -1436,7 +1437,8 @@ export default {
 
 .organization-dialog .el-dialog__body {
   padding: 0 24px 24px;
-  max-height: calc(100vh - 180px); /* Adjust as needed based on dialog header/footer height */
+  max-height: calc(100vh - 180px);
+  /* Adjust as needed based on dialog header/footer height */
   overflow-y: auto;
 }
 
@@ -1696,7 +1698,8 @@ export default {
 .employee-search-modal {
   display: flex;
   flex-direction: column;
-  height: 50vh; /* 고정 높이 부여 (뷰포트 높이의 50%) */
+  height: 50vh;
+  /* 고정 높이 부여 (뷰포트 높이의 50%) */
 }
 
 .employee-search-bar-modal {
@@ -1712,9 +1715,12 @@ export default {
 }
 
 .employee-search-results {
-  flex-grow: 1; /* 남은 공간을 모두 차지 */
-  position: relative; /* 자식 요소(empty-state)를 중앙 정렬하기 위함 */
-  overflow-y: auto; /* 내용이 많을 경우 스크롤 생성 */
+  flex-grow: 1;
+  /* 남은 공간을 모두 차지 */
+  position: relative;
+  /* 자식 요소(empty-state)를 중앙 정렬하기 위함 */
+  overflow-y: auto;
+  /* 내용이 많을 경우 스크롤 생성 */
   border: 1px solid #e4e7ed;
   border-radius: 8px;
 }
@@ -1762,12 +1768,12 @@ export default {
   padding: 12px 0;
 }
 
-.employee-search-results .el-table--enable-row-hover .el-table__body tr:hover > td {
+.employee-search-results .el-table--enable-row-hover .el-table__body tr:hover>td {
   background-color: #f0f9ff !important;
 }
 
 .employee-search-results .el-table__body tr.current-row>td {
-    background-color: #d9ecff !important;
+  background-color: #d9ecff !important;
 }
 
 .multi-line-cell .line-item {

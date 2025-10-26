@@ -1,4 +1,5 @@
 import apiClient from './index';
+import { jwtDecode } from 'jwt-decode';
 
 // 모든 직원 정보 조회
 const getAllEmployees = () => {
@@ -7,12 +8,15 @@ const getAllEmployees = () => {
 
 // 직원 검색
 const searchEmployees = (query) => {
-  return apiClient.get(`/search-service/employees/search?query=${query}`);
-};
+  const token = localStorage.getItem('accessToken');
+  const decodedToken = jwtDecode(token);
+  const companyId = decodedToken.companyId;
 
-// 직원 자동 완성 제안 조회
-const getEmployeeAutocompleteSuggestions = (keyword) => {
-  return apiClient.get(`/search-service/autocomplete?keyword=${keyword}`);
+  return apiClient.get(`/search-service/employees/search?query=${query}`, {
+    headers: {
+      'X-User-CompanyId': companyId
+    }
+  });
 };
 
 // 직원 ID로 상세 정보 조회 (수정 페이지용)
@@ -47,7 +51,6 @@ const restoreEmployee = (employeeId) => {
 export default {
   getAllEmployees,
   searchEmployees,
-  getEmployeeAutocompleteSuggestions,
   getEmployeeForEdit,
   getEmployeeDetails,
   updateEmployee,
