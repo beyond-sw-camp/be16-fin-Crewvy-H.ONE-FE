@@ -270,7 +270,7 @@
           <el-dropdown @command="handleUserCommand">
             <div class="user-profile">
               <el-avatar :src="userAvatarUrl" :size="32" />
-              <span class="user-name">{{ user.userName }}</span>
+              <span class="user-name">{{ user?.userName }}</span>
               <el-icon>
                 <ArrowDown />
               </el-icon>
@@ -792,9 +792,11 @@ export default {
           break;
         case 'logout':
           localStorage.removeItem('accessToken');
-          // Add other localStorage items to clear if necessary
-          // localStorage.removeItem('refreshToken');
-          // localStorage.removeItem('userSettings');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('userName');
+          localStorage.removeItem('memberId');
+          localStorage.removeItem('memberPositionId');
+          localStorage.removeItem('companyId');
           this.$router.push('/landing');
           break
       }
@@ -811,31 +813,21 @@ export default {
       if (!value) return true;
       return data.label.indexOf(value) !== -1;
     },
-    handleOrgNodeClick(data) {
-      this.searchedEmployees = this.getAllMembersFromNode(data);
-      this.activeOrgTab = 'employee';
-    },
-    getAllMembersFromNode(node, parentOrganizations = []) {
-      let members = [];
-      const currentOrganizationInfo = { id: node.id, name: node.label, parentId: node.parentId };
-      const organizationsForMembers = [...parentOrganizations, currentOrganizationInfo];
-
-      if (node.members && node.members.length > 0) {
-        node.members.forEach(member => {
-          members.push({
-            ...member,
-            organizationList: organizationsForMembers // Attach the full organization path
-          });
-        });
+    async handleOrgNodeClick(data) {
+      this.hasSearched = true; // 검색 실행 상태로 변경
+      console.log('Clicked Organization ID:', data.id);
+      try {
+        const response = await employeeService.searchEmployeesByOrganizationId(data.id);
+        console.log('API Response:', response.data);
+        this.searchedEmployees = response.data.data;
+        this.activeOrgTab = 'employee';
+      } catch (error) {
+        console.error('Failed to search employees by organization:', error);
+        this.error('조직별 직원 검색에 실패했습니다.');
+        this.searchedEmployees = [];
       }
-
-      if (node.children && node.children.length > 0) {
-        node.children.forEach(child => {
-          members = members.concat(this.getAllMembersFromNode(child, organizationsForMembers)); // Pass current path to children
-        });
-      }
-      return members;
     },
+
     flattenOrgTree(nodes) {
       let employees = [];
       const traverse = (node, department, team) => {
@@ -870,7 +862,6 @@ export default {
       flatList.forEach(org => {
         map[org.id] = { ...org, children: [] };
       });
-      console.log('buildOrganizationTree - map:', map);
 
       const tree = [];
       flatList.forEach(org => {
@@ -882,15 +873,13 @@ export default {
           tree.push(map[org.id]);
         }
       });
-      console.log('buildOrganizationTree - tree:', tree);
       return tree;
     },
     async fetchOrganizationTree() {
       try {
-        const response = await organizationService.getOrganizationTree();
-        console.log('Backend response data:', response.data);
-        this.orgTreeData = this.buildOrganizationTree(response.data);
-        console.log('Constructed tree data:', this.orgTreeData);
+        const orgTreeData = (await organizationService.getOrganizationTree()).data.data;
+        this.orgTreeData = this.buildOrganizationTree(orgTreeData);
+
       } catch (error) {
         console.error('Failed to fetch organization tree:', error);
         this.error('조직도를 불러오는데 실패했습니다.');
@@ -906,13 +895,13 @@ export default {
 
       // Ensure orgTreeData is fetched
       if (this.orgTreeData.length === 0) {
-        this.fetchOrganizationTree();
+this.fetchOrganizationTree();
+        this.fetchAllEmployees();
       }
     },
     async fetchAllEmployees() {
       try {
         const response = await employeeService.getAllEmployees();
-        console.log('fetchAllEmployees response:', response);
         this.allEmployees = response.data.data; // Corrected to access nested 'data' property
         this.searchedEmployees = this.allEmployees;
       } catch (error) {
@@ -928,7 +917,7 @@ export default {
       }
       try {
         const response = await employeeService.searchEmployees(this.employeeSearch);
-        this.searchedEmployees = response.data;
+        this.searchedEmployees = response.data.data;
       } catch (error) {
         console.error('Failed to search employees:', error);
         this.error('직원 검색에 실패했습니다.');
@@ -1068,11 +1057,15 @@ export default {
     }
   },
   created() {
-    this.fetchOrganizationTree();
+    if (localStorage.getItem('accessToken')) {
+      this.fetchOrganizationTree();
+    }
   },
   mounted() {
-    this.initSessionTimer()
-    this.updatePayrollMenuState()
+    if (localStorage.getItem('accessToken')) {
+      this.initSessionTimer();
+    }
+    this.updatePayrollMenuState();
   },
   beforeUnmount() {
     if (this.sessionTimer) {

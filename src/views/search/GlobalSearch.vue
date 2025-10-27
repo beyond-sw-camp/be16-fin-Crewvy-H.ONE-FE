@@ -84,7 +84,6 @@ export default {
   },
   methods: {
     async performSearch() {
-      console.log('performSearch called');
       this.searched = true;
       this.results = [];
       if (!this.searchQuery) {
@@ -93,7 +92,7 @@ export default {
 
       try {
         const response = await employeeService.searchEmployees(this.searchQuery);
-        this.results = response.data.map(emp => ({
+        this.results = response.data.data.map(emp => ({
           id: emp.memberId,
           type: '직원',
           title: emp.name,
