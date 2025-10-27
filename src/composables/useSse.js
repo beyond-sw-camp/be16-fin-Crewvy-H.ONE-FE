@@ -26,8 +26,9 @@ export function useSse() {
       console.log('SSE connection opened.');
     };
 
-    eventSource.addEventListener('notification', () => {
-      store.dispatch('notification/incrementUnreadCount');
+    eventSource.addEventListener('notification', (event) => {
+      const newNotification = JSON.parse(event.data);
+      store.dispatch('notification/addNotification', newNotification);
     });
 
     eventSource.onerror = (error) => {

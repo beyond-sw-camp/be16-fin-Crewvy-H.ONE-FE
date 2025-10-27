@@ -24,6 +24,10 @@ const mutations = {
     state.notifications = [];
     state.unreadCount = 0;
   },
+  ADD_NOTIFICATION(state, notification) {
+    state.notifications.unshift(notification);
+    state.unreadCount++;
+  },
 };
 
 const actions = {
@@ -48,6 +52,9 @@ const actions = {
   },
   markAllAsRead({ commit }) {
     commit('MARK_ALL_AS_READ');
+  },
+  addNotification({ commit }, notification) {
+    commit('ADD_NOTIFICATION', notification);
   },
 };
 
