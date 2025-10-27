@@ -114,6 +114,9 @@
           <el-menu-item index="/performance/my-goal">
             <span>내 목표 관리</span>
           </el-menu-item>
+          <el-menu-item index="/performance/review">
+            <span>평가</span>
+          </el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="payroll">
@@ -777,6 +780,7 @@ export default {
         '/admin/leave-management': '관리자 연차 현황',
         '/performance/team-goal': '팀 목표 관리',
         '/performance/my-goal': '내 목표 관리',
+        '/performance/review': '평가 관리',
         '/payroll': '급여 관리',
         '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
@@ -954,9 +958,9 @@ export default {
         const diff = expiry - now
 
         if (diff <= 0) {
-          this.handleSessionExpiry()
+          // this.handleSessionExpiry()
         } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
-          this.showSessionWarning()
+          // this.showSessionWarning()
         }
       }, 1000)
     },

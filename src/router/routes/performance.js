@@ -2,14 +2,35 @@ import MyGoal from "@/views/performance/MyGoal.vue";
 import MyGoalDetail from "@/views/performance/MyGoalDetail.vue";
 import RegisterMyGoal from "@/views/performance/RegisterMyGoal.vue";
 import TeamGoal from "@/views/performance/TeamGoal.vue";
+import RegisterTeamGoal from "@/views/performance/RegisterTeamGoal.vue";
 import TeamGoalDetail from "@/views/performance/TeamGoalDetail.vue";
 import TeamMemberGoalDetail from "@/views/performance/TeamMemberGoalDetail.vue";
+import PerformanceReview from "@/views/performance/PerformanceReview.vue";
+import TeamGoalReviewDetail from "@/views/performance/TeamGoalReviewDetail.vue";
 
 const routes = [
+  {
+    path: '/performance/review',
+    name: 'PerformanceReview',
+    component: PerformanceReview,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/performance/team-goal-review/:id',
+    name: 'TeamGoalReviewDetail',
+    component: TeamGoalReviewDetail,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/performance/team-goal',
     name: 'TeamGoal',
     component: TeamGoal,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/performance/team-goal/create',
+    name: 'RegisterTeamGoal',
+    component: RegisterTeamGoal,
     meta: { requiresAuth: true }
   },
   {
@@ -22,6 +43,12 @@ const routes = [
     path: '/performance/team-goal/:id',
     name: 'TeamGoalDetail',
     component: TeamGoalDetail,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/performance/team-goal/edit/:id',
+    name: 'EditTeamGoal',
+    component: RegisterTeamGoal,
     meta: { requiresAuth: true }
   },
   {

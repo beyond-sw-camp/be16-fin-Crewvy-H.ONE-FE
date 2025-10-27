@@ -27,7 +27,10 @@
                 <span>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</span>
             </el-form-item>
             <el-form-item label="상태">
-                <el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag>
+                <span><el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag></span>
+            </el-form-item>
+            <el-form-item label="반려 사유" v-if="goalDetail.status === '반려'">
+                <p>{{ goalDetail.comment }}</p>
             </el-form-item>
         </el-form>
     </el-card>
@@ -47,7 +50,7 @@
         </div>
     </el-card>
 
-    <el-card class="card-section" v-if="goalDetail.status === 'APPROVED'">
+    <el-card class="card-section" v-if="goalDetail.status !== '반려' && goalDetail.status !== '취소'">
         <template #header>
             <span>증적 자료</span>
         </template>
@@ -72,8 +75,32 @@
 
     <div class="actions-container">
         <el-button @click="goBack">취소</el-button>
-        <el-button type="primary" @click="saveChanges" :disabled="!['REQUESTED', 'APPROVED'].includes(goalDetail.status)">저장</el-button>
+        <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!['요청', '승인', '평가 대기'].includes(goalDetail.status)">저장</el-button>
+        <el-button v-if="isFromReviewPage" type="primary" @click="selfEvaluateDialogVisible = true">본인 평가</el-button>
     </div>
+
+    <el-dialog v-model="selfEvaluateDialogVisible" title="본인 평가" width="500px">
+      <el-form :model="selfEvaluateForm" label-position="top">
+        <el-form-item label="등급">
+          <el-select v-model="selfEvaluateForm.rating" placeholder="등급을 선택하세요">
+            <el-option label="A+" value="A+"></el-option>
+            <el-option label="A" value="A"></el-option>
+            <el-option label="B+" value="B+"></el-option>
+            <el-option label="B" value="B"></el-option>
+            <el-option label="F" value="F"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="평가 코멘트">
+          <el-input v-model="selfEvaluateForm.comment" type="textarea" :rows="4" placeholder="평가 코멘트를 입력해주세요."></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="selfEvaluateDialogVisible = false">취소</el-button>
+          <el-button type="primary" @click="handleSelfEvaluate">평가완료</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -88,7 +115,14 @@ export default {
   },
   data() {
     return {
-      goalDetail: {},
+      goalDetail: {
+        title: '',
+        contents: '',
+        startDate: '',
+        endDate: '',
+        status: '',
+        comment: '', // Initialize comment here
+      },
       fileList: [],
       filesToDelete: [],
       scoringRubric: [
@@ -97,7 +131,14 @@ export default {
         { grade: 'B+', description: '' },
         { grade: 'B', description: '' },
         { grade: 'F', description: '' }
-      ]
+      ],
+      isFromReviewPage: false,
+      selfEvaluateDialogVisible: false,
+      selfEvaluateForm: {
+        rating: '',
+        comment: ''
+      },
+      evaluatingGoalId: null
     };
   },
   methods: {
@@ -120,7 +161,7 @@ export default {
       document.body.removeChild(link);
     },
     goBack() {
-      this.$router.push('/performance/my-goal');
+      this.$router.go(-1);
     },
     async saveChanges() {
       try {
@@ -190,6 +231,7 @@ export default {
     },
     async fetchGoalDetail() {
       const goalId = this.$route.params.goalId;
+      this.evaluatingGoalId = goalId;
       try {
         const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data.data;
@@ -224,15 +266,47 @@ export default {
       }
     },
     getStatusType(status) {
-      if (status === 'APPROVED') return 'success';
-      if (status === 'REJECTED') return 'danger';
-      if (status === 'REQUESTED') return 'warning';
-      if (status === 'CANCELED') return 'info';
+      if (status === '승인') return 'success';
+      if (status === '반려') return 'danger';
+      if (status === '요청') return 'warning';
+      if (status === '취소') return 'info';
+      if (status === '평가 대기') return 'info';
+      if (status === '본인 평가 완료') return 'success';
+      if (status === '최종 평가 완료') return 'success';
       return '';
+    },
+    async handleSelfEvaluate() {
+      if (!this.selfEvaluateForm.rating) {
+        this.$message.warning('등급을 선택해주세요.');
+        return;
+      }
+
+      try {
+        const payload = {
+          goalId: this.$route.params.goalId, 
+          grade: this.selfEvaluateForm.rating,
+          type: 'SELF',
+          comment: this.selfEvaluateForm.comment
+        };
+
+        await apiClient.post('/workforce-service/performance/create-evaluation', payload);
+
+        this.$message.success('본인 평가가 저장되었습니다.');
+        this.selfEvaluateDialogVisible = false;
+        await this.fetchGoalDetail();
+
+      } catch (error) {
+        console.error('Error saving self evaluation:', error);
+        this.$message.error('평가 저장에 실패했습니다.');
+      }
     },
   },
   created() {
+    console.log('MyGoalDetail created. Route params:', this.$route.params);
     this.fetchGoalDetail();
+    if (this.$route.query.from === 'review') {
+      this.isFromReviewPage = true;
+    }
   }
 };
 </script>
