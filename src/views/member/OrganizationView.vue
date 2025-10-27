@@ -48,13 +48,13 @@
         </el-card>
       </el-col>
       <el-col :span="16">
-        <el-card class="employee-list-card">
+        <el-card class="employee-list-card" ref="employeeCardRef">
           <template #header>
             <div class="card-header">
               <span>{{ selectedOrganization ? selectedOrganization.name : '전체 직원' }}</span>
             </div>
           </template>
-          <el-table :data="filteredEmployees" style="width: 100%">
+          <el-table :data="filteredEmployees" :height="tableHeight" style="width: 100%" class="employee-table">
             <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip></el-table-column>
             <el-table-column prop="titleName" label="직책" width="120" show-overflow-tooltip></el-table-column>
             <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip></el-table-column>
@@ -82,9 +82,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
+
+const tableHeight = ref('400px'); // Default height
+const employeeCardRef = ref(null);
+
+const updateTableHeight = async () => {
+  await nextTick(); // Wait for DOM to be updated
+  if (employeeCardRef.value) {
+    const cardElement = employeeCardRef.value.$el;
+    const headerElement = cardElement.querySelector('.el-card__header');
+    const headerHeight = headerElement ? headerElement.offsetHeight : 0;
+    const cardPadding = 40; // el-card__body has 20px padding top/bottom
+    const calculatedHeight = cardElement.clientHeight - headerHeight - cardPadding;
+    tableHeight.value = calculatedHeight > 0 ? `${calculatedHeight}px` : '400px';
+  }
+};
 
 const orgSearch = ref('');
 const orgTree = ref([]);
@@ -287,6 +302,12 @@ const handleNodeCollapse = (data) => {
 onMounted(() => {
   fetchOrganizations();
   fetchAllEmployees();
+  updateTableHeight();
+  window.addEventListener('resize', updateTableHeight);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateTableHeight);
 });
 </script>
 

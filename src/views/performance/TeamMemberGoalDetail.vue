@@ -54,10 +54,43 @@
         </el-card>
     </div>
 
+    <el-divider v-if="isReviewMode"></el-divider>
+
+    <div class="evaluation-result-section" v-if="isReviewMode">
+      <h2>평가 결과</h2>
+      <el-card class="evaluation-card">
+        <h3>본인 평가</h3>
+        <div class="detail-item">
+          <label>평가 등급</label>
+          <p>{{ goalDetail.selfEvaluation.grade || 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>평가 코멘트</label>
+          <p>{{ goalDetail.selfEvaluation.comment || 'N/A' }}</p>
+        </div>
+      </el-card>
+
+      <el-card class="evaluation-card">
+        <h3>관리자 평가</h3>
+        <div class="detail-item">
+          <label>평가 등급</label>
+          <p>{{ goalDetail.managerEvaluation.grade || 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>평가 코멘트</label>
+          <p>{{ goalDetail.managerEvaluation.comment || 'N/A' }}</p>
+        </div>
+      </el-card>
+    </div>
+
     <div class="actions-container">
-        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== 'REQUESTED'">승인</el-button>
-        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== 'REQUESTED'">반려</el-button>
-        <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== 'APPROVED'">평가</el-button>
+      <template v-if="isReviewMode">
+        <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== '본인 평가 완료' || goalDetail.managerEvaluation.grade !== ''">관리자 평가</el-button>
+      </template>
+      <template v-else>
+        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== '요청' || !isManagerForGoal">승인</el-button>
+        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== '요청' || !isManagerForGoal">반려</el-button>
+      </template>
     </div>
 
     <el-dialog v-model="rejectDialogVisible" title="목표 반려" width="500px">
@@ -115,7 +148,10 @@ export default {
         contents: '',
         startDate: '',
         endDate: '',
-        status: ''
+        status: '',
+        teamGoalMemberPositionId: null, // Added this
+        selfEvaluation: { grade: '', comment: '' }, // Initialize here
+        managerEvaluation: { grade: '', comment: '' } // Initialize here
       },
       fileList: [],
       rejectDialogVisible: false,
@@ -133,18 +169,54 @@ export default {
         { grade: 'B+', description: '' },
         { grade: 'B', description: '' },
         { grade: 'F', description: '' }
-      ]
+      ],
+      myMemberPositionId: null,
+      isReviewMode: false, // New property
     };
+  },
+  computed: {
+    isManagerForGoal() {
+      return this.myMemberPositionId === this.goalDetail.teamGoalMemberPositionId;
+    },
   },
   methods: {
     goBack() {
       this.$router.go(-1);
     },
     async fetchGoalDetail() {
-      const goalId = this.$route.params.memberGoalId;
+      const memberGoalId = this.$route.params.memberGoalId;
       try {
-        const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
-        this.goalDetail = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${memberGoalId}`);
+        this.goalDetail = response.data.data || {}; // Ensure it's an object
+
+        // Initialize selfEvaluation and managerEvaluation if they don't exist in the fetched data
+        if (!this.goalDetail.selfEvaluation) {
+          this.goalDetail.selfEvaluation = { grade: '', comment: '' };
+        }
+        if (!this.goalDetail.managerEvaluation) {
+          this.goalDetail.managerEvaluation = { grade: '', comment: '' };
+        }
+
+        // Fetch evaluation results if in review mode
+        if (this.isReviewMode) {
+          try {
+            const evaluationResponse = await apiClient.get(`/workforce-service/performance/find-evaluation/${memberGoalId}`);
+            if (evaluationResponse.data && evaluationResponse.data.data) {
+              evaluationResponse.data.data.forEach(evaluation => {
+                if (evaluation.type === 'SELF') {
+                  this.goalDetail.selfEvaluation.grade = evaluation.grade;
+                  this.goalDetail.selfEvaluation.comment = evaluation.comment;
+                } else if (evaluation.type === 'SUPERVISOR') {
+                  this.goalDetail.managerEvaluation.grade = evaluation.grade;
+                  this.goalDetail.managerEvaluation.comment = evaluation.comment;
+                }
+              });
+            }
+          } catch (evalError) {
+            console.error('Error fetching evaluation results:', evalError);
+            // Optionally, display a message to the user
+          }
+        }
 
         if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
           this.fileList = response.data.data.evidenceList.map(evidence => {
@@ -175,10 +247,13 @@ export default {
       }
     },
     getStatusType(status) {
-      if (status === 'APPROVED') return 'success';
-      if (status === 'REJECTED') return 'danger';
-      if (status === 'REQUESTED') return 'warning';
-      if (status === 'CANCELED') return 'info';
+      if (status === '승인') return 'success';
+      if (status === '반려') return 'danger';
+      if (status === '요청') return 'warning';
+      if (status === '취소') return 'info';
+      if (status === '평가 대기') return 'info';
+      if (status === '본인 평가 완료') return 'success';
+      if (status === '최종 평가 완료') return 'success';
       return '';
     },
     handleFilePreview(file) {
@@ -250,14 +325,17 @@ export default {
 
       try {
         const params = {
-          goalId: this.goalDetail.goalId,
+          goalId: this.$route.params.memberGoalId,
           type: 'SUPERVISOR'
         };
         const response = await apiClient.get('/workforce-service/performance/find-evaluation', { params });
 
-        if (response.data.data) {
-          this.evaluateForm.rating = response.data.data.grade;
-          this.evaluateForm.comment = response.data.data.comment;
+        if (response.data && response.data.data) {
+          const supervisorEvaluation = response.data.data.find(evalItem => evalItem.type === 'SUPERVISOR');
+          if (supervisorEvaluation) {
+            this.evaluateForm.rating = supervisorEvaluation.grade;
+            this.evaluateForm.comment = supervisorEvaluation.comment;
+          }
         }
 
       } catch (error) {
@@ -276,13 +354,13 @@ export default {
 
       try {
         const payload = {
-          goalId: this.goalDetail.goalId,
+          goalId: this.$route.params.memberGoalId,
           grade: this.evaluateForm.rating,
           type: 'SUPERVISOR',
           comment: this.evaluateForm.comment
         };
 
-        await apiClient.post('/workforce-service/performance/create-evaluation', null, { params: payload });
+        await apiClient.post('/workforce-service/performance/create-evaluation', payload);
 
         this.evaluateDialogVisible = false;
         this.$message.success('평가가 저장되었습니다.');
@@ -295,6 +373,8 @@ export default {
     },
   },
   created() {
+    this.myMemberPositionId = localStorage.getItem('memberPositionId'); // Added this
+    this.isReviewMode = this.$route.query.mode === 'review'; // Set based on query param
     this.fetchGoalDetail();
   },
 };
@@ -392,5 +472,19 @@ export default {
   display: flex;
   align-items: center;
   word-break: break-word;
+}
+
+.evaluation-card {
+  margin-bottom: 16px;
+}
+.evaluation-card:last-child {
+  margin-bottom: 0;
+}
+
+.evaluation-card {
+  margin-bottom: 16px;
+}
+.evaluation-card:last-child {
+  margin-bottom: 0;
 }
 </style>

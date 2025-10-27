@@ -44,6 +44,10 @@ const searchEmployeesByOrganizationId = (organizationId) => {
   return apiClient.get(`/search-service/search/employees/organization?organizationId=${organizationId}`);
 };
 
+const hardDeleteMemberPosition = (memberPositionId) => {
+  return apiClient.delete(`/member-service/member/position/${memberPositionId}/delete`);
+};
+
 export default {
   getAllEmployees,
   searchEmployees,
@@ -53,4 +57,5 @@ export default {
   deleteEmployee,
   restoreEmployee,
   searchEmployeesByOrganizationId,
+  hardDeleteMemberPosition,
 };

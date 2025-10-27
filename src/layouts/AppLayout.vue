@@ -114,6 +114,9 @@
           <el-menu-item index="/performance/my-goal">
             <span>내 목표 관리</span>
           </el-menu-item>
+          <el-menu-item index="/performance/review">
+            <span>평가</span>
+          </el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="payroll">
@@ -233,38 +236,7 @@
           </el-button>
 
           <!-- 알림 -->
-          <el-popover placement="bottom-end" :width="320" trigger="click">
-            <template #reference>
-              <el-badge :value="notifications.length" class="notification-badge">
-                <el-button type="text" class="notification-btn">
-                  <el-icon>
-                    <Bell />
-                  </el-icon>
-                </el-button>
-              </el-badge>
-            </template>
-
-            <div class="notification-panel">
-              <div class="notification-header">
-                <h3>알림</h3>
-                <el-button type="text" size="small">모두 읽음</el-button>
-              </div>
-              <div class="notification-list">
-                <div v-for="notification in notifications" :key="notification.id" class="notification-item">
-                  <div class="notification-content">
-                    <div class="notification-title">{{ notification.title }}</div>
-                    <div class="notification-message">{{ notification.message }}</div>
-                    <div class="notification-time">{{ notification.time }}</div>
-                  </div>
-                  <el-button type="text" size="small" @click="removeNotification(notification.id)">
-                    <el-icon>
-                      <Close />
-                    </el-icon>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </el-popover>
+          <notification-bell />
 
           <!-- 사용자 메뉴 -->
           <el-dropdown @command="handleUserCommand">
@@ -278,6 +250,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="my-info">내 정보</el-dropdown-item>
+                <el-dropdown-item command="notification-settings">알림 설정</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>로그아웃</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -306,7 +279,7 @@
                     <div class="custom-tree-node-modal">
                       <span>{{ node.label }}</span>
                       <span v-if="data.members && data.members.length > 0" class="member-count">{{ data.members.length
-                        }}명</span>
+                      }}명</span>
                     </div>
                   </template>
                 </el-tree>
@@ -465,21 +438,36 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
+import { useSnackbar } from '@/composables/useSnackbar';
+import SnackbarContainer from '../components/SnackbarContainer.vue';
 
-import { useSnackbar } from '@/composables/useSnackbar'
-import SnackbarContainer from '../components/SnackbarContainer.vue'
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import employeeService from '@/api/employeeService';
 
 import organizationService from '@/api/organizationService';
+import { onMounted, onBeforeUnmount } from 'vue';
+import { useSse } from '@/composables/useSse.js';
+import NotificationBell from '@/components/NotificationBell.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer },
+  components: { SnackbarContainer, NotificationBell },
   setup() {
-    const { success, error, warning, info } = useSnackbar()
-    return { success, error, warning, info }
+    const { success, error, warning, info } = useSnackbar();
+    const { connect, disconnect } = useSse();
+    const store = useStore();
+
+    onMounted(() => {
+      store.dispatch('notification/fetchNotifications');
+      connect();
+    });
+
+    onBeforeUnmount(() => {
+      disconnect();
+    });
+
+    return { success, error, warning, info };
   },
   data() {
     return {
@@ -669,7 +657,8 @@ export default {
     userAvatarUrl() {
       return this.user?.avatar || this.defaultAvatarSvg;
     },
-    ...mapState(['user', 'notifications']),
+    ...mapState(['user']),
+    ...mapGetters(['userName', 'memberId']),
     activeMenuIndex() {
       const path = this.$route.path
       if (path.startsWith('/payroll')) {
@@ -767,6 +756,7 @@ export default {
         '/admin/leave-management': '관리자 연차 현황',
         '/performance/team-goal': '팀 목표 관리',
         '/performance/my-goal': '내 목표 관리',
+        '/performance/review': '평가 관리',
         '/payroll': '급여 관리',
         '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
@@ -789,6 +779,9 @@ export default {
       switch (command) {
         case 'my-info':
           this.$router.push('/my-info');
+          break;
+        case 'notification-settings':
+          this.$router.push('/my-info/notification-settings');
           break;
         case 'logout':
           localStorage.removeItem('accessToken');
@@ -895,7 +888,7 @@ export default {
 
       // Ensure orgTreeData is fetched
       if (this.orgTreeData.length === 0) {
-this.fetchOrganizationTree();
+        this.fetchOrganizationTree();
         this.fetchAllEmployees();
       }
     },
@@ -993,9 +986,9 @@ this.fetchOrganizationTree();
         const diff = expiry - now
 
         if (diff <= 0) {
-          this.handleSessionExpiry()
+          // this.handleSessionExpiry()
         } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
-          this.showSessionWarning()
+          // this.showSessionWarning()
         }
       }, 1000)
     },
