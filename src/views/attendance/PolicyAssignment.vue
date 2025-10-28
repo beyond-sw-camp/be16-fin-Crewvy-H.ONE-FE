@@ -112,426 +112,450 @@
                           <p class="section-description">현재 회사의 모든 정책 할당 내역을 확인할 수 있습니다.</p>
                         </div>
                   
-                        <!-- 할당 목록 테이블 -->
-                        <el-table
-                          :data="processedAssignments"
-                          @selection-change="handleSelectionChange"
-                          v-loading="isLoading"
-                          border
-                          stripe
-                          style="width: 100%; margin-top: 20px;"
-                          empty-text="할당된 정책이 없습니다."
-                        >
-                          <el-table-column type="selection" width="55" align="center" />
-                          <el-table-column type="index" label="No" width="60" align="center"></el-table-column>
-                          <el-table-column 
-                            prop="policyName" 
-                            label="정책 이름" 
-                            :filters="policyNameFilters"
-                            :filter-method="filterHandler"
-                          ></el-table-column>
-                          <el-table-column 
-                            prop="targetName" 
-                            label="할당 대상" 
-                            :filters="targetNameFilters"
-                            :filter-method="filterHandler"
-                          >
-                          </el-table-column>
-                          <el-table-column 
-                            prop="targetAffiliation" 
-                            label="소속" 
-                            :filters="affiliationFilters"
-                            :filter-method="filterHandler"
-                          >
-                          </el-table-column>
-                          <el-table-column 
-                            prop="scope" 
-                            label="대상 유형" 
-                            width="120" 
-                            align="center"
-                            :filters="scopeTypeFilters"
-                            :filter-method="filterHandler"
-                          >
-                            <template #default="{ row }">
-                              <el-tag v-if="row.scope === 'COMPANY'" type="danger" effect="dark">회사</el-tag>
-                              <el-tag v-else-if="row.scope === 'ORGANIZATION'" type="warning" effect="dark">조직</el-tag>
-                              <el-tag v-else type="info" effect="dark">개인</el-tag>
-                            </template>
-                          </el-table-column>
-                          <el-table-column prop="isActive" label="상태" width="100" align="center">
-                            <template #default="{ row }">
-                              <el-tag :type="row.isActive ? 'success' : 'info'" effect="dark">{{ row.isActive ? '활성' : '해지됨' }}</el-tag>
-                            </template>
-                          </el-table-column>
-                          <el-table-column prop="assignedAt" label="할당일시" width="180">
-                            <template #default="{ row }">
-                              {{ new Date(row.assignedAt).toLocaleString() }}
-                            </template>
-                          </el-table-column>
-                          <el-table-column label="작업" width="180" align="center" fixed="right">
-                            <template #default="{ row }">
-                              <el-button
-                                v-if="!row.isActive"
-                                type="success"
-                                size="small"
-                                @click="handleReactivate(row.policyAssignmentId)"
-                              >재활성</el-button>
-                              <el-button
-                                v-if="row.isActive"
-                                type="warning"
-                                size="small"
-                                @click="handleRevoke(row.policyAssignmentId)"
-                              >해지</el-button>
-                              <el-button
-                                type="danger"
-                                size="small"
-                                @click="handleDelete(row.policyAssignmentId)"
-                              >삭제</el-button>
-                            </template>
-                          </el-table-column>
-                        </el-table>
-                      </el-card>
-                    </div>
-                  </template>
-                  
-                  <script>
-                                    import { ref, onMounted, watch, computed, nextTick } from 'vue';
-                                    import { useSnackbar } from '@/composables/useSnackbar';
-                                    import { getPolicies, createAssignment, getPolicyAssignments, deleteAssignment, deleteAssignments, revokeAssignments, reactivateAssignments } from '@/api/attendance';
-                                    import organizationService from '@/api/organizationService';
-                                    import { ElMessageBox } from 'element-plus';
-                                    import { OfficeBuilding, User, Check, Refresh, School, Pointer } from '@element-plus/icons-vue';
-                  
-                                    export default {
-                                      name: 'PolicyAssignment',
-                                      components: {
-                                        OfficeBuilding, User, Check, Refresh, School, Pointer
-                                      },
-                                      setup() {
-                                        const { success, error } = useSnackbar();
-                  
-                                        const policies = ref([]);
-                                        const assignments = ref([]);
-                                        const selectedAssignments = ref([]);
-                                        const isLoading = ref(false);
-                                        const isAssigning = ref(false);
-                  
-                                        const treeRef = ref(null);
-                                        const filterText = ref('');
-                                        const organizationTree = ref([]);
-                  
-                                        const form = ref({ policyId: null });
-                  
-                                        const nodeMap = computed(() => {
-                                          const map = new Map();
-                                          const traverse = (nodes, parent) => {
-                                            nodes.forEach(node => {
-                                              map.set(node.id, { ...node, parent });
-                                              if (node.children) {
-                                                traverse(node.children, node);
-                                              }
-                                            });
-                                          };
-                                          traverse(organizationTree.value, null);
-                                          return map;
-                                        });
-                  
-                                              const processedAssignments = computed(() => {
-                                                if (!assignments.value) return []; // 방어 코드
-                                                if (assignments.value.length === 0 || nodeMap.value.size === 0) {
-                                                  return assignments.value;
-                                                }
-                                                return assignments.value.map(assignment => {
-                                                  const node = nodeMap.value.get(assignment.targetId);
-                                                  let targetName = '정보 없음';
-                                                  let targetAffiliation = '-';
-                  
-                                                  if (node) {
-                                                    targetName = node.mainLabel;
-                                                    if (node.parent) {
-                                                      targetAffiliation = node.parent.mainLabel;
-                                                    }
-                                                  }
-                  
-                                                  return {
-                                                    ...assignment,
-                                                    targetName,
-                                                    targetAffiliation,
-                                                  };
-                                                });
-                                              });
-                  
-                                              const checkedSummary = computed(() => {
-                                                if (!treeRef.value) return { organizations: 0, members: 0, total: 0 };
-                                                const checkedNodes = treeRef.value.getCheckedNodes();
-                                                const organizations = checkedNodes.filter(node => node.type !== 'member').length;
-                                                const members = checkedNodes.filter(node => node.type === 'member').length;
-                                                return { organizations, members, total: organizations + members };
-                                              });
-                  
-                                              const filterHandler = (value, row, column) => {
-                                                const property = column['property'];
-                                                return row[property] === value;
-                                              };
-                  
-                                              const scopeTypeFilters = [
-                                                { text: '회사', value: 'COMPANY' },
-                                                { text: '조직', value: 'ORGANIZATION' },
-                                                { text: '개인', value: 'MEMBER' },
-                                              ];
-                  
-                                              const policyNameFilters = computed(() => {
-                                                if (!processedAssignments.value) return []; // 방어 코드
-                                                const names = new Set(processedAssignments.value.map(item => item.policyName));
-                                                return Array.from(names).map(name => ({ text: name, value: name }));
-                                              });
-                  
-                                              const targetNameFilters = computed(() => {
-                                                if (!processedAssignments.value) return []; // 방어 코드
-                                                const names = new Set(processedAssignments.value.map(item => item.targetName).filter(Boolean));
-                                                return Array.from(names).map(name => ({ text: name, value: name }));
-                                              });
-                  
-                                              const affiliationFilters = computed(() => {
-                                                if (!processedAssignments.value) return []; // 방어 코드
-                                                const names = new Set(processedAssignments.value.map(item => item.targetAffiliation).filter(Boolean));
-                                                return Array.from(names).map(name => ({ text: name, value: name }));
-                                              });                  
-                                        const fetchOrganizationTree = async () => {
-                                          try {
-                                            const response = await organizationService.getOrganizationTreeWithMembers();
-                                            const rawTreeData = response.data?.data || response.data || [];
-                                            const transformDataForTree = (nodes) => {
-                                              return nodes.map(node => {
-                                                const newNode = {
-                                                  id: node.id,
-                                                  mainLabel: node.label,
-                                                  subLabel: null,
-                                                  type: node.type,
-                                                  children: node.children ? transformDataForTree(node.children) : []
-                                                };
-                                                if (node.members && node.members.length > 0) {
-                                                  const memberNodes = node.members.map(member => ({
-                                                    id: member.id,
-                                                    mainLabel: member.name,
-                                                    subLabel: `(${member.position} / ${member.email})`,
-                                                    type: 'member'
-                                                  }));
-                                                  newNode.children = [...newNode.children, ...memberNodes];
-                                                }
-                                                return newNode;
-                                              });
-                                            };
-                                            organizationTree.value = transformDataForTree(Array.isArray(rawTreeData) ? rawTreeData : [rawTreeData]);
-                                          } catch (err) {
-                                            error(err.message || '조직도 데이터를 불러오는 데 실패했습니다.');
-                                          }
-                                        };
-                  
-                                        watch(filterText, (val) => {
-                                          if (treeRef.value) {
-                                            treeRef.value.filter(val);
-                                          }
-                                        });
-                  
-                                        const filterNode = (value, data) => {
-                                          if (!value) return true;
-                                          return data.mainLabel.toLowerCase().includes(value.toLowerCase());
-                                        };
-                  
-                                        const fetchPolicies = async () => {
-                                          try {
-                                            const response = await getPolicies({ page: 0, size: 100 });
-                                            policies.value = response.content || [];
-                                          } catch (err) {
-                                            error(err.message || '정책 목록을 불러오는 데 실패했습니다.');
-                                          }
-                                        };
-                  
-                                        const fetchAllAssignments = async () => {
-                                          isLoading.value = true;
-                                          try {
-                                            assignments.value = await getPolicyAssignments() || [];
-                                          } catch (err) {
-                                            assignments.value = [];
-                                            error(err.response?.data?.message || '할당 목록 조회에 실패했습니다.');
-                                          } finally {
-                                            // 렌더링이 완료된 후 로딩 상태를 해제하여 경쟁 상태 방지
-                                            await nextTick();
-                                            isLoading.value = false;
-                                          }
-                                        };                  
-                      const handleAssign = async () => {
-                        if (!form.value.policyId || checkedSummary.value.total === 0) {
-                          error('정책과 할당 대상을 모두 선택하세요.');
-                          return;
-                        }
-                        isAssigning.value = true;
-                        try {
-                          const checkedNodes = treeRef.value.getCheckedNodes();
-                          const assignmentsPayload = checkedNodes.map(node => {
-                            let scopeType;
-                            if (node.type === 'member') {
-                              scopeType = 'MEMBER';
-                            } else if (node.type === 'company') {
-                              scopeType = 'COMPANY';
-                            } else {
-                              scopeType = 'ORGANIZATION';
-                            }
-                            return {
-                              policyId: form.value.policyId,
-                              targetId: node.id,
-                              scopeType: scopeType
+      <!-- 할당 목록 테이블 -->
+      <el-table
+        :data="processedAssignments"
+        @selection-change="handleSelectionChange"
+        v-loading="isLoading"
+        border
+        stripe
+        style="width: 100%; margin-top: 20px;"
+        empty-text="할당된 정책이 없습니다."
+      >
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column 
+          prop="policyName" 
+          label="정책 이름" 
+          width="200"
+          :filters="policyNameFilters"
+          :filter-method="filterHandler"
+        ></el-table-column>
+        <el-table-column 
+          prop="scopeType" 
+          label="할당 유형" 
+          width="120"
+          :filters="scopeTypeFilters"
+          :filter-method="filterHandler"
+        >
+          <template #default="{ row }">
+            <el-tag :type="row.scopeType === 'COMPANY' ? 'danger' : row.scopeType === 'ORGANIZATION' ? 'warning' : 'success'">
+              {{ row.scopeType === 'COMPANY' ? '회사' : row.scopeType === 'ORGANIZATION' ? '조직' : '개인' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column 
+          prop="targetName" 
+          label="할당 대상" 
+          width="150"
+          :filters="targetNameFilters"
+          :filter-method="filterHandler"
+        ></el-table-column>
+        <el-table-column 
+          prop="targetAffiliation" 
+          label="소속" 
+          width="150"
+          :filters="affiliationFilters"
+          :filter-method="filterHandler"
+        ></el-table-column>
+        <el-table-column 
+          prop="isActive" 
+          label="상태" 
+          width="100"
+        >
+          <template #default="{ row }">
+            <el-tag :type="row.isActive ? 'success' : 'info'">
+              {{ row.isActive ? '활성' : '비활성' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column 
+          prop="assignedAt" 
+          label="할당일" 
+          width="180" 
+          sortable
+        >
+          <template #default="{ row }">
+            {{ new Date(row.assignedAt).toLocaleString('ko-KR') }}
+          </template>
+        </el-table-column>
+        <el-table-column label="작업" width="250" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.isActive" size="small" type="warning" @click="handleRevoke(row.policyAssignmentId)">해지</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row.policyAssignmentId)">삭제</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 페이지네이션 -->
+      <div class="pagination-container">
+        <el-pagination
+          background
+          layout="prev, pager, next, total"
+          :total="pagination.totalElements"
+          :page-size="pagination.size"
+          :current-page="pagination.page + 1"
+          @current-change="handlePageChange"
+        />
+      </div>
+                                              </el-card>
+                                            </div>
+                                          </template>
+                        
+                                          <script>
+                                          import { ref, onMounted, watch, computed } from 'vue';
+                                          import { useSnackbar } from '@/composables/useSnackbar';                                    import { getPolicies, createAssignment, getPolicyAssignments, deleteAssignment, deleteAssignments, revokeAssignments, reactivateAssignments } from '@/api/attendance';
+                                                            import organizationService from '@/api/organizationService';
+                                                            import { ElMessageBox } from 'element-plus';
+                                                            import { OfficeBuilding, User, Check, Refresh, School, Pointer } from '@element-plus/icons-vue';
+                                          
+                                                            export default {
+                                                              name: 'PolicyAssignment',
+                                                              components: {
+                                                                OfficeBuilding, User, Check, Refresh, School, Pointer
+                                                              },
+                                                              setup() {
+                                                                const { success, error } = useSnackbar();
+                                          
+                                                                const policies = ref([]);
+                                                                const assignments = ref([]);
+                                                                const selectedAssignments = ref([]);
+                                                                const pagination = ref({
+                                                                  page: 0,
+                                                                  size: 10,
+                                                                  totalElements: 0,
+                                                                });
+                                                                const isLoading = ref(false);
+                                                                const isAssigning = ref(false);
+                                          
+                                                                const treeRef = ref(null);
+                                                                const filterText = ref('');
+                                                                const organizationTree = ref([]);
+                                          
+                                                                const form = ref({ policyId: null });
+                                          
+                                                                const nodeMap = computed(() => {
+                                                                  const map = new Map();
+                                                                  const traverse = (nodes, parent) => {
+                                                                    nodes.forEach(node => {
+                                                                      map.set(node.id, { ...node, parent });
+                                                                      if (node.children) {
+                                                                        traverse(node.children, node);
+                                                                      }
+                                                                    });
+                                                                  };
+                                                                  traverse(organizationTree.value, null);
+                                                                  return map;
+                                                                });
+                                          
+                                                                      const processedAssignments = computed(() => {
+                                                                        if (!assignments.value) return []; // 방어 코드
+                                                                        if (assignments.value.length === 0 || nodeMap.value.size === 0) {
+                                                                          return assignments.value;
+                                                                        }
+                                                                        return assignments.value.map(assignment => {
+                                                                          const node = nodeMap.value.get(assignment.targetId);
+                                                                          let targetName = '정보 없음';
+                                                                          let targetAffiliation = '-';
+                                          
+                                                                          if (node) {
+                                                                            targetName = node.mainLabel;
+                                                                            if (node.parent) {
+                                                                              targetAffiliation = node.parent.mainLabel;
+                                                                            }
+                                                                          }
+                                          
+                                                                          return {
+                                                                            ...assignment,
+                                                                            targetName,
+                                                                            targetAffiliation,
+                                                                          };
+                                                                        });
+                                                                      });
+                                          
+                                                                      const checkedSummary = computed(() => {
+                                                                        if (!treeRef.value) return { organizations: 0, members: 0, total: 0 };
+                                                                        const checkedNodes = treeRef.value.getCheckedNodes();
+                                                                        const organizations = checkedNodes.filter(node => node.type !== 'member').length;
+                                                                        const members = checkedNodes.filter(node => node.type === 'member').length;
+                                                                        return { organizations, members, total: organizations + members };
+                                                                      });
+                                          
+                                                                      const filterHandler = (value, row, column) => {
+                                                                        const property = column['property'];
+                                                                        return row[property] === value;
+                                                                      };
+                                          
+                                                                      const scopeTypeFilters = [
+                                                                        { text: '회사', value: 'COMPANY' },
+                                                                        { text: '조직', value: 'ORGANIZATION' },
+                                                                        { text: '개인', value: 'MEMBER' },
+                                                                      ];
+                                          
+                                                                      const policyNameFilters = computed(() => {
+                                                                        if (!processedAssignments.value) return []; // 방어 코드
+                                                                        const names = new Set(processedAssignments.value.map(item => item.policyName));
+                                                                        return Array.from(names).map(name => ({ text: name, value: name }));
+                                                                      });
+                                          
+                                                                      const targetNameFilters = computed(() => {
+                                                                        if (!processedAssignments.value) return []; // 방어 코드
+                                                                        const names = new Set(processedAssignments.value.map(item => item.targetName).filter(Boolean));
+                                                                        return Array.from(names).map(name => ({ text: name, value: name }));
+                                                                      });
+                                          
+                                                                      const affiliationFilters = computed(() => {
+                                                                        if (!processedAssignments.value) return []; // 방어 코드
+                                                                        const names = new Set(processedAssignments.value.map(item => item.targetAffiliation).filter(Boolean));
+                                                                        return Array.from(names).map(name => ({ text: name, value: name }));
+                                                                      });                  
+                                                                const fetchOrganizationTree = async () => {
+                                                                  try {
+                                                                    const response = await organizationService.getOrganizationTreeWithMembers();
+                                                                    const rawTreeData = response.data?.data || response.data || [];
+                                                                    const transformDataForTree = (nodes) => {
+                                                                      return nodes.map(node => {
+                                                                        const newNode = {
+                                                                          id: node.id,
+                                                                          mainLabel: node.label,
+                                                                          subLabel: null,
+                                                                          type: node.type,
+                                                                          children: node.children ? transformDataForTree(node.children) : []
+                                                                        };
+                                                                        if (node.members && node.members.length > 0) {
+                                                                          const memberNodes = node.members.map(member => ({
+                                                                            id: member.id,
+                                                                            mainLabel: member.name,
+                                                                            subLabel: `(${member.position} / ${member.email})`,
+                                                                            type: 'member'
+                                                                          }));
+                                                                          newNode.children = [...newNode.children, ...memberNodes];
+                                                                        }
+                                                                        return newNode;
+                                                                      });
+                                                                    };
+                                                                    organizationTree.value = transformDataForTree(Array.isArray(rawTreeData) ? rawTreeData : [rawTreeData]);
+                                                                  } catch (err) {
+                                                                    error(err.message || '조직도 데이터를 불러오는 데 실패했습니다.');
+                                                                  }
+                                                                };
+                                          
+                                                                watch(filterText, (val) => {
+                                                                  if (treeRef.value) {
+                                                                    treeRef.value.filter(val);
+                                                                  }
+                                                                });
+                                          
+                                                                const filterNode = (value, data) => {
+                                                                  if (!value) return true;
+                                                                  return data.mainLabel.toLowerCase().includes(value.toLowerCase());
+                                                                };
+                                          
+                                                                const fetchPolicies = async () => {
+                                                                  try {
+                                                                    const response = await getPolicies({ page: 0, size: 100 });
+                                                                    policies.value = response.content || [];
+                                                                  } catch (err) {
+                                                                    error(err.message || '정책 목록을 불러오는 데 실패했습니다.');
+                                                                  }
+                                                                };
+                                          
+                                const fetchAllAssignments = async () => {
+                                  isLoading.value = true;
+                                  try {
+                                    const params = {
+                                      page: pagination.value.page,
+                                      size: pagination.value.size,
+                                      sort: 'assignedAt,desc'
+                                    };
+                                    const response = await getPolicyAssignments(params);
+                                    assignments.value = response.content || [];
+                                    // totalElements가 항상 유효한 숫자가 되도록 보장
+                                    pagination.value.totalElements = Number(response.totalElements) || 0;
+                                  } catch (err) {
+                                    assignments.value = [];
+                                    pagination.value.totalElements = 0; // 오류 발생 시 초기화
+                                    error(err.message || '할당 목록 조회에 실패했습니다.');
+                                  } finally {
+                                    isLoading.value = false;
+                                  }
+                                };                        
+                            const handlePageChange = (newPage) => {
+                              pagination.value.page = newPage - 1;
+                              fetchAllAssignments();
                             };
-                          });
-                          const requestData = { assignments: assignmentsPayload };
-                          await createAssignment(requestData);
-                          success(`${checkedSummary.value.total}개 대상에게 정책이 성공적으로 할당되었습니다.`);
-                          fetchAllAssignments();
-                          resetForm();
-                        } catch (err) {
-                          error(err.response?.data?.message || '정책 할당에 실패했습니다.');
-                        } finally {
-                          isAssigning.value = false;
-                        }
-                      };
-                  
-                      const handleDelete = async (assignmentId) => {
-                        try {
-                          await ElMessageBox.confirm('이 할당을 영구적으로 삭제하시겠습니까?', '영구 삭제 경고', { type: 'error' });
-                          await deleteAssignment(assignmentId);
-                          success('정책 할당이 영구적으로 삭제되었습니다.');
-                          fetchAllAssignments();
-                        } catch (err) {
-                          if (err !== 'cancel') {
-                            error(err.message || '삭제에 실패했습니다.');
-                          }
-                        }
-                      };
-                      
-                      const handleBulkDelete = async () => {
-                        if (selectedAssignments.value.length === 0) {
-                          error('삭제할 항목을 선택하세요.');
-                          return;
-                        }
-                        try {
-                          await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 영구적으로 삭제하시겠습니까?`, '일괄 삭제 확인', { type: 'error' });
-                          const idsToDelete = selectedAssignments.value.map(item => item.policyAssignmentId);
-                          await deleteAssignments(idsToDelete);
-                          success('선택된 정책 할당이 삭제되었습니다.');
-                          fetchAllAssignments();
-                        } catch (err) {
-                          if (err !== 'cancel') {
-                            error(err.message || '일괄 삭제에 실패했습니다.');
-                          }
-                        }
-                      };
-                  
-                      const handleRevoke = async (assignmentId) => {
-                        try {
-                          await ElMessageBox.confirm('이 정책 할당을 해지(비활성화)하시겠습니까?', '해지 확인', { type: 'warning' });
-                          await revokeAssignments([assignmentId]); // 일괄 API 재사용
-                          success('정책 할당이 해지되었습니다.');
-                          fetchAllAssignments();
-                        } catch (err) {
-                          if (err !== 'cancel') {
-                            error(err.message || '해지에 실패했습니다.');
-                          }
-                        }
-                      };
-                  
-                      const handleBulkRevoke = async () => {
-                        if (selectedAssignments.value.length === 0) {
-                          error('해지할 항목을 선택하세요.');
-                          return;
-                        }
-                        try {
-                          await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 해지하시겠습니까?`, '일괄 해지 확인', { type: 'warning' });
-                          const idsToRevoke = selectedAssignments.value.map(item => item.policyAssignmentId);
-                          await revokeAssignments(idsToRevoke);
-                          success('선택된 정책 할당이 해지되었습니다.');
-                          fetchAllAssignments();
-                        } catch (err) {
-                          if (err !== 'cancel') {
-                            error(err.message || '일괄 해지에 실패했습니다.');
-                          }
-                        }
-                      };
-                  
-                      const handleBulkReactivate = async () => {
-                        if (selectedAssignments.value.length === 0) {
-                          error('재활성화할 항목을 선택하세요.');
-                          return;
-                        }
-                        try {
-                          await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 재활성화하시겠습니까?`, '일괄 재활성 확인', { type: 'success' });
-                          const idsToReactivate = selectedAssignments.value.map(item => item.policyAssignmentId);
-                          await reactivateAssignments(idsToReactivate);
-                          success('선택된 정책 할당이 재활성화되었습니다.');
-                          fetchAllAssignments();
-                        } catch (err) {
-                          if (err !== 'cancel') {
-                            error(err.message || '일괄 재활성에 실패했습니다.');
-                          }
-                        }
-                      };
-                  
-                      const handleNodeCheck = (data) => {
-                        const node = treeRef.value.getNode(data.id);
-                        if (node && node.childNodes.length > 0) { // 자식이 있는 노드만 토글
-                          node.expanded = !node.expanded;
-                        }
-                      };
-                  
-                      const handleSelectionChange = (selection) => {
-                        selectedAssignments.value = selection;
-                      };
-                  
-                      const resetForm = () => {
-                        form.value.policyId = null;
-                        if (treeRef.value) {
-                          treeRef.value.setCheckedKeys([]);
-                        }
-                      };
-                  
-                      onMounted(() => {
-                        fetchPolicies();
-                        fetchOrganizationTree();
-                        fetchAllAssignments();
-                      });
-                  
-                      return {
-                        policies,
-                        assignments,
-                        processedAssignments,
-                        isLoading,
-                        isAssigning,
-                        treeRef,
-                        filterText,
-                        organizationTree,
-                        form,
-                        checkedSummary,
-                        selectedAssignments,
-                        handleAssign,
-                        fetchAllAssignments,
-                        handleDelete,
-                        handleBulkDelete,
-                        handleRevoke,
-                        handleBulkRevoke,
-                        handleBulkReactivate,
-                        handleSelectionChange,
-                        resetForm,
-                        filterNode,
-                        filterHandler,
-                        scopeTypeFilters,
-                        policyNameFilters,
-                        targetNameFilters,
-                        affiliationFilters,
-                        treeProps: { children: 'children', label: 'mainLabel' },
-                        handleNodeCheck,
-                      };  }
-};
-</script>
+                                          
+                                              const handleAssign = async () => {
+                                                if (!form.value.policyId || checkedSummary.value.total === 0) {
+                                                  error('정책과 할당 대상을 모두 선택하세요.');
+                                                  return;
+                                                }
+                                                isAssigning.value = true;
+                                                try {
+                                                  const checkedNodes = treeRef.value.getCheckedNodes();
+                                                  const assignmentsPayload = checkedNodes.map(node => {
+                                                    let scopeType;
+                                                    if (node.type === 'member') {
+                                                      scopeType = 'MEMBER';
+                                                    } else if (node.type === 'company') {
+                                                      scopeType = 'COMPANY';
+                                                    } else {
+                                                      scopeType = 'ORGANIZATION';
+                                                    }
+                                                    return {
+                                                      policyId: form.value.policyId,
+                                                      targetId: node.id,
+                                                      scopeType: scopeType
+                                                    };
+                                                  });
+                                                  const requestData = { assignments: assignmentsPayload };
+                                                  await createAssignment(requestData);
+                                                  success(`${checkedSummary.value.total}개 대상에게 정책이 성공적으로 할당되었습니다.`);
+                                                  fetchAllAssignments();
+                                                  resetForm();
+                                                } catch (err) {
+                                                  error(err.response?.data?.message || '정책 할당에 실패했습니다.');
+                                                } finally {
+                                                  isAssigning.value = false;
+                                                }
+                                              };
+                                          
+                                              const handleDelete = async (assignmentId) => {
+                                                try {
+                                                  await ElMessageBox.confirm('이 할당을 영구적으로 삭제하시겠습니까?', '영구 삭제 경고', { type: 'error' });
+                                                  await deleteAssignment(assignmentId);
+                                                  success('정책 할당이 영구적으로 삭제되었습니다.');
+                                                  fetchAllAssignments();
+                                                } catch (err) {
+                                                  if (err !== 'cancel') {
+                                                    error(err.message || '삭제에 실패했습니다.');
+                                                  }
+                                                }
+                                              };
+                                              
+                                              const handleBulkDelete = async () => {
+                                                if (selectedAssignments.value.length === 0) {
+                                                  error('삭제할 항목을 선택하세요.');
+                                                  return;
+                                                }
+                                                try {
+                                                  await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 영구적으로 삭제하시겠습니까?`, '일괄 삭제 확인', { type: 'error' });
+                                                  const idsToDelete = selectedAssignments.value.map(item => item.policyAssignmentId);
+                                                  await deleteAssignments(idsToDelete);
+                                                  success('선택된 정책 할당이 삭제되었습니다.');
+                                                  fetchAllAssignments();
+                                                } catch (err) {
+                                                  if (err !== 'cancel') {
+                                                    error(err.message || '일괄 삭제에 실패했습니다.');
+                                                  }
+                                                }
+                                              };
+                                          
+                                              const handleRevoke = async (assignmentId) => {
+                                                try {
+                                                  await ElMessageBox.confirm('이 정책 할당을 해지(비활성화)하시겠습니까?', '해지 확인', { type: 'warning' });
+                                                  await revokeAssignments([assignmentId]); // 일괄 API 재사용
+                                                  success('정책 할당이 해지되었습니다.');
+                                                  fetchAllAssignments();
+                                                } catch (err) {
+                                                  if (err !== 'cancel') {
+                                                    error(err.message || '해지에 실패했습니다.');
+                                                  }
+                                                }
+                                              };
+                                          
+                                              const handleBulkRevoke = async () => {
+                                                if (selectedAssignments.value.length === 0) {
+                                                  error('해지할 항목을 선택하세요.');
+                                                  return;
+                                                }
+                                                try {
+                                                  await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 해지하시겠습니까?`, '일괄 해지 확인', { type: 'warning' });
+                                                  const idsToRevoke = selectedAssignments.value.map(item => item.policyAssignmentId);
+                                                  await revokeAssignments(idsToRevoke);
+                                                  success('선택된 정책 할당이 해지되었습니다.');
+                                                  fetchAllAssignments();
+                                                } catch (err) {
+                                                  if (err !== 'cancel') {
+                                                    error(err.message || '일괄 해지에 실패했습니다.');
+                                                  }
+                                                }
+                                              };
+                                          
+                                              const handleBulkReactivate = async () => {
+                                                if (selectedAssignments.value.length === 0) {
+                                                  error('재활성화할 항목을 선택하세요.');
+                                                  return;
+                                                }
+                                                try {
+                                                  await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 재활성화하시겠습니까?`, '일괄 재활성 확인', { type: 'success' });
+                                                  const idsToReactivate = selectedAssignments.value.map(item => item.policyAssignmentId);
+                                                  await reactivateAssignments(idsToReactivate);
+                                                  success('선택된 정책 할당이 재활성화되었습니다.');
+                                                  fetchAllAssignments();
+                                                } catch (err) {
+                                                  if (err !== 'cancel') {
+                                                    error(err.message || '일괄 재활성에 실패했습니다.');
+                                                  }
+                                                }
+                                              };
+                                          
+                                              const handleNodeCheck = (data) => {
+                                                const node = treeRef.value.getNode(data.id);
+                                                if (node && node.childNodes.length > 0) { // 자식이 있는 노드만 토글
+                                                  node.expanded = !node.expanded;
+                                                }
+                                              };
+                                          
+                                              const handleSelectionChange = (selection) => {
+                                                selectedAssignments.value = selection;
+                                              };
+                                          
+                                              const resetForm = () => {
+                                                form.value.policyId = null;
+                                                if (treeRef.value) {
+                                                  treeRef.value.setCheckedKeys([]);
+                                                }
+                                              };
+                                          
+                                              onMounted(() => {
+                                                fetchPolicies();
+                                                fetchOrganizationTree();
+                                                fetchAllAssignments();
+                                              });
+                                          
+                                              return {
+                                                policies,
+                                                assignments,
+                                                processedAssignments,
+                                                isLoading,
+                                                isAssigning,
+                                                treeRef,
+                                                filterText,
+                                                organizationTree,
+                                                form,
+                                                checkedSummary,
+                                                selectedAssignments,
+                                                handleAssign,
+                                                fetchAllAssignments,
+                                                handleDelete,
+                                                handleBulkDelete,
+                                                handleRevoke,
+                                                handleBulkRevoke,
+                                                handleBulkReactivate,
+                                                handleSelectionChange,
+                                                resetForm,
+                                                filterNode,
+                                                filterHandler,
+                                                scopeTypeFilters,
+                                                policyNameFilters,
+                                                targetNameFilters,
+                                                affiliationFilters,
+                                                treeProps: { children: 'children', label: 'mainLabel' },
+                                                handleNodeCheck,
+                                                pagination,
+                                                handlePageChange,
+                                              };  }
+                        };</script>
 
 <style scoped>
 .policy-assignment {

@@ -10,6 +10,12 @@ const attendanceRoutes = [
     meta: { requiresAuth: true, title: '내 근태 현황' }
   },
   {
+    path: '/leave-request',
+    name: 'LeaveRequest',
+    component: () => import('@/views/attendance/LeaveRequest.vue'),
+    meta: { requiresAuth: true, title: '휴가/출장 신청' }
+  },
+  {
     path: '/admin/policy-management', // 경로 수정
     name: 'PolicyManagement',
     component: () => import('@/views/PolicyManagement.vue'),
@@ -38,6 +44,18 @@ const attendanceRoutes = [
     name: 'TeamAttendanceStatus',
     component: TeamAttendanceStatus,
     meta: { requiresAuth: true, title: '팀원 근태 현황' }
+  },
+  {
+    path: '/admin/work-location-management',
+    name: 'WorkLocationManagement',
+    component: () => import('@/views/attendance/WorkLocationManagement.vue'),
+    meta: { requiresAuth: true, title: '근무지 관리' }
+  },
+  {
+    path: '/admin/device-approval-management',
+    name: 'DeviceApprovalManagement',
+    component: () => import('@/views/admin/DeviceApprovalManagement.vue'),
+    meta: { requiresAuth: true, title: '디바이스 승인 관리' }
   }
 ];
 

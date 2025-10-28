@@ -84,27 +84,35 @@
           <el-menu-item index="/shared-calendar">
             <span>공유 캘린더</span>
           </el-menu-item>
-          <el-menu-item index="/admin/attendance">
-            <span>관리자 근태 현황</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/leave-management">
-            <span>관리자 연차 현황</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/policy-management">
-            <span>근태 정책 관리</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/policy-assignment">
-            <span>정책 할당</span>
-          </el-menu-item>
           <el-menu-item index="/team-attendance-status">
             <span>팀원 근태 현황</span>
           </el-menu-item>
-          <el-menu-item index="/admin/work-location-management">
-            <span>근무지 관리</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/audit-log">
-            <span>감사 로그</span>
-          </el-menu-item>
+          <el-sub-menu index="attendance-admin">
+            <template #title>
+              <span>관리자 메뉴</span>
+            </template>
+            <el-menu-item index="/admin/attendance">
+              <span>근태 현황</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/leave-management">
+              <span>연차 현황</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/policy-management">
+              <span>정책 관리</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/policy-assignment">
+              <span>정책 할당</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/work-location-management">
+              <span>근무지 관리</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/device-approval-management">
+              <span>디바이스 승인</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/audit-log">
+              <span>감사 로그</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-sub-menu>
 
         <el-sub-menu index="performance">
@@ -781,6 +789,7 @@ export default {
         '/shared-calendar': '공유 캘린더',
         '/admin/attendance': '관리자 근태 현황',
         '/admin/leave-management': '관리자 연차 현황',
+        '/admin/device-approval-management': '디바이스 승인 관리',
         '/performance/team-goal': '팀 목표 관리',
         '/performance/my-goal': '내 목표 관리',
         '/payroll': '급여 관리',
