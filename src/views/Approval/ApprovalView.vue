@@ -67,7 +67,7 @@
     <!-- 탭 메뉴 -->
     <div class="approval-tabs">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="승인 대기" name="pending">
+        <el-tab-pane label="결재 대기함" name="pending">
           <div class="pending-approvals">
             <div class="section-header">
               <h3>대기 중인 결재</h3>
@@ -101,7 +101,7 @@
           </div>
         </el-tab-pane>
         
-        <el-tab-pane label="결재 내역" name="my-requests">
+        <el-tab-pane label="내 기안(진행중)" name="my-requests">
           <div class="my-requests">
             <div class="section-header">
               <h3>내 결재 신청</h3>
@@ -134,7 +134,7 @@
           </div>
         </el-tab-pane>
         
-        <el-tab-pane label="결재 완료" name="completed">
+        <el-tab-pane label="내 기안(완료)" name="completed">
           <div class="completed-approvals">
             <div class="section-header">
               <h3>완료된 결재</h3>
@@ -183,6 +183,45 @@
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="내 결재(완료)" name="my-approvals-completed">
+          <div class="completed-approvals">
+            <div class="section-header">
+              <h3>내 결재(완료)</h3>
+            </div>
+            <div class="completed-list">
+              <div class="completed-item" v-for="approval in myApprovalsCompletedList" :key="approval.approvalId">
+                <div class="completed-info">
+                  <div class="completed-header">
+                    <div class="completed-title">{{ approval.title }}</div>
+                  </div>
+                  <div class="completed-details">
+                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
+                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
+                  </div>
+                </div>
+                <div class="completed-meta-actions">
+                  <div class="completed-meta-actions-row">
+                    <div class="completed-meta">
+                      <el-tag :type="getStatusType(approval.status)" size="small">
+                        {{ getKoreanStatus(approval.status) }}
+                      </el-tag>
+                      <span class="completed-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
+                    </div>
+                    <div class="completed-actions">
+                      <el-button size="small" @click="viewCompletedDetails(approval)">
+                        <el-icon><View /></el-icon>
+                        상세
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="myApprovalsCompletedList.length === 0" class="empty-state">
+                <p>내 결재(완료) 내역이 없습니다.</p>
               </div>
             </div>
           </div>
@@ -286,18 +325,8 @@ export default {
     ]);
     const myRequests = ref([]); // This will be filled by the API call
     const temporarySaves = ref([]);
-    const completedList = ref([
-        {
-          id: 1,
-          title: '회의실 예약 신청',
-          type: '기타',
-          requester: '김철수',
-          completedDate: '2024-01-12',
-          status: '승인',
-          amount: 0,
-          description: '대회의실 예약 신청입니다.'
-        },
-    ]);
+    const completedList = ref([]);
+    const myApprovalsCompletedList = ref([]);
 
     const fetchApprovalStats = async () => {
       try {
@@ -353,6 +382,16 @@ export default {
       }
     };
 
+    const fetchMyApprovalsCompleted = async () => {
+      try {
+        const response = await apiClient.get('/workforce-service/approval/find-approve-complete-list');
+        myApprovalsCompletedList.value = response.data.data;
+      } catch (err) {
+        error('내 결재(완료) 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
     const handleTabChange = (tabName) => {
       activeTab.value = tabName;
       if (tabName === 'pending') {
@@ -367,6 +406,8 @@ export default {
         fetchTemporarySaves();
       } else if (tabName === 'completed') {
         fetchCompletedApprovals();
+      } else if (tabName === 'my-approvals-completed') {
+        fetchMyApprovalsCompleted();
       }
     };
 
@@ -480,7 +521,9 @@ export default {
       pendingApprovalsList,
       myRequests,
       completedList,
+      myApprovalsCompletedList,
       handleTabChange,
+      fetchMyApprovalsCompleted,
       openTemplateSelector,
       handleTemplateSelect,
       getPriorityType,
