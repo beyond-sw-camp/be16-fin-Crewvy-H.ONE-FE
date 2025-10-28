@@ -267,14 +267,14 @@
     <!-- 조직도 모달 -->
     <el-dialog v-model="showOrgModal" title="직원 찾기" width="800px" :before-close="handleClose"
       class="organization-dialog">
-      <el-tabs v-model="activeOrgTab" class="organization-tabs-modal">
+      <el-tabs v-model="activeOrgTab">
         <el-tab-pane label="조직" name="org">
           <div class="organization-modal">
             <div class="org-tree-container-modal">
               <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
               <div class="tree-container">
                 <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" @node-click="handleOrgNodeClick"
-                  :filter-node-method="filterNode" :expand-on-click-node="false" class="org-tree">
+                  :filter-node-method="filterNode" :expand-on-click-node="false" :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
                   <template #default="{ node, data }">
                     <div class="custom-tree-node-modal">
                       <span>{{ node.label }}</span>
@@ -851,19 +851,34 @@ export default {
       return employees;
     },
     buildOrganizationTree(flatList) {
+      if (!flatList || flatList.length === 0) {
+        return [];
+      }
       const map = {};
+      // First pass: create map and transform nodes
       flatList.forEach(org => {
-        map[org.id] = { ...org, children: [] };
+        map[org.organizationId] = { 
+          ...org, 
+          id: org.organizationId, // Set the 'id' for node-key
+          label: org.label,      // Set the 'label' for the tree prop
+          children: [] 
+        };
       });
 
       const tree = [];
+      // Second pass: link children
       flatList.forEach(org => {
         if (org.parentId) {
-          if (map[org.parentId]) {
-            map[org.parentId].children.push(map[org.id]);
+          const parent = map[org.parentId];
+          if (parent) {
+            parent.children.push(map[org.organizationId]);
+          } else {
+            // If parent not found, treat as a root
+            tree.push(map[org.organizationId]);
           }
         } else {
-          tree.push(map[org.id]);
+          // No parent, it's a root
+          tree.push(map[org.organizationId]);
         }
       });
       return tree;
@@ -886,11 +901,16 @@ export default {
       this.searchedEmployees = []; // 직원 목록 초기화
       this.hasSearched = false; // 검색 상태 초기화
 
-      // Ensure orgTreeData is fetched
-      if (this.orgTreeData.length === 0) {
-        this.fetchOrganizationTree();
-        this.fetchAllEmployees();
-      }
+      // Always fetch the latest organization tree data when the modal is opened
+      this.fetchOrganizationTree().then(() => {
+        this.$nextTick(() => {
+          const orgTreeInstance = this.$refs.orgTree;
+          if (orgTreeInstance && orgTreeInstance.expandNode && this.orgTreeData.length > 0 && this.orgTreeData[0].children && this.orgTreeData[0].children.length > 0) {
+            orgTreeInstance.expandNode(this.orgTreeData[0].id, true);
+          }
+        });
+      });
+      // this.fetchAllEmployees(); // This is for the employee tab, can be fetched when that tab is active or on demand.
     },
     async fetchAllEmployees() {
       try {
@@ -1428,15 +1448,19 @@ export default {
   overflow-y: auto;
 }
 
-.organization-tabs-modal {
-  /* min-height: 450px; */
+.organization-modal {
+  padding-top: 16px;
+  height: 50vh;
+  overflow-y: auto;
 }
 
-.organization-modal,
-.employee-search-modal {
-  padding-top: 16px;
-  max-height: 65vh;
+.employee-search-results {
+  flex-grow: 1;
+  position: relative;
   overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  min-height: calc(100vh - 500px); /* Responsive minimum height */
 }
 
 .org-tree-container-modal {

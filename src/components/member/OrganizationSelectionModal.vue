@@ -24,8 +24,8 @@
 
 <script setup>
 import { ref, watch, defineEmits, defineExpose } from 'vue';
-import axios from 'axios';
 import { ElMessage } from 'element-plus';
+import organizationService from '@/api/organizationService';
 
 const visible = ref(false);
 const orgSearch = ref('');
@@ -41,21 +41,15 @@ watch(orgSearch, (val) => {
   orgTreeRef.value.filter(val);
 });
 
+// Simplified fetchOrganizations for debugging
 const fetchOrganizations = async () => {
+  console.log("MODAL: Attempting to fetch organizations...");
   try {
-    const token = localStorage.getItem('accessToken');
-    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/list`, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : null
-      }
-    });
-    orgTree.value = response.data.data;
-    if (orgTree.value.length > 0 && expandedKeys.value.length === 0) {
-      expandedKeys.value = [orgTree.value[0].id];
-    }
+    const response = await organizationService.getOrganizationTree();
+    console.log("MODAL API SUCCESS:", response);
+    console.log("Raw data from API:", response.data.data);
   } catch (error) {
-    ElMessage.error('조직도 데이터를 불러오는 데 실패했습니다.');
-    console.error(error);
+    console.error("MODAL API ERROR:", error);
   }
 };
 
@@ -89,7 +83,6 @@ const close = () => {
 defineExpose({
   open
 });
-
 </script>
 
 <style scoped>
