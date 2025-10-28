@@ -50,6 +50,18 @@ export default {
     }
   },
 
+  async restoreTitle(titleId) {
+    try {
+      const headers = getAuthHeadersFromToken();
+      if (!headers) throw new Error("Authentication headers not available.");
+      const response = await apiClient.patch(`/member-service/member/title/${titleId}/restore`, {}, { headers });
+      return response.data.data;
+    } catch (error) {
+      console.error("Error restoring title:", error);
+      throw error;
+    }
+  },
+
   async reorderTitle(memberPositionId, titleIds) {
     try {
       const headers = getAuthHeadersFromToken();

@@ -8,32 +8,54 @@
       <template #header>
         <div class="card-header">
           <span>직급 목록</span>
-          <el-button type="primary" @click="openAddModal" v-if="canCreateGrade">
-            <el-icon style="margin-right: 8px"><Plus /></el-icon> 새로운 직급 추가
-          </el-button>
+          <div>
+            <el-switch v-if="canDeleteGrade" v-model="showDeleted" inline-prompt active-text="삭제 포함" inactive-text="삭제 제외" style="margin-right: 16px;"/>
+            <el-button type="primary" @click="openAddModal" v-if="canCreateGrade">
+              <el-icon style="margin-right: 8px">
+                <Plus />
+              </el-icon> 새로운 직급 추가
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <draggable v-model="grade" item-key="id" handle=".drag-handle" @end="handleGradeReorder" v-loading="loading" class="draggable-list">
-        <template #item="{ element }">
-          <div class="draggable-item">
+      <el-table :data="filteredGrade" style="width: 100%" row-key="id" v-loading="loading" ref="tableRef" class="grade-table">
+        <el-table-column label="" width="50">
+          <template #default>
             <div class="drag-handle">
-              <el-icon><Rank /></el-icon>
-              {{ element.name }}
+              <el-icon>
+                <Grid />
+              </el-icon>
             </div>
-            <div class="actions">
-              <el-button size="small" @click="openEditModal(element)" v-if="canUpdateGrade">수정</el-button>
-              <el-button size="small" type="danger" @click="deleteGrade(element)" v-if="canDeleteGrade">삭제</el-button>
-            </div>
-          </div>
-        </template>
-      </draggable>
+          </template>
+        </el-table-column>
+        <el-table-column label="순서" width="80">
+          <template #default="scope">
+            <span>{{ scope.$index + 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="직급명"></el-table-column>
+        <el-table-column label="상태" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.ynDel === true ? 'danger' : 'success'" disable-transitions>
+              {{ scope.row.ynDel === true ? '삭제됨' : '사용중' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="액션" width="150">
+          <template #default="scope">
+            <el-button size="small" @click="openEditModal(scope.row)" v-if="canUpdateGrade && !scope.row.ynDel">수정</el-button>
+            <el-button size="small" type="danger" @click="deleteGrade(scope.row)" v-if="canDeleteGrade && !scope.row.ynDel">삭제</el-button>
+            <el-button size="small" @click="restoreGrade(scope.row)" v-if="canDeleteGrade && scope.row.ynDel">복원</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="modalTitle" width="500px" @opened="handleDialogOpened">
-      <el-form :model="currentGrade" label-position="top" @submit.prevent="saveGrade"> <!-- @submit.prevent="saveGrade" 추가 -->
+      <el-form :model="currentGrade" label-position="top" @submit.prevent="saveGrade">
         <el-form-item label="직급명">
-          <el-input ref="gradeNameInput" v-model="currentGrade.name" placeholder="예: 사원, 대리, 과장"></el-input> <!-- ref 추가, @keyup.enter 제거 -->
+          <el-input ref="gradeNameInput" v-model="currentGrade.name" placeholder="예: 사원, 대리, 과장"></el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -52,8 +74,8 @@ import { ElMessageBox } from 'element-plus';
 import gradeService from '@/api/gradeService';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSnackbar } from '@/composables/useSnackbar';
-import draggable from 'vuedraggable'; // draggable 임포트
-import { Plus, Rank } from '@element-plus/icons-vue'; // Rank 아이콘 임포트
+import { Plus, Grid } from '@element-plus/icons-vue';
+import Sortable from 'sortablejs';
 
 const { checkPermission } = usePermissions();
 const { success, error, info } = useSnackbar();
@@ -61,10 +83,31 @@ const isEdit = ref(false);
 const loading = ref(false);
 const grade = ref([]);
 const dialogVisible = ref(false);
-const gradeNameInput = ref(null); // ref 선언
+const gradeNameInput = ref(null);
 const currentGrade = ref({ id: null, name: '' });
+const tableRef = ref(null);
+const showDeleted = ref(false);
 
-// 모달이 열릴 때 입력 필드에 포커스
+const filteredGrade = computed(() => {
+  if (showDeleted.value) {
+    return grade.value;
+  }
+  return grade.value.filter(g => !g.ynDel);
+});
+
+const initSortable = () => {
+  const tbody = tableRef.value.$el.querySelector('.el-table__body-wrapper tbody');
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    onEnd: (evt) => {
+      const { oldIndex, newIndex } = evt;
+      const movedItem = grade.value.splice(oldIndex, 1)[0];
+      grade.value.splice(newIndex, 0, movedItem);
+      handleGradeReorder();
+    },
+  });
+};
+
 const handleDialogOpened = () => {
   if (gradeNameInput.value) {
     gradeNameInput.value.focus();
@@ -116,7 +159,6 @@ const saveGrade = async () => {
       await gradeService.updateGrade(currentGrade.value.id, { name: currentGrade.value.name });
       success('직급이 수정되었습니다.');
     } else {
-      // 새로운 직급 추가 시 displayOrder 설정
       const newDisplayOrder = grade.value.length > 0 ? Math.max(...grade.value.map(g => g.displayOrder)) + 1 : 0;
       await gradeService.createGrade({ name: currentGrade.value.name, displayOrder: newDisplayOrder });
       success('새로운 직급이 추가되었습니다.');
@@ -133,7 +175,7 @@ const saveGrade = async () => {
 };
 
 const deleteGrade = async (grade) => {
-  ElMessageBox.confirm(`'${grade.name}' 직급을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`, '경고', {
+  ElMessageBox.confirm(`'${grade.name}' 직급을 삭제하시겠습니까?`, '경고', {
     confirmButtonText: '삭제',
     cancelButtonText: '취소',
     type: 'warning'
@@ -155,18 +197,37 @@ const deleteGrade = async (grade) => {
   });
 };
 
+const restoreGrade = async (grade) => {
+  ElMessageBox.confirm(`'${grade.name}' 직급을 복원하시겠습니까?`, '확인', {
+    confirmButtonText: '복원',
+    cancelButtonText: '취소',
+    type: 'info'
+  }).then(async () => {
+    loading.value = true;
+    try {
+      await gradeService.restoreGrade(grade.id);
+      success('복원되었습니다.');
+      await fetchGrade();
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || '직급 복원에 실패했습니다.';
+      error(errorMessage);
+      console.error("Error restoring grade:", error);
+    } finally {
+      loading.value = false;
+    }
+  }).catch(() => {
+    info('복원이 취소되었습니다.');
+  });
+};
+
 const handleGradeReorder = async () => {
   loading.value = true;
   try {
     const gradeIds = grade.value.map(g => g.id);
-    const memberPositionId = localStorage.getItem('memberPositionId'); // 예시: localStorage에서 가져옴
+    const memberPositionId = localStorage.getItem('memberPositionId');
     if (!memberPositionId) {
       throw new Error("MemberPositionId not found.");
     }
-
-    console.log('--- Reorder Grade Request ---');
-    console.log('memberPositionId:', memberPositionId);
-    console.log('gradeIds:', gradeIds);
 
     await gradeService.reorderGrade(memberPositionId, gradeIds);
     success('직급 순서가 변경되었습니다.');
@@ -182,57 +243,38 @@ const handleGradeReorder = async () => {
 onMounted(() => {
   checkPermissions();
   fetchGrade();
+  initSortable();
 });
 </script>
 
 <style scoped>
 .grade-management-page {
-  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.draggable-list {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.draggable-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 15px;
-  background-color: #fff;
-  border-bottom: 1px solid #ebeef5;
+.drag-handle {
   cursor: grab;
 }
 
-.draggable-item:last-child {
-  border-bottom: none;
-}
-
-.drag-handle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #606266;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-}
-
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin: 0;
 }
 
 .box-card {
@@ -248,6 +290,10 @@ onMounted(() => {
 .card-header span {
   font-size: 18px;
   font-weight: 600;
+}
+
+.grade-table {
+  font-size: 16px;
 }
 
 .el-table th {

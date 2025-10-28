@@ -3,10 +3,6 @@
     <el-page-header @back="goBack" class="back-button"></el-page-header>
     <div class="header">
       <h1 class="main-goal-title">{{ teamGoalDetail.title }}</h1>
-      <div class="header-actions" v-if="isTeamGoalManager">
-        <el-button type="primary" @click="handleEdit">수정</el-button>
-        <el-button type="danger" @click="handleDelete">삭제</el-button>
-      </div>
     </div>
 
     <div class="goal-summary">
@@ -40,9 +36,9 @@
     <el-divider></el-divider>
 
     <div class="sub-goal-section">
-      <h2>팀원 목표 목록</h2>
-      <div class="sub-goal-list">
-        <el-card v-for="goal in teamGoalDetail.goalList" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId)">
+      <h2>본인 평가 완료</h2>
+      <div v-if="completedGoals.length > 0" class="sub-goal-list">
+        <el-card v-for="goal in completedGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId)">
           <div class="sub-goal-content">
             <div class="sub-goal-details">
               <h4 class="sub-goal-title">{{ goal.title }}</h4>
@@ -59,6 +55,34 @@
           </div>
         </el-card>
       </div>
+      <div v-else>
+        <p>평가 완료된 목표가 없습니다.</p>
+      </div>
+
+      <el-divider></el-divider>
+
+      <h2>평가 대기</h2>
+      <div v-if="pendingGoals.length > 0" class="sub-goal-list">
+        <el-card v-for="goal in pendingGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId)">
+          <div class="sub-goal-content">
+            <div class="sub-goal-details">
+              <h4 class="sub-goal-title">{{ goal.title }}</h4>
+              <p class="sub-goal-description">{{ goal.contents }}</p>
+              <div class="sub-goal-user-info">
+                <span class="user-name">{{ goal.memberName }}</span>
+                <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+              </div>
+              <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
+            </div>
+            <div class="sub-goal-meta">
+              <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
+            </div>
+          </div>
+        </el-card>
+      </div>
+      <div v-else>
+        <p>평가 대기중인 목표가 없습니다.</p>
+      </div>
     </div>
   </div>
 </template>
@@ -68,7 +92,7 @@ import apiClient from '@/api/http';
 import { User, Star } from '@element-plus/icons-vue';
 
 export default {
-  name: 'TeamGoalDetail',
+  name: 'TeamGoalReviewDetail',
   components: {
     User,
     Star,
@@ -88,13 +112,16 @@ export default {
     };
   },
   computed: {
-    isTeamGoalManager() {
-      return this.myMemberPositionId === this.teamGoalDetail.memberPositionId;
+    completedGoals() {
+      return this.teamGoalDetail.goalList.filter(goal => goal.status === '본인 평가 완료');
+    },
+    pendingGoals() {
+      return this.teamGoalDetail.goalList.filter(goal => goal.status === '평가 대기');
     },
   },
   methods: {
     goBack() {
-      this.$router.push('/performance/team-goal');
+      this.$router.push('/performance/review');
     },
     async fetchTeamGoalDetail() {
       const goalId = this.$route.params.id;
@@ -126,33 +153,7 @@ export default {
     },
     goToMemberGoalDetail(memberGoalId) {
       const teamGoalId = this.$route.params.id;
-      this.$router.push(`/performance/team-goal/${teamGoalId}/member-goal/${memberGoalId}`);
-    },
-    handleEdit() {
-      this.$router.push(`/performance/team-goal/edit/${this.$route.params.id}`);
-    },
-    async handleDelete() {
-      try {
-        await this.$confirm('정말로 이 팀 목표를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', '팀 목표 삭제', {
-          confirmButtonText: '삭제',
-          cancelButtonText: '취소',
-          type: 'warning',
-        });
-
-        const teamGoalId = this.$route.params.id;
-        await apiClient.delete(`/workforce-service/performance/delete-team-goal/${teamGoalId}`);
-
-        this.$message.success('팀 목표가 성공적으로 삭제되었습니다.');
-        this.$router.push('/performance/team-goal');
-
-      } catch (error) {
-        if (error === 'cancel') {
-          this.$message.info('삭제가 취소되었습니다.');
-        } else {
-          console.error('Error deleting team goal:', error);
-          this.$message.error('팀 목표 삭제에 실패했습니다.');
-        }
-      }
+      this.$router.push({ path: `/performance/team-goal/${teamGoalId}/member-goal/${memberGoalId}`, query: { mode: 'review' } });
     },
   },
   created() {

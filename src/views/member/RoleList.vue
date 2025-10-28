@@ -2,24 +2,29 @@
   <div class="role-list-page">
     <div class="page-header">
       <h1>역할 목록</h1>
-      <el-button type="primary" @click="goToCreateRole">
-        <el-icon><Plus /></el-icon> 새로운 역할 생성
-      </el-button>
+      <div>
+        <el-switch v-if="canDeleteRole" v-model="showDeleted" inline-prompt active-text="삭제 포함" inactive-text="삭제 제외" style="margin-right: 16px;"/>
+        <el-button type="primary" @click="goToCreateRole" v-if="canCreateRole">
+          <el-icon>
+            <Plus />
+          </el-icon> 새로운 역할 생성
+        </el-button>
+      </div>
     </div>
 
     <el-row :gutter="24">
       <!-- Left Column: Role Cards -->
       <el-col :span="8">
-        <draggable v-model="role" item-key="id" handle=".role-card" @end="handleRoleReorder" class="role-cards-container">
+        <draggable v-model="filteredRole" item-key="id" handle=".role-card" @end="handleRoleReorder"
+          class="role-cards-container">
           <template #item="{ element }">
-            <el-card
-              :key="element.id"
-              class="role-card"
-              :class="{ active: selectedRole && selectedRole.id === element.id }"
-              @click="selectRole(element)"
-            >
+            <el-card :key="element.id" class="role-card"
+              :class="{ active: selectedRole && selectedRole.id === element.id }" @click="selectRole(element)">
               <div class="role-card-header">
-                <span class="role-name">{{ element.name }}</span>
+                <div class="role-name-status-wrapper">
+                  <span class="role-name">{{ element.name }}</span>
+                  <el-tag v-if="element.ynDel" type="danger" size="small">삭제됨</el-tag>
+                </div>
                 <span class="member-count">{{ element.memberCount }}명</span>
               </div>
               <p class="role-description">{{ element.description }}</p>
@@ -35,8 +40,9 @@
             <div class="details-header">
               <h3>{{ selectedRole.name }}</h3>
               <div>
-                <el-button type="primary" plain size="small" @click="editRole(selectedRole)">수정</el-button>
-                <el-button type="danger" plain size="small" @click="deleteRole(selectedRole)">삭제</el-button>
+                <el-button v-if="canUpdateRole && !selectedRole.ynDel" type="primary" plain size="small" @click="editRole(selectedRole)">수정</el-button>
+                <el-button v-if="canDeleteRole && !selectedRole.ynDel" type="danger" plain size="small" @click="deleteRole(selectedRole)">삭제</el-button>
+                <el-button v-if="canDeleteRole && selectedRole.ynDel" plain size="small" @click="restoreRole(selectedRole)">복원</el-button>
               </div>
             </div>
           </template>
@@ -70,19 +76,40 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { ElMessageBox } from 'element-plus'; // ElMessage 임포트 제거
+import { ElMessageBox } from 'element-plus';
 import { useSnackbar } from '@/composables/useSnackbar';
-import draggable from 'vuedraggable'; // draggable 임포트
-import { Plus } from '@element-plus/icons-vue'; // Plus 아이콘은 이미 사용 중
-import roleService from '@/api/roleService'; // roleService 임포트
+import { usePermissions } from '@/composables/usePermissions';
+import draggable from 'vuedraggable';
+import { Plus } from '@element-plus/icons-vue';
+import roleService from '@/api/roleService';
 
 const router = useRouter();
-const { success, error, info } = useSnackbar(); // Destructure success and info as well
+const { success, error, info } = useSnackbar();
+const { checkPermission } = usePermissions();
+
 const role = ref([]);
 const selectedRole = ref(null);
+const showDeleted = ref(false);
+
+const canCreateRole = ref(false);
+const canUpdateRole = ref(false);
+const canDeleteRole = ref(false);
+
+const filteredRole = computed(() => {
+  if (showDeleted.value) {
+    return role.value;
+  }
+  return role.value.filter(r => !r.ynDel);
+});
+
+const checkPermissions = async () => {
+  canCreateRole.value = await checkPermission('member', 'CREATE', 'COMPANY');
+  canUpdateRole.value = await checkPermission('member', 'UPDATE', 'COMPANY');
+  canDeleteRole.value = await checkPermission('member', 'DELETE', 'COMPANY');
+};
 
 const fetchRole = async () => {
   try {
@@ -99,7 +126,8 @@ const fetchRole = async () => {
     const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/role`, { headers });
     role.value = response.data.data;
     if (role.value.length > 0) {
-      selectedRole.value = role.value[0];
+      // Select the first non-deleted role by default
+      selectedRole.value = role.value.find(r => !r.ynDel) || role.value[0];
     }
   } catch (err) {
     const errorMessage = err.response?.data?.message || '역할 목록을 불러오는 데 실패했습니다.';
@@ -134,7 +162,7 @@ const deleteRole = (role) => {
       await roleService.deleteRole(memberPositionId, role.id);
       success('삭제되었습니다.');
       selectedRole.value = null;
-      fetchRole();
+      await fetchRole();
     } catch (error) {
       const errorMessage = error.response?.data?.message || '삭제에 실패했습니다.';
       error(errorMessage);
@@ -145,11 +173,34 @@ const deleteRole = (role) => {
   });
 };
 
+const restoreRole = (role) => {
+  ElMessageBox.confirm(`'${role.name}' 역할을 복원하시겠습니까?`, '확인', {
+    confirmButtonText: '복원',
+    cancelButtonText: '취소',
+    type: 'info'
+  }).then(async () => {
+    try {
+      const memberPositionId = localStorage.getItem('memberPositionId');
+      if (!memberPositionId) {
+        throw new Error("MemberPositionId not found.");
+      }
+      await roleService.restoreRole(memberPositionId, role.id);
+      success('복원되었습니다.');
+      await fetchRole();
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || '복원에 실패했습니다.';
+      error(errorMessage);
+      console.error(err);
+    }
+  }).catch(() => {
+    info('복원이 취소되었습니다.');
+  });
+};
+
 const handleRoleReorder = async () => {
   try {
     const roleIds = role.value.map(r => r.id);
-    const memberPositionId = localStorage.getItem('memberPositionId'); // memberPositionId 가져오기
-    console.log('Reordering roles with:', { memberPositionId, roleIds }); // 디버깅 로그 추가
+    const memberPositionId = localStorage.getItem('memberPositionId');
     if (!memberPositionId) {
       throw new Error("MemberPositionId not found.");
     }
@@ -163,13 +214,15 @@ const handleRoleReorder = async () => {
 };
 
 onMounted(() => {
+  checkPermissions();
   fetchRole();
 });
 </script>
 
 <style scoped>
 .role-list-page {
-  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-header {
@@ -180,107 +233,112 @@ onMounted(() => {
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
   margin: 0;
 }
 
-.page-header p {
-    font-size: 14px;
-    color: #606266;
-    margin-top: 8px;
-    margin-bottom: 16px;
-}
-
 .role-cards-container {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    height: 60vh;
-    overflow-y: auto;
-    padding-right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 60vh;
+  overflow-y: auto;
+  padding-right: 10px;
 }
 
 .role-card {
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border-radius: 8px;
 }
 
 .role-card.active {
-    border-color: #4f46e5;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
 }
 
 .role-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .role-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .role-name {
-    font-size: 16px;
-    font-weight: 600;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.role-name-status-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .member-count {
-    font-size: 14px;
-    color: #909399;
+  font-size: 14px;
+  color: #909399;
 }
 
 .role-description {
-    font-size: 14px;
-    color: #606266;
-    line-height: 1.5;
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.5;
 }
 
 .details-card {
-    height: calc(60vh + 32px);
-    border-radius: 8px;
+  height: calc(60vh + 32px);
+  border-radius: 8px;
 }
 
 .details-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .details-header h3 {
-    font-size: 20px;
-    font-weight: 600;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .details-section {
-    margin-bottom: 32px;
+  margin-bottom: 32px;
 }
 
 .details-section:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .details-section h4 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
 .permissions-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .no-selection {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
 }
 </style>
