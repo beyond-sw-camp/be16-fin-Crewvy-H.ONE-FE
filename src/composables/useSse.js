@@ -13,30 +13,34 @@ export function useSse() {
       return;
     }
 
-    const eventSource = new EventSourcePolyfill(
-      `${process.env.VUE_APP_API_BASE_URL}/workspace-service/sse/subscribe`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    try {
+      const eventSource = new EventSourcePolyfill(
+        `${process.env.VUE_APP_API_BASE_URL}/workspace-service/sse/subscribe`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-    eventSource.onopen = () => {
-      console.log('SSE connection opened.');
-    };
+      eventSource.onopen = () => {
+        console.log('SSE connection opened.');
+      };
 
-    eventSource.addEventListener('notification', (event) => {
-      const newNotification = JSON.parse(event.data);
-      store.dispatch('notification/addNotification', newNotification);
-    });
+      eventSource.addEventListener('notification', (event) => {
+        const newNotification = JSON.parse(event.data);
+        store.dispatch('notification/addNotification', newNotification);
+      });
 
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      eventSource.close();
-    };
+      eventSource.onerror = (error) => {
+        console.error('SSE error:', error);
+        eventSource.close();
+      };
 
-    sse.value = eventSource;
+      sse.value = eventSource;
+    } catch (error) {
+      console.error('Failed to connect to SSE:', error);
+    }
   };
 
   const disconnect = () => {
