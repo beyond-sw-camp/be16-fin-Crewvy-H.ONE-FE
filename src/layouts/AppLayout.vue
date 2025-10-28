@@ -1008,21 +1008,6 @@ export default {
       this.sessionTimer = setInterval(() => {
         // 현재 시간 업데이트 (반응성 트리거)
         this.currentTime = new Date()
-
-        // const now = this.currentTime.getTime()
-        // const expiry = this.sessionExpiryTime.getTime()
-        // const diff = expiry - now
-
-        // if (diff <= 0) {
-        //   this.handleSessionExpiry()
-        // } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
-        //   this.showSessionWarning()
-        // }
-        if (diff <= 0) {
-          // this.handleSessionExpiry()
-        } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
-          // this.showSessionWarning()
-        }
       }, 1000)
     },
     // handleSessionExpiry() {
