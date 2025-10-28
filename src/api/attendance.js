@@ -1,76 +1,114 @@
-import apiClient from './index';
+import axios from 'axios';
+import store from '@/store';
+
+// workforce-service 전용 API 클라이언트 생성
+const workforceClient = axios.create({
+  baseURL: `${process.env.VUE_APP_API_BASE_URL}/workforce-service`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Axios 요청 인터셉터: 모든 요청에 헤더 추가
+workforceClient.interceptors.request.use(
+  (config) => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    const companyId = store.getters.companyId || localStorage.getItem('companyId');
+    if (companyId) {
+      config.headers['X-User-CompanyId'] = companyId;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Axios 응답 인터셉터: 공통 응답 구조 처리
+workforceClient.interceptors.response.use(
+  (response) => {
+    // success가 true이면 data를 반환, 아니면 Promise.reject
+    if (response.data && response.data.success) {
+      return response.data.data ?? response.data;
+    }
+    // 백엔드에서 success: false로 응답한 경우
+    return Promise.reject(new Error(response.data.message || 'API 요청에 실패했습니다.'));
+  },
+  (error) => {
+    // HTTP 상태 코드가 2xx가 아닌 경우
+    const message = error.response?.data?.message || error.message || '네트워크 오류가 발생했습니다.';
+    return Promise.reject(new Error(message));
+  }
+);
+
+
+// --- 정책 (Policy) ---
+
+export const getPolicies = (params) => workforceClient.get('/policies', { params });
+export const getPolicyById = (policyId) => workforceClient.get(`/policies/${policyId}`);
+export const createPolicy = (data) => workforceClient.post('/policies', data);
+export const updatePolicy = (policyId, data) => workforceClient.put(`/policies/${policyId}`, data);
+export const deletePolicy = (policyId) => workforceClient.delete(`/policies/${policyId}`);
+export const activatePolicies = (policyIds) => workforceClient.patch('/policies/activate', { policyIds });
+export const deactivatePolicies = (policyIds) => workforceClient.patch('/policies/deactivate', { policyIds });
+export const getPolicyTypes = () => workforceClient.get('/policies/types');
+export const getMyEffectivePolicy = () => workforceClient.get('/policies/my-effective-policy');
+export const getApplicablePolicies = () => workforceClient.get('/policies/applicable-to-me');
+
+// --- 정책 할당 (Policy Assignment) ---
+
+export const getPolicyAssignments = (params) => workforceClient.get('/policy-assignments', { params });
+export const createAssignment = (data) => workforceClient.post('/policy-assignments', data);
+export const deleteAssignment = (assignmentId) => workforceClient.delete(`/policy-assignments/${assignmentId}`);
+export const deleteAssignments = (assignmentIds) => workforceClient.delete('/policy-assignments', { data: { assignmentIds } });
+export const revokeAssignments = (assignmentIds) => workforceClient.patch('/policy-assignments/revoke', { assignmentIds });
+export const reactivateAssignments = (assignmentIds) => workforceClient.patch('/policy-assignments/reactivate', { assignmentIds });
+
+// --- 휴가/근태 신청 (Request) ---
+
+export const createLeaveRequest = (data) => workforceClient.post('/requests/leave', data);
+export const getMyRequests = (params) => workforceClient.get('/requests/my', { params });
+export const getMyLeaveRequests = (params) => workforceClient.get('/requests/my-leaves', { params });
+export const getRequestById = (requestId) => workforceClient.get(`/requests/${requestId}`);
+export const cancelRequest = (requestId) => workforceClient.delete(`/requests/${requestId}/cancel`);
+
+// --- 근무지 관리 (Work Location) ---
+
+export const getWorkLocations = (params) => workforceClient.get('/work-locations', { params });
+export const getActiveWorkLocations = () => workforceClient.get('/work-locations/active');
+export const getWorkLocationById = (workLocationId) => workforceClient.get(`/work-locations/${workLocationId}`);
+export const createWorkLocation = (data) => workforceClient.post('/work-locations', data);
+export const updateWorkLocation = (workLocationId, data) => workforceClient.put(`/work-locations/${workLocationId}`, data);
+export const toggleWorkLocationActive = (workLocationId) => workforceClient.patch(`/work-locations/${workLocationId}/toggle-active`);
+export const deleteWorkLocation = (workLocationId) => workforceClient.delete(`/work-locations/${workLocationId}`);
+
+// ... (기존 함수들) ...
+
+// --- 내 근태 현황 조회 ---
 
 /**
- * 근태 이벤트 기록 (출근, 퇴근 등)
- * @param {object} params - { memberId, companyId }
- * @param {object} data - EventRequest DTO
- * @returns {Promise<object>}
+ * 월별 내 출퇴근 현황 조회
+ * @param {object} params - { year, month }
+ * @returns {Promise<Array<object>>}
  */
-export const recordEvent = (params, data) => {
-  return apiClient.post('/attendance/events', data, { params });
-};
+export const getMyMonthlyAttendance = (params) => workforceClient.get('/attendance/my/monthly', { params });
 
 /**
- * 새 근태 정책 생성
- * @param {object} params - { companyId }
- * @param {object} data - PolicyCreateRequest DTO
- * @returns {Promise<object>}
+ * 내 휴가 신청 목록 조회 (페이징)
+ * @param {object} params - { page, size, sort? }
+ * @returns {Promise<object>} // Page 객체 반환
  */
-export const createPolicy = (params, data) => {
-  return apiClient.post('/policies', data, { params });
-};
+// getMyRequests는 이미 휴가/근태 신청 섹션에 정의되어 있으므로 중복 제거
 
-/**
- * 특정 회사의 모든 정책 목록 조회
- * @param {object} params - { companyId, page, size, sort }
- * @returns {Promise<object>} - 정책 목록 페이지 데이터
- */
-export const getPolicies = (params) => {
-  return apiClient.get('/policies', { params });
-};
+export const recordAttendanceEvent = (data) => workforceClient.post('/attendance/events', data);
+export const getMyTodayAttendance = () => workforceClient.get('/attendance/my/today');
+export const getMyBalance = () => workforceClient.get('/attendance/my/balance');
 
-/**
- * ID로 특정 정책 상세 정보 조회
- * @param {string} policyId - 정책 ID
- * @returns {Promise<object>} - 정책 상세 데이터
- */
-export const getPolicyById = (policyId) => {
-  return apiClient.get(`/policies/${policyId}`);
-};
+// --- 디바이스 관리 (Device Management) ---
 
-/**
- * 기존 정책 수정
- * @param {string} policyId - 수정할 정책 ID
- * @param {object} data - 수정할 정책 데이터
- * @returns {Promise<object>} - 수정된 정책 정보
- */
-export const updatePolicy = (policyId, data) => {
-  return apiClient.put(`/policies/${policyId}`, data);
-};
-
-/**
- * 정책 삭제
- * @param {string} policyId - 삭제할 정책 ID
- * @returns {Promise<void>}
- */
-export const deletePolicy = (policyId) => {
-  return apiClient.delete(`/policies/${policyId}`);
-};
-
-/**
- * 정책 활성화
- * @param {string} policyId - 활성화할 정책 ID
- * @returns {Promise<object>} - 활성화된 정책 정보
- */
-export const activatePolicy = (policyId) => {
-  return apiClient.patch(`/policies/${policyId}/activate`);
-};
-
-/**
- * 특정 회사의 모든 정책 유형 목록 조회
- * @param {object} params - { companyId }
- * @returns {Promise<Array>} - 정책 유형 목록 데이터
- */
-export const getPolicyTypes = (params) => {
-  return apiClient.get('/policies/types', { params });
-};
+export const registerDevice = (data) => workforceClient.post('/requests/devices/register', data);
+export const getMyDevices = (params) => workforceClient.get('/requests/devices/my', { params });
+export const getPendingDevices = (params) => workforceClient.get('/requests/devices/pending', { params });
+export const approveDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/approve`);
+export const rejectDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/reject`);

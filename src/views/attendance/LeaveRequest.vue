@@ -1,164 +1,315 @@
 <template>
-  <div class="leave-request">
-    <div class="content-card">
-      <div class="card-header">
-        <h3>휴가/출장 신청</h3>
-      </div>
-      <div class="request-form-section">
-        <el-form :model="requestForm" label-width="120px" label-position="left">
-          <el-form-item label="신청 유형">
-            <el-select v-model="requestForm.type" placeholder="신청 유형 선택" style="width: 100%;">
-              <el-option label="휴가 신청" value="vacation_request"></el-option>
-              <el-option label="출장 신청" value="business_trip"></el-option>
-              <el-option label="연장근무 신청" value="overtime_request"></el-option>
-              <el-option label="지출결의서" value="expense_report"></el-option>
-              <el-option label="자원 예약 신청" value="resource_booking"></el-option>
-              <el-option label="기타 신청" value="other"></el-option>
-            </el-select>
-          </el-form-item>
+  <div class="leave-request-page">
+    <el-row :gutter="20">
+      <!-- 신청서 섹션 -->
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <h2>휴가/출장 신청</h2>
+            </div>
+          </template>
+          <el-form ref="formRef" :model="form" label-width="120px" @submit.prevent="submitForm">
+            <el-form-item label="신청 종류" prop="requestType">
+              <el-radio-group v-model="requestType" @change="handleRequestTypeChange">
+                <el-radio-button label="leave">휴가</el-radio-button>
+                <el-radio-button label="trip">출장</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
 
-          <el-form-item label="기간">
-            <el-date-picker
-              v-model="requestForm.duration"
-              type="daterange"
-              range-separator="-"
-              start-placeholder="시작일"
-              end-placeholder="종료일"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="width: 100%;"
-            />
-          </el-form-item>
+            <el-form-item v-if="requestType === 'leave'" label="휴가 종류" prop="policyId" :rules="{ required: true, message: '휴가 종류를 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="휴가 종류를 선택하세요">
+                <el-option v-for="policy in leavePolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+            </el-form-item>
 
-          <el-form-item label="사유">
-            <el-input
-              v-model="requestForm.reason"
-              type="textarea"
-              :rows="4"
-              placeholder="상세 사유를 입력하세요"
-            />
-          </el-form-item>
+            <el-form-item v-if="requestType === 'trip'" label="출장 종류" prop="policyId" :rules="{ required: true, message: '출장 종류를 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="출장 종류를 선택하세요">
+                <el-option v-for="policy in tripPolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+            </el-form-item>
 
-          <el-form-item>
-            <el-button type="primary" @click="proceedToDetailForm">다음 단계</el-button>
-            <el-button @click="cancelRequest">취소</el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-    </div>
+            <el-form-item v-if="requestType === 'leave'" label="신청 단위" prop="requestUnit">
+              <el-radio-group v-model="form.requestUnit">
+                <el-radio-button label="DAY">종일</el-radio-button>
+                <el-radio-button label="HALF_DAY_AM">오전 반차</el-radio-button>
+                <el-radio-button label="HALF_DAY_PM">오후 반차</el-radio-button>
+                <el-radio-button label="TIME_OFF">시간 단위</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+
+            <el-form-item v-if="form.requestUnit !== 'TIME_OFF'" label="기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
+              <el-date-picker
+                v-model="form.dateRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="시작일"
+                end-placeholder="종료일"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+
+            <el-form-item v-if="form.requestUnit === 'TIME_OFF'" label="시간" prop="dateTimeRange" :rules="{ required: true, message: '시간을 선택하세요', trigger: 'change' }">
+              <el-date-picker
+                v-model="form.dateTimeRange"
+                type="datetimerange"
+                range-separator="-"
+                start-placeholder="시작 시각"
+                end-placeholder="종료 시각"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+              />
+            </el-form-item>
+            
+            <el-form-item v-if="requestType === 'trip'" label="출장지" prop="workLocation">
+              <el-select v-model="form.workLocation" placeholder="출장지를 선택하세요">
+                <el-option v-for="loc in workLocations" :key="loc.workLocationId" :label="loc.name" :value="loc.name" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="사유" prop="reason" :rules="{ required: true, message: '사유를 입력하세요', trigger: 'blur' }">
+              <el-input v-model="form.reason" type="textarea" />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" @click="submitForm" :loading="isSubmitting">제출</el-button>
+              <el-button @click="resetForm">초기화</el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
+
+      <!-- 신청 현황 섹션 -->
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <h2>신청 현황</h2>
+              <el-button class="button" text @click="fetchMyRequests" :icon="Refresh">새로고침</el-button>
+            </div>
+          </template>
+          <el-table :data="myRequests" v-loading="tableLoading" stripe height="400">
+            <el-table-column prop="policyName" label="신청 종류" />
+            <el-table-column label="신청 기간" width="220">
+              <template #default="{ row }">
+                {{ formatPeriod(row) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="deductionDays" label="차감일수" width="90" />
+            <el-table-column prop="reason" label="사유" show-overflow-tooltip />
+            <el-table-column label="상태" width="90">
+              <template #default="{ row }">
+                <el-tag :type="getStatusType(row.status)">{{ formatStatus(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            small
+            background
+            layout="prev, pager, next"
+            :total="pagination.total"
+            :page-size="pagination.size"
+            :current-page="pagination.page"
+            @current-change="handlePageChange"
+            class="pagination"
+          />
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue';
-import { useSnackbar } from '@/composables/useSnackbar';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useSnackbar } from '@/composables/useSnackbar';
+import { createLeaveRequest, getPolicies, getActiveWorkLocations, getMyLeaveRequests } from '@/api/attendance';
+import { Refresh } from '@element-plus/icons-vue';
 
 export default {
   name: 'LeaveRequest',
+  components: { }, // Refresh 아이콘 컴포넌트 등록
   setup() {
-    const { warning } = useSnackbar();
     const router = useRouter();
+    const { success, error } = useSnackbar();
+    const formRef = ref(null);
+    const isSubmitting = ref(false);
+    const requestType = ref('leave');
 
-    const requestForm = ref({
-      type: '',
-      duration: [], // [startDate, endDate]
+    const allPolicies = ref([]);
+    const workLocations = ref([]);
+
+    const form = ref({
+      policyId: null,
+      requestUnit: 'DAY',
+      dateRange: [],
+      dateTimeRange: [],
       reason: '',
+      workLocation: null,
     });
 
-    const proceedToDetailForm = () => {
-      if (!requestForm.value.type || !requestForm.value.duration[0] || !requestForm.value.duration[1] || !requestForm.value.reason) {
-        warning('모든 필수 정보를 입력해주세요.');
-        return;
+    // --- 신청 현황 테이블용 상태 변수 ---
+    const myRequests = ref([]);
+    const pagination = ref({ page: 1, size: 10, total: 0 });
+    const tableLoading = ref(false);
+
+    const leavePolicies = computed(() => 
+      allPolicies.value.filter(p => p && p.typeCode && (p.typeCode.includes('LEAVE') || p.typeCode.includes('PTC00')))
+    );
+    const tripPolicies = computed(() => 
+      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC102')
+    );
+
+    watch(requestType, (newType) => {
+      if (newType === 'trip') {
+        form.value.requestUnit = 'DAY';
       }
+    });
 
-      let routeName = '';
-      let queryParams = {
-        startDate: requestForm.value.duration[0],
-        endDate: requestForm.value.duration[1],
-        reason: requestForm.value.reason
-      };
-
-      switch (requestForm.value.type) {
-        case 'vacation_request':
-          routeName = 'VacationRequestForm';
-          // If specific vacationType is needed, it would be selected here or in the next form
-          break;
-        case 'business_trip':
-          routeName = 'BusinessTripRequestForm';
-          break;
-        case 'overtime_request':
-          routeName = 'OvertimeRequest';
-          break;
-        case 'expense_report':
-          routeName = 'ExpenseReport';
-          break;
-        case 'resource_booking':
-          routeName = 'ResourceBookingForm';
-          break;
-        case 'other':
-          routeName = 'OtherApprovalForm';
-          break;
-        default:
-          warning('알 수 없는 신청 유형입니다.');
-          return;
+    const fetchInitialData = async () => {
+      try {
+        const policyResponse = await getPolicies({ page: 0, size: 100 });
+        console.log('Fetched Policies:', policyResponse.content); // 데이터 확인용 콘솔 로그
+        allPolicies.value = policyResponse.content || [];
+        
+        workLocations.value = await getActiveWorkLocations();
+      } catch (err) {
+        error(err.message || '필요한 데이터를 불러오는 데 실패했습니다.');
       }
+    };
 
-      router.push({
-        name: routeName,
-        query: queryParams
+    const fetchMyRequests = async () => {
+      tableLoading.value = true;
+      try {
+        const params = { page: pagination.value.page - 1, size: pagination.value.size, sort: 'createdAt,desc' };
+        const response = await getMyLeaveRequests(params);
+        myRequests.value = response.content;
+        pagination.value.total = response.totalElements;
+      } catch (err) {
+        error(err.message || '신청 현황을 불러오는 데 실패했습니다.');
+      } finally {
+        tableLoading.value = false;
+      }
+    };
+
+    onMounted(() => {
+      fetchInitialData();
+      fetchMyRequests(); // onMounted에 추가
+    });
+
+    const submitForm = async () => {
+      if (!formRef.value) return;
+      await formRef.value.validate(async (valid) => {
+        if (valid) {
+          isSubmitting.value = true;
+          try {
+            const payload = {
+              policyId: form.value.policyId,
+              requestUnit: form.value.requestUnit,
+              reason: form.value.reason,
+              workLocation: requestType.value === 'trip' ? form.value.workLocation : null,
+            };
+
+            if (form.value.requestUnit === 'TIME_OFF') {
+              payload.startDateTime = form.value.dateTimeRange[0];
+              payload.endDateTime = form.value.dateTimeRange[1];
+            } else {
+              payload.startAt = form.value.dateRange[0];
+              payload.endAt = form.value.dateRange[1];
+            }
+
+            await createLeaveRequest(payload);
+            success('신청이 성공적으로 제출되었습니다.');
+            fetchMyRequests(); // 신청 성공 후 목록 새로고침
+            router.push({ name: 'AttendancePage' });
+          } catch (err) {
+            error(err.message || '신청 제출에 실패했습니다.');
+          } finally {
+            isSubmitting.value = false;
+          }
+        }
       });
     };
 
-    const cancelRequest = () => {
-      console.log('신청 취소');
-      warning('신청이 취소되었습니다.');
-      router.back(); // 이전 페이지로 돌아가기
+    const resetForm = () => {
+      if (formRef.value) {
+        formRef.value.resetFields();
+      }
+      form.value.dateTimeRange = [];
+    };
+    
+    const handleRequestTypeChange = () => {
+      form.value.policyId = null;
+      resetForm();
+    };
+
+    const handleSizeChange = (newSize) => {
+      pagination.value.size = newSize;
+      fetchMyRequests();
+    };
+
+    const handlePageChange = (newPage) => {
+      pagination.value.page = newPage;
+      fetchMyRequests();
+    };
+
+    const formatRequestUnit = (unit) => ({ 'DAY': '종일', 'HALF_DAY_AM': '오전 반차', 'HALF_DAY_PM': '오후 반차', 'TIME_OFF': '시간 단위' }[unit] || unit);
+    const formatStatus = (status) => ({ 'PENDING': '대기중', 'APPROVED': '승인', 'REJECTED': '반려', 'CANCELED': '취소' }[status] || status);
+    const getStatusType = (status) => ({ 'PENDING': 'info', 'APPROVED': 'success', 'REJECTED': 'danger', 'CANCELED': 'warning' }[status] || 'info');
+    const formatDate = (dateTimeStr) => dateTimeStr ? dateTimeStr.split('T')[0] : '';
+    const formatPeriod = (row) => {
+      if (!row) return '';
+      if (row.requestUnit === 'TIME_OFF') {
+        const start = row.startDateTime ? row.startDateTime.replace('T', ' ').substring(0, 16) : '';
+        const end = row.endDateTime ? row.endDateTime.replace('T', ' ').substring(0, 16) : '';
+        return `${start} ~ ${end}`;
+      }
+      const startAt = row.startDateTime ? row.startDateTime.substring(0, 10) : '';
+      const endAt = row.endDateTime ? row.endDateTime.substring(0, 10) : '';
+      return `${startAt} ~ ${endAt}`;
     };
 
     return {
-      requestForm,
-      proceedToDetailForm,
-      cancelRequest,
+      form,
+      formRef,
+      isSubmitting,
+      requestType,
+      leavePolicies,
+      tripPolicies,
+      workLocations,
+      submitForm,
+      resetForm,
+      handleRequestTypeChange,
+      myRequests,
+      pagination,
+      tableLoading,
+      fetchMyRequests,
+      handleSizeChange,
+      handlePageChange,
+      formatRequestUnit,
+      formatStatus,
+      getStatusType,
+      formatDate,
+      formatPeriod,
+      Refresh,
     };
   },
 };
 </script>
 
 <style scoped>
-.leave-request {
-  max-width: 800px;
+.leave-request-page {
+  max-width: 1600px;
   margin: 0 auto;
 }
-
-.content-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
 .card-header {
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-
-.card-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.request-form-section {
-  padding: 24px;
-}
-
-.form-help-text {
-    font-size: 12px;
-    color: #909399;
+.pagination {
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.0.0",
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@mdi/font": "^7.4.47",
     "axios": "^1.12.2",
     "chart.js": "^4.5.0",
