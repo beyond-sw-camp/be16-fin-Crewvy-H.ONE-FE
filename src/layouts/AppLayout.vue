@@ -130,11 +130,8 @@
             <template #title>
               <span>급여 관리</span>
             </template>
-              <el-menu-item index="/payroll/policy-settings">
-                <span>급여 정책 설정</span>
-              </el-menu-item>
-            <el-menu-item index="/payroll/item-management">
-              <span>급여 기초 정보</span>
+            <el-menu-item index="/payroll/settings">
+              <span>급여 설정</span>
             </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
               <span>급여 기본 정보</span>
