@@ -28,11 +28,11 @@
           <div v-if="!searched">
             <el-empty description="검색어를 입력해주세요."></el-empty>
           </div>
-          <div v-else-if="filteredResults.length === 0">
+          <div v-else-if="results.length === 0">
             <el-empty :description="'\'' + searchQuery + '\'에 대한 검색 결과가 없습니다.'"></el-empty>
           </div>
           <div v-else>
-            <div v-for="result in filteredResults" :key="result.id" class="result-item">
+            <div v-for="result in results" :key="result.id" class="result-item">
               <div class="result-header">
                 <span class="result-type">{{ result.type }}</span>
                 <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
@@ -63,6 +63,7 @@
 </template>
 
 <script>
+import employeeService from '@/api/employeeService';
 export default {
   name: 'GlobalSearch',
   data() {
@@ -76,32 +77,35 @@ export default {
         { name: 'board', label: '게시판' },
         { name: 'approval', label: '결재' },
       ],
-      results: [
-        { id: 1, type: '직원', title: '김철수', snippet: '개발팀 팀장. <strong>검색</strong> 관련 프로젝트 담당.', category: 'employee', path: '/employee/1' },
-        { id: 2, type: '조직', title: '개발팀', snippet: 'H.ONE의 핵심 기술 개발을 담당하는 부서. 현재 <strong>검색</strong> 엔진 고도화 작업 진행 중.', category: 'organization', path: '/organization/dev' },
-        { id: 3, type: '게시판', title: '[공지] 2025년 하반기 정기 보안 업데이트 안내', snippet: '전사 시스템에 대한 보안 업데이트가 예정되어 있습니다. <strong>검색</strong> 기능 개선 포함.', category: 'board', path: '/board/notice/1' },
-        { id: 4, type: '결재', title: '통합 검색 기능 개발 기획안', snippet: '사용자 경험 개선을 위한 통합 <strong>검색</strong> 기능 도입 기획안입니다.', category: 'approval', path: '/approval/doc/123' },
-        { id: 5, type: '직원', title: '박민수', snippet: '개발팀 주임. <strong>검색</strong> 성능 최적화 담당.', category: 'employee', path: '/employee/2' },
-      ],
+      results: [],
     };
   },
   computed: {
-    filteredResults() {
-      if (!this.searchQuery) return [];
-      return this.results.filter(result => 
-        result.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        result.snippet.toLowerCase().includes(this.searchQuery.toLowerCase())
-      );
-    }
   },
   methods: {
-    performSearch() {
+    async performSearch() {
       this.searched = true;
-      // 실제 검색 로직은 여기에 구현합니다.
-      // 지금은 더미 데이터를 필터링하는 것으로 대체합니다.
+      this.results = [];
+      if (!this.searchQuery) {
+        return;
+      }
+
+      try {
+        const response = await employeeService.searchEmployees(this.searchQuery);
+        this.results = response.data.data.map(emp => ({
+          id: emp.memberId,
+          type: '직원',
+          title: emp.name,
+                    snippet: `${emp.organizationName.join(', ')} - ${emp.titleName.join(', ')}`,          category: 'employee',
+          path: `/member/detail/${emp.memberId}`
+        }));
+      } catch (error) {
+        console.error('Error searching employees:', error);
+        // You can add user-facing error handling here, like a snackbar notification.
+      }
     },
     getResultsByCategory(category) {
-      return this.filteredResults.filter(result => result.category === category);
+      return this.results.filter(result => result.category === category);
     },
     navigateTo(result) {
       this.$router.push(result.path);

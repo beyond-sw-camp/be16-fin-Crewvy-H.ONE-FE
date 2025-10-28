@@ -59,11 +59,7 @@
             v-loading="loading"
             element-loading-text="데이터를 불러오는 중..."
           >
-            <el-table-column label="번호" width="80" align="center">
-              <template #default="scope">
-                {{ scope.$index + 1 }}
-              </template>
-            </el-table-column>
+            <el-table-column type="selection" width="55" align="center" />
             
             <el-table-column label="구분" width="150" align="center">
               <template #default="scope">
@@ -72,40 +68,25 @@
                   placeholder="선택하세요"
                   size="small"
                   style="width: 100%"
+                  :disabled="scope.row.isBasicRequired"
+                  :style="{ cursor: 'default' }"
                   @change="(value) => handleTypeChange(scope.row, value)"
                 >
-                  <el-option label="지급" value="ALLOWANCE" />
-                  <el-option label="공제" value="DEDUCTION" />
+                  <el-option label="지급" value="payment" />
+                  <el-option label="공제" value="deduction" />
                 </el-select>
               </template>
             </el-table-column>
             
             <el-table-column label="항목명" min-width="200">
               <template #default="scope">
-                <div class="item-name-container">
-                  <el-select 
-                    v-model="scope.row.itemName" 
-                    placeholder="항목명을 선택하세요"
-                    size="small"
-                    style="width: 100%"
-                    @change="(value) => handleItemNameChange(scope.row, value)"
-                  >
-                    <el-option 
-                      v-for="option in getItemNameOptions(scope.row.type)" 
-                      :key="option.value" 
-                      :label="option.label" 
-                      :value="option.value" 
-                    />
-                  </el-select>
-                  <el-input 
-                    v-if="scope.row.itemName === '기타항목'"
-                    v-model="scope.row.customItemName" 
-                    placeholder="직접 입력하세요"
-                    size="small"
-                    style="width: 100%; margin-top: 8px;"
-                    @input="(value) => handleCustomItemNameChange(scope.row, value)"
-                  />
-                </div>
+                <el-input 
+                  v-model="scope.row.itemName" 
+                  :placeholder="'항목명을 입력하세요'"
+                  size="small"
+                  :readonly="scope.row.isBasicRequired"
+                  :style="{ cursor: 'default' }"
+                />
               </template>
             </el-table-column>
             
@@ -115,16 +96,40 @@
                   v-model="scope.row.description" 
                   :placeholder="'항목 설명을 입력하세요'"
                   size="small"
+                  :readonly="scope.row.isBasicRequired"
+                  :style="{ cursor: 'default' }"
                 />
               </template>
             </el-table-column>
             
             <el-table-column label="사용여부" width="100" align="center">
               <template #default="scope">
-                <el-switch 
+                <el-checkbox 
                   v-model="scope.row.isActive"
-                  active-color="#13ce66"
-                  inactive-color="#ff4949"
+                  :disabled="scope.row.isBasicRequired"
+                />
+              </template>
+            </el-table-column>
+            
+            <el-table-column label="과세 대상" width="100" align="center">
+              <template #default="scope">
+                <el-checkbox 
+                  v-model="scope.row.isTaxable"
+                  :disabled="scope.row.isBasicRequired || scope.row.type === 'deduction'"
+                  :class="{ 'disabled-checkbox': scope.row.isBasicRequired || scope.row.type === 'deduction' }"
+                />
+              </template>
+            </el-table-column>
+            
+            <el-table-column label="비과세 한도" width="150" align="center">
+              <template #default="scope">
+                <el-input 
+                  v-model="scope.row.nonTaxableLimit" 
+                  placeholder="한도 입력"
+                  size="small"
+                  :readonly="!((scope.row.calculationCode === 'ST001' && scope.row.isTaxable === false) || scope.row.type === 'payment')"
+                  :class="{ 'disabled-input': !((scope.row.calculationCode === 'ST001' && scope.row.isTaxable === false) || scope.row.type === 'payment') }"
+                  type="number"
                 />
               </template>
             </el-table-column>
@@ -140,6 +145,8 @@
                 <el-button 
                   type="danger" 
                   size="small" 
+                  :disabled="scope.row.isBasicRequired"
+                  :style="{ cursor: 'default' }"
                   @click="deleteItem(scope.$index)"
                 >
                   <el-icon><Delete /></el-icon>
@@ -225,14 +232,17 @@ export default {
       payrollItems: [],
       originalPayrollItems: [], // 원본 데이터 저장
       loading: false,
+      // API에서 가져온 항목명 옵션
+      paymentItemOptions: [],
+      deductionItemOptions: []
     }
   },
   computed: {
     paymentItemsCount() {
-      return this.payrollItems.filter(item => item.type === 'ALLOWANCE').length
+      return this.payrollItems.filter(item => item.type === 'payment').length
     },
     deductionItemsCount() {
-      return this.payrollItems.filter(item => item.type === 'DEDUCTION').length
+      return this.payrollItems.filter(item => item.type === 'deduction').length
     },
     activeItemsCount() {
       return this.payrollItems.filter(item => item.isActive).length
@@ -241,47 +251,100 @@ export default {
       return this.payrollItems.filter(item => !item.isActive).length
     },
     hasChanges() {
-      if (this.originalData.length !== this.payrollItems.length) {
+      if (this.originalPayrollItems.length !== this.payrollItems.length) {
         return true
       }
       
       return this.payrollItems.some((item, index) => {
-        const original = this.originalData[index]
+        const original = this.originalPayrollItems[index]
         if (!original) return true
         
         return (
           item.type !== original.type ||
           item.itemName !== original.itemName ||
           item.description !== original.description ||
-          item.isActive !== original.isActive
+          item.isActive !== original.isActive ||
+          item.isTaxable !== original.isTaxable ||
+          item.nonTaxableLimit !== original.nonTaxableLimit
         )
       })
     },
     changedItems() {
       return this.payrollItems.filter((item, index) => {
-        const original = this.originalData[index]
+        const original = this.originalPayrollItems[index]
         if (!original) return true
         
         return (
           item.type !== original.type ||
           item.itemName !== original.itemName ||
           item.description !== original.description ||
-          item.isActive !== original.isActive
+          item.isActive !== original.isActive ||
+          item.isTaxable !== original.isTaxable ||
+          item.nonTaxableLimit !== original.nonTaxableLimit
         )
       })
     }
   },
   async mounted() {
+    await this.loadItemOptions()
     await this.loadPayrollItems()
   },
   methods: {
+    // 회사 ID 가져오기 (실제로는 사용자 세션이나 환경변수에서 가져와야 함)
+    getCompanyId() {
+      // TODO: 실제 구현에서는 사용자 세션이나 환경변수에서 가져와야 함
+      // 현재는 개발용으로 환경변수 또는 기본값 사용
+      return process.env.VUE_APP_COMPANY_ID || 'f1e85c26-14fa-4603-8edd-bfbdd82234ab'
+    },
+    
+    // 항목명 옵션을 API에서 가져오기
+    async loadItemOptions() {
+      try {
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
+          params: { companyId: this.getCompanyId() } // 특정 회사 ID로 요청 (백엔드에서 null 포함해서 응답)
+        })
+        
+        // API 응답에 따라 데이터 구조 조정
+        let items = []
+        if (response.data) {
+          if (Array.isArray(response.data)) {
+            items = response.data
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            items = response.data.data
+          } else if (response.data.payrollItems && Array.isArray(response.data.payrollItems)) {
+            items = response.data.payrollItems
+          }
+        }
+        
+        // 지급/공제 구분하여 옵션 생성
+        this.paymentItemOptions = items
+          .filter(item => item.salaryType === 'ALLOWANCE')
+          .map(item => ({
+            label: item.name,
+            value: item.name
+          }))
+        
+        this.deductionItemOptions = items
+          .filter(item => item.salaryType === 'DEDUCTION')
+          .map(item => ({
+            label: item.name,
+            value: item.name
+          }))
+      } catch (error) {
+        console.warn('항목 옵션 로드 실패:', error)
+        // 실패 시 빈 배열로 초기화
+        this.paymentItemOptions = []
+        this.deductionItemOptions = []
+      }
+    },
+    
     // 백엔드에서 급여 항목 목록 로드
     async loadPayrollItems() {
       try {
         this.loading = true
         
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: this.getCompanyId() }
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -297,46 +360,46 @@ export default {
         }
         
         // 백엔드 데이터를 프론트엔드 형식으로 변환
-        const convertedItems = items.map((item, index) => {
+        console.log('백엔드에서 받은 데이터:', items)
+        const convertedItems = items.map((item) => {
           const type = item.salaryType === 'ALLOWANCE' ? 'payment' : 'deduction'
-          const availableOptions = this.getItemNameOptions(type)
-          const isStandardItem = availableOptions.some(option => option.value === item.name)
+          
+          // companyId가 null인 경우는 기본 필수 항목, 그 외는 회사별 항목
+          const isBasicRequiredItem = item.companyId === null
           
           return {
-            id: index + 1, // 화면에 보여줄 번호 (1부터 시작)
-            uuid: item.id, // 실제 UUID는 내부적으로만 사용
+            uuid: item.id, // UUID를 사용하여 수정/삭제 시 식별
             type: type,
-            itemName: isStandardItem ? item.name : '기타항목',
-            customItemName: isStandardItem ? '' : item.name,
+            itemName: item.name, // 항목명을 직접 사용
             description: item.description || '',
-            isActive: item.isActive === 'TRUE' || item.isActive === true,
-            createdAt: item.createdAt
+            isActive: item.isActive === 'TRUE' || item.isActive === true || item.isActive === 'true',
+            isTaxable: item.isTaxable === true || item.isTaxable === 'TRUE' || item.isTaxable === 'true', // 과세 대상 여부
+            nonTaxableLimit: item.nonTaxableLimit || 0, // 비과세 한도
+            calculationCode: item.calculationCode || null, // 계산 코드
+            createdAt: item.createdAt,
+            isBasicRequired: isBasicRequiredItem // 기본 필수 항목 여부
           }
         })
         
         // 지급 항목을 상위에, 공제 항목을 하위에 정렬
-        // 각 구분 내에서 기타항목은 하단에 위치
+        // 각 구분 내에서 기본 필수 항목을 먼저, 기타항목을 나중에 배치
         this.payrollItems = convertedItems.sort((a, b) => {
           // 먼저 구분별로 정렬 (지급 > 공제)
           if (a.type === 'payment' && b.type === 'deduction') return -1
           if (a.type === 'deduction' && b.type === 'payment') return 1
           
-          // 같은 구분 내에서는 기타항목을 하단에 배치
+          // 같은 구분 내에서는 기본 필수 항목을 먼저, 기타항목을 나중에 배치
           if (a.type === b.type) {
-            if (a.itemName === '기타항목' && b.itemName !== '기타항목') return 1
-            if (a.itemName !== '기타항목' && b.itemName === '기타항목') return -1
+            if (a.isBasicRequired && !b.isBasicRequired) return -1
+            if (!a.isBasicRequired && b.isBasicRequired) return 1
           }
           
           return 0
         })
         
-        // 정렬 후 ID 재정렬 (1부터 순차적으로)
-        this.payrollItems.forEach((item, index) => {
-          item.id = index + 1
-        })
-        
         // 원본 데이터 저장 (깊은 복사)
         this.originalPayrollItems = JSON.parse(JSON.stringify(this.payrollItems))
+        console.log('변환된 데이터:', this.payrollItems)
         
       } catch (error) {
         console.error('급여 항목 로드 실패:', error)
@@ -349,24 +412,29 @@ export default {
     },
 
     addNewItem() {
-      const today = new Date()
-      // 현재 존재하는 항목들 중 가장 큰 ID를 찾아서 +1
-      const maxId = this.payrollItems.length > 0 ? Math.max(...this.payrollItems.map(item => item.id)) : 0
-      const newItem = {
-        id: maxId + 1,
-        uuid: null, // 새 항목은 UUID가 없음
-        type: '',
-        itemName: '',
-        customItemName: '',
-        description: '',
-        isActive: true,
-        createdAt: today
-      }
+        const newItem = {
+          uuid: null, // 새 항목은 UUID가 없음
+          type: '',
+          itemName: '',
+          description: '',
+          isActive: true,
+          isTaxable: false, // 기본값: 비과세
+          nonTaxableLimit: 0, // 기본값: 0원
+          calculationCode: null, // 계산 코드
+          createdAt: new Date(),
+          isBasicRequired: false // 새로 추가하는 항목은 기본 필수 항목이 아님
+        }
       this.payrollItems.push(newItem)
       this.info('새로운 항목이 추가되었습니다. 내용을 입력한 후 저장해주세요.')
     },
     async deleteItem(index) {
       const item = this.payrollItems[index]
+      
+      // 기본 필수 항목은 삭제 불가
+      if (item.isBasicRequired) {
+        this.warning('기본 필수 항목은 삭제할 수 없습니다.')
+        return
+      }
       
       // 새로 추가된 항목(uuid가 null)인 경우 백엔드 요청 없이 로컬에서만 삭제
       if (!item.uuid) {
@@ -376,7 +444,6 @@ export default {
           type: 'warning'
         }).then(() => {
           this.payrollItems.splice(index, 1)
-          this.reorderIds()
           this.success('항목이 삭제되었습니다.')
         }).catch(() => {
           this.info('삭제가 취소되었습니다.')
@@ -398,7 +465,6 @@ export default {
           
           // 백엔드 삭제 성공 시 로컬에서도 삭제
           this.payrollItems.splice(index, 1)
-          this.reorderIds()
           this.success('항목이 삭제되었습니다.')
         } catch (error) {
           console.error('항목 삭제 실패:', error)
@@ -408,6 +474,7 @@ export default {
         this.info('삭제가 취소되었습니다.')
       })
     },
+    
     cancelChanges() {
       // 변경사항이 없으면 취소하지 않음 (추가 안전장치)
       if (!this.hasChanges) {
@@ -421,7 +488,7 @@ export default {
         type: 'warning'
       }).then(() => {
         // 원본 데이터로 복원
-        this.payrollItems = JSON.parse(JSON.stringify(this.originalData))
+        this.payrollItems = JSON.parse(JSON.stringify(this.originalPayrollItems))
         this.info('변경사항이 취소되었습니다.')
       }).catch(() => {
         this.info('편집을 계속합니다.')
@@ -430,7 +497,12 @@ export default {
 
     // 개별 항목의 변경사항 확인
     hasItemChanged(originalItem, currentItem) {
-      const fieldsToCompare = ['type', 'itemName', 'customItemName', 'description', 'isActive']
+      // 기본 필수 항목은 변경사항 무시
+      if (currentItem.isBasicRequired) {
+        return false
+      }
+      
+      const fieldsToCompare = ['type', 'itemName', 'description', 'isActive', 'isTaxable', 'nonTaxableLimit']
       
       for (const field of fieldsToCompare) {
         if (currentItem[field] !== originalItem[field]) {
@@ -443,7 +515,7 @@ export default {
 
     async saveItems() {
       // 변경사항이 없으면 저장하지 않음
-      if (!this.hasChanges()) {
+      if (!this.hasChanges) {
         this.info('변경된 내용이 없습니다.')
         return
       }
@@ -451,13 +523,11 @@ export default {
       // 유효성 검사
       const invalidItems = this.payrollItems.filter(item => {
         if (!item.type || !item.itemName.trim()) return true
-        // 기타항목인 경우 커스텀 항목명이 필수
-        if (item.itemName === '기타항목' && !item.customItemName.trim()) return true
         return false
       })
       
       if (invalidItems.length > 0) {
-        this.error('구분과 항목명은 필수 입력 항목입니다. 기타항목을 선택한 경우 직접 입력도 필요합니다.')
+        this.error('구분과 항목명은 필수 입력 항목입니다.')
         return
       }
       
@@ -468,31 +538,41 @@ export default {
         const changedItems = []
         
         this.payrollItems.forEach(item => {
-          const finalItemName = item.itemName === '기타항목' ? item.customItemName : item.itemName
-          const finalSalaryType = item.type === 'payment' ? 'ALLOWANCE' : 'DEDUCTION'
-          
-          const itemData = {
-            companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e', // 회사 UUID
-            memberId: item.uuid, // 기존 항목의 UUID (새 항목은 null)
-            salaryType: finalSalaryType,
-            name: finalItemName, // 기타항목인 경우 입력 필드의 실제 값
-            isActive: item.isActive ? 'TRUE' : 'FALSE',
-            description: item.description
+          // 기본 필수 항목은 저장 대상에서 제외
+          if (item.isBasicRequired) {
+            return
           }
+          
+          const finalItemName = item.itemName
+          const finalSalaryType = item.type === 'payment' ? 'ALLOWANCE' : 'DEDUCTION'
           
           // 새 항목인 경우 (uuid가 null)
           if (!item.uuid) {
+            const itemData = {
+              companyId: this.getCompanyId(), // 회사 UUID
+              memberId: null, // 새 항목은 memberId가 null
+              salaryType: finalSalaryType,
+              name: finalItemName,
+               isActive: item.isActive ? 'TRUE' : 'FALSE',
+               description: item.description,
+               isTaxable: item.isTaxable ? 'TRUE' : 'FALSE',
+               nonTaxableLimit: item.nonTaxableLimit || 0,
+              calculationCode: null
+            }
             newItems.push(itemData)
           } else {
             // 기존 항목인 경우 변경사항 확인
             const originalItem = this.originalPayrollItems.find(orig => orig.uuid === item.uuid)
             if (originalItem && this.hasItemChanged(originalItem, item)) {
               changedItems.push({
-                id: item.uuid,
+                id: item.uuid, // UUID로 식별
                 salaryType: finalSalaryType,
                 name: finalItemName,
-                isActive: item.isActive ? 'TRUE' : 'FALSE',
-                description: item.description
+               isActive: item.isActive ? 'TRUE' : 'FALSE',
+               description: item.description,
+               isTaxable: item.isTaxable ? 'TRUE' : 'FALSE',
+               nonTaxableLimit: item.nonTaxableLimit || 0,
+                calculationCode: null
               })
             }
           }
@@ -534,73 +614,13 @@ export default {
       })
     },
     
-    // 구분에 따른 항목명 옵션 반환
-    getItemNameOptions(type) {
-      if (type === 'payment') {
-        return [
-          { label: '기본급', value: '기본급' },
-          { label: '연장수당', value: '연장수당' },
-          { label: '야간수당', value: '야간수당' },
-          { label: '직책수당', value: '직책수당' },
-          { label: '식대', value: '식대' },
-          { label: '기타항목', value: '기타항목' }
-        ]
-      } else if (type === 'deduction') {
-        return [
-          { label: '국민연금', value: '국민연금' },
-          { label: '건강보험', value: '건강보험' },
-          { label: '고용보험', value: '고용보험' },
-          { label: '장기요양보험', value: '장기요양보험' },
-          { label: '기타항목', value: '기타항목' }
-        ]
-      }
-      return []
-    },
-    
     // 구분 변경 시 처리
     handleTypeChange(row) {
-      // 구분이 변경되면 항목명과 커스텀 항목명 초기화
+      // 구분이 변경되면 항목명과 설명 초기화
       row.itemName = ''
-      row.customItemName = ''
       row.description = ''
     },
     
-    // 항목명 변경 시 처리
-    handleItemNameChange(row, newItemName) {
-      // 기타항목이 아닌 경우 커스텀 항목명 초기화
-      if (newItemName !== '기타항목') {
-        row.customItemName = ''
-        // 기타항목이 아닌 경우에만 기본 설명 설정
-        this.updateDescriptionByItemName(row, newItemName)
-      } else {
-        // 기타항목 선택 시 설명 필드는 비워둠 (placeholder만 표시)
-        row.description = ''
-      }
-    },
-    
-    // 커스텀 항목명 변경 시 처리
-    handleCustomItemNameChange() {
-      // 커스텀 항목명 변경 시에는 설명을 자동으로 설정하지 않음
-      // 사용자가 직접 설명을 입력하도록 함
-    },
-    
-    // 항목명에 따른 설명 자동 설정
-    updateDescriptionByItemName(row, itemName) {
-      const descriptions = {
-        '기본급': '정규 직원 기본 급여',
-        '연장수당': '정규 근무 시간 초과시 발생하는 수당',
-        '야간수당': '야간 근무 수당',
-        '직책수당': '직책에 따른 추가 수당',
-        '식대': '직원 식대 지원금',
-        '국민연금': '국민연금 보험료 공제',
-        '건강보험': '건강보험료 공제',
-        '고용보험': '고용보험료 공제',
-        '장기요양보험': '장기요양보험료 공제',
-        '기타항목': '기타 항목'
-      }
-      
-      row.description = descriptions[itemName] || ''
-    }
   },
   async created() {
     // 컴포넌트 생성 시 급여 항목 목록 로드
@@ -611,34 +631,28 @@ export default {
 
 <style scoped>
 .payroll-item-management {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
+  padding: 20px;
 }
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
-.header-content h1 {
-  font-size: 32px;
-  font-weight: 600;
+.page-header h1 {
   color: #2c3e50;
   margin-bottom: 8px;
 }
 
-.header-content p {
-  font-size: 16px;
+.page-header p {
   color: #606266;
-  margin: 0;
+  font-size: 14px;
 }
 
 .header-actions {
   display: flex;
   gap: 12px;
+  margin-bottom: 20px;
+  justify-content: flex-end;
 }
 
 .content-section {
@@ -769,11 +783,23 @@ export default {
   gap: 4px;
 }
 
+/* 기본 필수 항목의 커서 스타일 강제 적용 */
+.table-container :deep(.el-select.is-disabled) {
+  cursor: default !important;
+}
+
+.table-container :deep(.el-switch.is-disabled) {
+  cursor: default !important;
+}
+
+.table-container :deep(.el-input.is-disabled) {
+  cursor: default !important;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 16px;
+  .payroll-item-management {
+    padding: 16px;
   }
   
   .stats-cards {
@@ -781,8 +807,8 @@ export default {
   }
   
   .header-actions {
-    width: 100%;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 8px;
   }
 }
 
@@ -823,10 +849,36 @@ export default {
   box-shadow: 0 2px 4px rgba(144, 147, 153, 0.3);
 }
 
-.header-actions .el-button--info:not(.disabled-button):hover {
-  background-color: #a6a9ad;
-  border-color: #a6a9ad;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(144, 147, 153, 0.4);
-}
-</style>
+ .header-actions .el-button--info:not(.disabled-button):hover {
+   background-color: #a6a9ad;
+   border-color: #a6a9ad;
+   transform: translateY(-1px);
+   box-shadow: 0 4px 8px rgba(144, 147, 153, 0.4);
+ }
+
+ /* 비활성화된 체크박스 스타일 */
+ .disabled-checkbox :deep(.el-checkbox__input) {
+   background-color: #f5f7fa !important;
+   border-color: #dcdfe6 !important;
+ }
+
+ .disabled-checkbox :deep(.el-checkbox__label) {
+   color: #c0c4cc !important;
+ }
+
+ .disabled-checkbox :deep(.el-checkbox__input.is-disabled + .el-checkbox__label) {
+   color: #c0c4cc !important;
+ }
+
+ /* 비활성화된 입력 필드 스타일 */
+ .disabled-input :deep(.el-input__inner) {
+   background-color: #f5f7fa !important;
+   color: #c0c4cc !important;
+   border-color: #dcdfe6 !important;
+ }
+
+ .disabled-input :deep(.el-input__inner:focus) {
+   background-color: #f5f7fa !important;
+   border-color: #dcdfe6 !important;
+ }
+ </style>

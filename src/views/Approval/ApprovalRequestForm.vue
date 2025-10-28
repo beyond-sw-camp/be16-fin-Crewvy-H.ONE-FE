@@ -138,6 +138,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
+import { useSnackbar } from '@/composables/useSnackbar';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/api/http';
 import ApprovalLineEditorModal from '@/components/approval/ApprovalLineEditorModal.vue';
@@ -150,6 +151,7 @@ export default {
     UploadFilled,
   },
   setup() {
+    const { showSnackbar } = useSnackbar();
     const router = useRouter();
     const route = useRoute();
     const documentId = ref(null); // For the template
@@ -351,7 +353,7 @@ export default {
         });
       } catch (error) {
         console.error('File upload failed:', error);
-        alert('파일 업로드에 실패했습니다.');
+        showSnackbar('파일 업로드에 실패했습니다.', 'error');
       }
     };
 
@@ -381,11 +383,11 @@ export default {
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
         }
-        alert('결재 요청이 성공적으로 전송되었습니다.');
+        showSnackbar('결재 요청이 성공적으로 전송되었습니다.');
         router.push('/approval');
       } catch (error) {
         console.error('결재 요청 실패:', error);
-        alert('결재 요청에 실패했습니다.');
+        showSnackbar('결재 요청에 실패했습니다.', 'error');
       }
     };
 
@@ -413,11 +415,11 @@ export default {
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
         }
-        alert('결재가 임시저장되었습니다.');
+        showSnackbar('결재가 임시저장되었습니다.');
         router.push('/approval');
       } catch (error) {
         console.error('임시저장 실패:', error);
-        alert('임시저장에 실패했습니다.');
+        showSnackbar('임시저장에 실패했습니다.', 'error');
       }
     };
 
@@ -427,11 +429,11 @@ export default {
       if (confirm('이 임시저장 문서를 삭제하시겠습니까?')) {
         try {
           await apiClient.delete(`/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
-          alert('문서가 삭제되었습니다.');
+          showSnackbar('문서가 삭제되었습니다.');
           router.push('/approval');
         } catch (error) {
           console.error('삭제 실패:', error);
-          alert('삭제에 실패했습니다.');
+          showSnackbar('삭제에 실패했습니다.', 'error');
         }
       }
     };
