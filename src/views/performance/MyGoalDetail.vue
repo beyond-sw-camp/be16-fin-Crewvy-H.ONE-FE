@@ -57,7 +57,7 @@
         <el-upload
             ref="uploader"
             class="upload-demo"
-            drag
+            :disabled="isFromReviewPage" 
             action="https://jsonplaceholder.typicode.com/posts/" 
             multiple
             :file-list="fileList"
@@ -66,17 +66,48 @@
             :on-preview="handleFilePreview"
             :auto-upload="false"
         >
-            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-            <div class="el-upload__text">
-            클릭하거나 파일을 드래그하여 업로드하세요
-            </div>
+            <template v-if="!isFromReviewPage">
+                <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                <div class="el-upload__text">
+                클릭하거나 파일을 드래그하여 업로드하세요
+                </div>
+            </template>
         </el-upload>
+    </el-card>
+
+    <el-card class="card-section" v-if="goalDetail.status === '최종 평가 완료'">
+      <template #header>
+        <span>평가 결과</span>
+      </template>
+      <el-card class="evaluation-card">
+        <h3>본인 평가</h3>
+        <div class="detail-item">
+          <label>평가 등급</label>
+          <p>{{ goalDetail.selfEvaluation.grade || 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>평가 코멘트</label>
+          <p>{{ goalDetail.selfEvaluation.comment || 'N/A' }}</p>
+        </div>
+      </el-card>
+
+      <el-card class="evaluation-card">
+        <h3>관리자 평가</h3>
+        <div class="detail-item">
+          <label>평가 등급</label>
+          <p>{{ goalDetail.managerEvaluation.grade || 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>평가 코멘트</label>
+          <p>{{ goalDetail.managerEvaluation.comment || 'N/A' }}</p>
+        </div>
+      </el-card>
     </el-card>
 
     <div class="actions-container">
         <el-button @click="goBack">취소</el-button>
         <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!['요청', '승인', '평가 대기'].includes(goalDetail.status)">저장</el-button>
-        <el-button v-if="isFromReviewPage" type="primary" @click="selfEvaluateDialogVisible = true">본인 평가</el-button>
+        <el-button v-if="isFromReviewPage" type="primary" @click="selfEvaluateDialogVisible = true" :disabled="goalDetail.status !== '평가 대기'">본인 평가</el-button>
     </div>
 
     <el-dialog v-model="selfEvaluateDialogVisible" title="본인 평가" width="500px">
@@ -122,6 +153,8 @@ export default {
         endDate: '',
         status: '',
         comment: '', // Initialize comment here
+        selfEvaluation: { grade: '', comment: '' },
+        managerEvaluation: { grade: '', comment: '' }
       },
       fileList: [],
       filesToDelete: [],
@@ -236,19 +269,32 @@ export default {
         const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data.data;
 
-        if (response.data.data.evidenceList && response.data.data.evidenceList.length > 0) {
-          this.fileList = response.data.data.evidenceList.map(evidence => {
-            const url = evidence.evidenceUrl;
-            const firstUnderscoreIndex = url.indexOf('_');
-            const name = firstUnderscoreIndex !== -1 ? url.substring(firstUnderscoreIndex + 1) : url;
+        // Initialize selfEvaluation and managerEvaluation if they don't exist in the fetched data
+        if (!this.goalDetail.selfEvaluation) {
+          this.goalDetail.selfEvaluation = { grade: '', comment: '' };
+        }
+        if (!this.goalDetail.managerEvaluation) {
+          this.goalDetail.managerEvaluation = { grade: '', comment: '' };
+        }
 
-            return {
-              name: name,
-              url: url,
-              fileId: evidence.evidenceId,
-              uid: evidence.evidenceId
+        // Fetch evaluation results if status is '최종 평가 완료' or '본인 평가 완료'
+        if (this.goalDetail.status === '최종 평가 완료' || this.goalDetail.status === '본인 평가 완료') {
+          try {
+            const evaluationResponse = await apiClient.get(`/workforce-service/performance/find-evaluation/${goalId}`);
+            if (evaluationResponse.data && evaluationResponse.data.data) {
+              evaluationResponse.data.data.forEach(evaluation => {
+                if (evaluation.type === 'SELF') {
+                  this.goalDetail.selfEvaluation.grade = evaluation.grade;
+                  this.goalDetail.selfEvaluation.comment = evaluation.comment;
+                } else if (evaluation.type === 'SUPERVISOR') {
+                  this.goalDetail.managerEvaluation.grade = evaluation.grade;
+                  this.goalDetail.managerEvaluation.comment = evaluation.comment;
+                }
+              });
             }
-          });
+          } catch (evalError) {
+            console.error('Error fetching evaluation results:', evalError);
+          }
         }
 
         if (this.goalDetail.gradingSystem) {
