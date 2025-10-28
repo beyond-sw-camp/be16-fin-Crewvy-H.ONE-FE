@@ -18,7 +18,7 @@
             <el-button @click="printPayroll" class="primary-btn">인쇄</el-button>
         </div>
         <!-- 모든 필드와 계산하기 버튼을 한 행에 -->
-        <el-row :gutter="20" class="search-row">
+        <el-row class="search-row">
           <el-col :span="3">
             <div class="search-item">
               <label>급여년월</label>
@@ -30,6 +30,7 @@
                 value-format="YYYY.MM"
                 size="mini"
                 style="width: 100%"
+                @change="onPayrollMonthChange"
               />
             </div>
           </el-col>
@@ -47,7 +48,7 @@
               />
             </div>
           </el-col>
-          <el-col :span="3">
+          <!-- <el-col :span="3">
             <div class="search-item">
               <label>급여내역</label>
               <el-input v-model="searchForm.payrollDetails" placeholder="급여내역" size="mini" />
@@ -92,17 +93,17 @@
             <div class="search-item">
               <el-button @click="calculatePayroll" class="calculate-btn">계산하기</el-button>
             </div>
-          </el-col>
+          </el-col> -->
         </el-row>
         
         <!-- 하단 버튼들 -->
-        <div class="button-section">
+        <!-- <div class="button-section">
           <div class="button-row">
             <el-button @click="adjustBonus" class="action-btn">상여조정</el-button>
             <el-button @click="copyPayroll" class="action-btn">급여복사</el-button>
             <el-button @click="annualLeavePayment" class="action-btn">연차지급</el-button>
           </div>
-        </div>
+        </div> -->
       </el-card>
     </div>
 
@@ -120,91 +121,65 @@
             :summary-method="getSummaries"
             class="payroll-employee-table"
             @selection-change="handleSelectionChange"
+            v-loading="loading"
+            element-loading-text="데이터를 불러오는 중..."
           >
           <!-- 선택 컬럼 -->
           <el-table-column type="selection" width="55" align="center" />
           
-          <!-- 직원 정보 -->
-          <el-table-column prop="employeeId" label="사번" width="80" align="center" header-align="center" />
-          <el-table-column prop="name" label="성명" width="100" align="center" header-align="center" />
-          <el-table-column prop="department" label="부서" width="100" align="center" header-align="center" />
-          <el-table-column prop="workDays" label="급여일수" width="100" align="center" header-align="center" />
+          <!-- 직원 정보 (고정 컬럼) -->
+          <!-- <el-table-column prop="employeeId" label="사번" width="80" align="center" header-align="center" fixed="left" /> -->
+          <el-table-column prop="name" label="성명" width="100" align="center" header-align="center" fixed="left" />
+          <el-table-column prop="department" label="부서" width="100" align="center" header-align="center" fixed="left" />
+          <el-table-column prop="workDays" label="급여일수" width="100" align="center" header-align="center" fixed="left" />
+          
+          <!-- 합계 컬럼 -->
+          <el-table-column prop="netPay" label="실지급액" width="120" align="right" header-align="center" fixed="left">
+            <template #default="scope">
+              <strong>{{ formatCurrency(scope.row.netPay) }}</strong>
+            </template>
+          </el-table-column>
+          <el-table-column prop="totalAllowance" label="총지급액" width="120" align="right" header-align="center">
+            <template #default="scope">
+              {{ formatCurrency(scope.row.totalAllowance) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="totalDeduction" label="총공제액" width="120" align="right" header-align="center">
+            <template #default="scope">
+              {{ formatCurrency(scope.row.totalDeduction) }}
+            </template>
+          </el-table-column>
           
           <!-- 지급항목 -->
           <el-table-column label="지급항목" align="center">
-            <el-table-column prop="basicSalary" label="기본급" width="120" align="right" header-align="center">
+            <el-table-column 
+              v-for="item in allowanceItems" 
+              :key="item.name"
+              :prop="item.property" 
+              :label="item.name" 
+              width="120" 
+              align="right" 
+              header-align="center"
+            >
               <template #default="scope">
-                {{ formatCurrency(scope.row.basicSalary) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="overtimeAllowance" label="연장수당" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.overtimeAllowance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="nightAllowance" label="야간수당" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.nightAllowance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="positionAllowance" label="직책수당" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.positionAllowance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="certificationAllowance" label="자격증수당" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.certificationAllowance) }}
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="mealAllowance" label="식대" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.mealAllowance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="bonus" label="상여금" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.bonus) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="otherAllowance" label="수당" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.otherAllowance) }}
+                {{ formatCurrency(scope.row[item.property]) }}
               </template>
             </el-table-column>
           </el-table-column>
           
           <!-- 공제항목 -->
           <el-table-column label="공제항목" align="center">
-            <el-table-column prop="nationalPension" label="국민연금" width="120" align="right" header-align="center">
+            <el-table-column 
+              v-for="item in deductionItems" 
+              :key="item.name"
+              :prop="item.property" 
+              :label="item.name" 
+              width="120" 
+              align="right" 
+              header-align="center"
+            >
               <template #default="scope">
-                {{ formatCurrency(scope.row.nationalPension) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="healthInsurance" label="건강보험" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.healthInsurance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="employmentInsurance" label="고용보험" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.employmentInsurance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="longTermCareInsurance" label="장기요양보험" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.longTermCareInsurance) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="incomeTax" label="소득세" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.incomeTax) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="localIncomeTax" label="지방소득세" width="120" align="right" header-align="center">
-              <template #default="scope">
-                {{ formatCurrency(scope.row.localIncomeTax) }}
+                {{ formatCurrency(scope.row[item.property]) }}
               </template>
             </el-table-column>
           </el-table-column>
@@ -262,6 +237,7 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import axios from 'axios'
 
 export default {
   name: 'PayrollActualCalculation',
@@ -282,206 +258,34 @@ export default {
         department: '',
         searchAll: ''
       },
-      payrollData: [
-        {
-          employeeId: 'EMP001',
-          name: '김철수',
-          department: '개발팀',
-          workDays: 20,
-          basicSalary: 4500000,
-          overtimeAllowance: 150000,
-          nightAllowance: 80000,
-          positionAllowance: 200000,
-          certificationAllowance: 100000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 50000,
-          nationalPension: 202500,
-          healthInsurance: 159525,
-          employmentInsurance: 27000,
-          longTermCareInsurance: 12762,
-          incomeTax: 180000,
-          localIncomeTax: 18000
-        },
-        {
-          employeeId: 'EMP002',
-          name: '박민수',
-          department: '개발팀',
-          workDays: 20,
-          basicSalary: 3800000,
-          overtimeAllowance: 120000,
-          nightAllowance: 60000,
-          positionAllowance: 150000,
-          certificationAllowance: 80000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 30000,
-          nationalPension: 171000,
-          healthInsurance: 134710,
-          employmentInsurance: 22800,
-          longTermCareInsurance: 10777,
-          incomeTax: 140000,
-          localIncomeTax: 14000
-        },
-        {
-          employeeId: 'EMP003',
-          name: '이지은',
-          department: '디자인팀',
-          workDays: 20,
-          basicSalary: 3200000,
-          overtimeAllowance: 80000,
-          nightAllowance: 40000,
-          positionAllowance: 100000,
-          certificationAllowance: 60000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 20000,
-          nationalPension: 144000,
-          healthInsurance: 113440,
-          employmentInsurance: 19200,
-          longTermCareInsurance: 9075,
-          incomeTax: 95000,
-          localIncomeTax: 9500
-        },
-        {
-          employeeId: 'EMP004',
-          name: '최영희',
-          department: '마케팅팀',
-          workDays: 20,
-          basicSalary: 3500000,
-          overtimeAllowance: 100000,
-          nightAllowance: 50000,
-          positionAllowance: 120000,
-          certificationAllowance: 70000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 25000,
-          nationalPension: 157500,
-          healthInsurance: 124075,
-          employmentInsurance: 21000,
-          longTermCareInsurance: 9946,
-          incomeTax: 110000,
-          localIncomeTax: 11000
-        },
-        {
-          employeeId: 'EMP005',
-          name: '정민호',
-          department: '인사팀',
-          workDays: 20,
-          basicSalary: 4000000,
-          overtimeAllowance: 0,
-          nightAllowance: 0,
-          positionAllowance: 180000,
-          certificationAllowance: 90000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 40000,
-          nationalPension: 180000,
-          healthInsurance: 141800,
-          employmentInsurance: 24000,
-          longTermCareInsurance: 11344,
-          incomeTax: 160000,
-          localIncomeTax: 16000
-        },
-        {
-          employeeId: 'EMP006',
-          name: '김수진',
-          department: '회계팀',
-          workDays: 20,
-          basicSalary: 3600000,
-          overtimeAllowance: 0,
-          nightAllowance: 0,
-          positionAllowance: 130000,
-          certificationAllowance: 75000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 30000,
-          nationalPension: 162000,
-          healthInsurance: 127620,
-          employmentInsurance: 21600,
-          longTermCareInsurance: 10210,
-          incomeTax: 120000,
-          localIncomeTax: 12000
-        },
-        {
-          employeeId: 'EMP007',
-          name: '박지훈',
-          department: '영업팀',
-          workDays: 20,
-          basicSalary: 4200000,
-          overtimeAllowance: 200000,
-          nightAllowance: 100000,
-          positionAllowance: 160000,
-          certificationAllowance: 85000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 500000,
-          otherAllowance: 60000,
-          nationalPension: 189000,
-          healthInsurance: 148890,
-          employmentInsurance: 25200,
-          longTermCareInsurance: 11831,
-          incomeTax: 200000,
-          localIncomeTax: 20000
-        },
-        {
-          employeeId: 'EMP008',
-          name: '이하늘',
-          department: '고객지원팀',
-          workDays: 20,
-          basicSalary: 2800000,
-          overtimeAllowance: 60000,
-          nightAllowance: 30000,
-          positionAllowance: 80000,
-          certificationAllowance: 50000,
-          cashierAllowance: 0,
-          fireSafetyAllowance: 0,
-          mealAllowance: 200000,
-          bonus: 0,
-          otherAllowance: 15000,
-          nationalPension: 126000,
-          healthInsurance: 99260,
-          employmentInsurance: 16800,
-          longTermCareInsurance: 7930,
-          incomeTax: 75000,
-          localIncomeTax: 7500
-        }
-      ]
+      payrollData: [],
+      loading: false,
+      allowanceItems: [], // 지급항목 목록
+      deductionItems: [] // 공제항목 목록
     }
   },
   computed: {
     totals() {
-      return {
-        basicSalary: this.payrollData.reduce((sum, item) => sum + item.basicSalary, 0),
-        overtimeAllowance: this.payrollData.reduce((sum, item) => sum + item.overtimeAllowance, 0),
-        nightAllowance: this.payrollData.reduce((sum, item) => sum + item.nightAllowance, 0),
-        positionAllowance: this.payrollData.reduce((sum, item) => sum + item.positionAllowance, 0),
-        certificationAllowance: this.payrollData.reduce((sum, item) => sum + item.certificationAllowance, 0),
-        cashierAllowance: this.payrollData.reduce((sum, item) => sum + item.cashierAllowance, 0),
-        fireSafetyAllowance: this.payrollData.reduce((sum, item) => sum + item.fireSafetyAllowance, 0),
-        mealAllowance: this.payrollData.reduce((sum, item) => sum + item.mealAllowance, 0),
-        bonus: this.payrollData.reduce((sum, item) => sum + item.bonus, 0),
-        otherAllowance: this.payrollData.reduce((sum, item) => sum + item.otherAllowance, 0),
-        nationalPension: this.payrollData.reduce((sum, item) => sum + item.nationalPension, 0),
-        healthInsurance: this.payrollData.reduce((sum, item) => sum + item.healthInsurance, 0),
-        employmentInsurance: this.payrollData.reduce((sum, item) => sum + item.employmentInsurance, 0),
-        longTermCareInsurance: this.payrollData.reduce((sum, item) => sum + item.longTermCareInsurance, 0),
-        incomeTax: this.payrollData.reduce((sum, item) => sum + item.incomeTax, 0),
-        localIncomeTax: this.payrollData.reduce((sum, item) => sum + item.localIncomeTax, 0)
+      if (!this.payrollData || this.payrollData.length === 0) {
+        return {}
       }
+      
+      // 모든 지급/공제 항목의 합계를 동적으로 계산
+      const totals = {}
+      
+      // 지급항목 합계 계산
+      this.allowanceItems.forEach(item => {
+        totals[item.property] = this.payrollData.reduce((sum, row) => 
+          sum + (Number(row[item.property]) || 0), 0)
+      })
+      
+      // 공제항목 합계 계산
+      this.deductionItems.forEach(item => {
+        totals[item.property] = this.payrollData.reduce((sum, row) => 
+          sum + (Number(row[item.property]) || 0), 0)
+      })
+      
+      return totals
     },
     summary() {
       // 선택된 사원들의 급여 합계 계산
@@ -499,51 +303,29 @@ export default {
         }
       }
 
-      const selectedTotals = this.selectedEmployees.reduce((acc, employee) => {
-        acc.basicSalary += employee.basicSalary || 0
-        acc.overtimeAllowance += employee.overtimeAllowance || 0
-        acc.nightAllowance += employee.nightAllowance || 0
-        acc.positionAllowance += employee.positionAllowance || 0
-        acc.certificationAllowance += employee.certificationAllowance || 0
-        acc.cashierAllowance += employee.cashierAllowance || 0
-        acc.fireSafetyAllowance += employee.fireSafetyAllowance || 0
-        acc.mealAllowance += employee.mealAllowance || 0
-        acc.bonus += employee.bonus || 0
-        acc.otherAllowance += employee.otherAllowance || 0
-        acc.nationalPension += employee.nationalPension || 0
-        acc.healthInsurance += employee.healthInsurance || 0
-        acc.employmentInsurance += employee.employmentInsurance || 0
-        acc.longTermCareInsurance += employee.longTermCareInsurance || 0
-        acc.incomeTax += employee.incomeTax || 0
-        acc.localIncomeTax += employee.localIncomeTax || 0
-        return acc
-      }, {
-        basicSalary: 0, overtimeAllowance: 0, nightAllowance: 0, positionAllowance: 0,
-        certificationAllowance: 0, cashierAllowance: 0, fireSafetyAllowance: 0,
-        mealAllowance: 0, bonus: 0, otherAllowance: 0, nationalPension: 0,
-        healthInsurance: 0, employmentInsurance: 0, longTermCareInsurance: 0,
-        incomeTax: 0, localIncomeTax: 0
-      })
-
-      const totalPayments = selectedTotals.basicSalary + selectedTotals.overtimeAllowance + 
-                           selectedTotals.nightAllowance + selectedTotals.positionAllowance + 
-                           selectedTotals.certificationAllowance + selectedTotals.cashierAllowance + 
-                           selectedTotals.fireSafetyAllowance + selectedTotals.mealAllowance + 
-                           selectedTotals.bonus + selectedTotals.otherAllowance
+      // 동적으로 지급액과 공제액 합계 계산
+      let totalPayments = 0
+      let totalDeductions = 0
       
-      const totalDeductions = selectedTotals.nationalPension + selectedTotals.healthInsurance + 
-                             selectedTotals.employmentInsurance + selectedTotals.longTermCareInsurance + 
-                             selectedTotals.incomeTax + selectedTotals.localIncomeTax
+      this.selectedEmployees.forEach(employee => {
+        this.allowanceItems.forEach(item => {
+          totalPayments += Number(employee[item.property]) || 0
+        })
+        
+        this.deductionItems.forEach(item => {
+          totalDeductions += Number(employee[item.property]) || 0
+        })
+      })
       
       return {
         totalPayments: totalPayments,
         totalDeductions: totalDeductions,
         netPayment: totalPayments - totalDeductions,
-        taxableAmount: totalPayments - selectedTotals.mealAllowance, // 식대는 비과세
-        incomeTax: selectedTotals.incomeTax,
+        taxableAmount: totalPayments,
+        incomeTax: 0,
         refundableIncomeTax: 0,
-        nonTaxableAmount: selectedTotals.mealAllowance,
-        localIncomeTax: selectedTotals.localIncomeTax,
+        nonTaxableAmount: 0,
+        localIncomeTax: 0,
         refundableLocalTax: 0
       }
     }
@@ -554,6 +336,54 @@ export default {
     },
     handleSelectionChange(selection) {
       this.selectedEmployees = selection
+    },
+    
+    // 급여년월 변경 시 지급일 자동 계산
+    async onPayrollMonthChange(value) {
+      if (!value) {
+        this.searchForm.paymentDate = ''
+        return
+      }
+      
+      try {
+        const companyId = 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        // '2025.09' 형식을 'YYYY-MM' 형식으로 변환
+        const yearMonth = value.replace('.', '-')
+        
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-policy/payment-date`, {
+          params: {
+            companyId: companyId,
+            yearMonth: yearMonth
+          }
+        })
+        
+        console.log('지급일 응답:', response.data)
+        
+        // 응답 데이터에서 지급일 추출
+        if (response.data) {
+          // 응답이 직접 날짜 문자열인 경우
+          if (typeof response.data === 'string') {
+            // YYYY-MM-DD 형식을 YYYY.MM.DD로 변환
+            this.searchForm.paymentDate = response.data.replace(/-/g, '.')
+          } 
+          // 응답이 객체이고 paymentDate 필드가 있는 경우
+          else if (response.data.paymentDate) {
+            this.searchForm.paymentDate = response.data.paymentDate.replace(/-/g, '.')
+          }
+          // 응답이 data 속성을 가진 경우
+          else if (response.data.data) {
+            const paymentDate = response.data.data
+            if (typeof paymentDate === 'string') {
+              this.searchForm.paymentDate = paymentDate.replace(/-/g, '.')
+            } else if (paymentDate.paymentDate) {
+              this.searchForm.paymentDate = paymentDate.paymentDate.replace(/-/g, '.')
+            }
+          }
+        }
+      } catch (err) {
+        console.error('지급일 조회 실패:', err)
+        this.error('지급일을 불러오는데 실패했습니다.')
+      }
     },
     getSummaries({ columns, data }) {
       const sums = []
@@ -566,39 +396,242 @@ export default {
       })
       return sums
     },
-    searchPayroll() {
-      this.success('급여 정보를 조회했습니다.')
+    
+    // 급여 항목 목록 로드
+    async loadPayrollItems() {
+      try {
+        const companyId = 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
+          params: { companyId }
+        })
+        
+        // API 응답에 따라 데이터 구조 조정
+        let items = []
+        if (response.data) {
+          if (Array.isArray(response.data)) {
+            items = response.data
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            items = response.data.data
+          }
+        }
+        
+        // 지급항목과 공제항목 분리
+        const allowanceItems = items
+          .filter(item => item.salaryType === 'ALLOWANCE')
+          .map(item => ({
+            name: item.name,
+            property: `allowance_${item.id}` // 동적 프로퍼티명 생성
+          }))
+        
+        const deductionItems = items
+          .filter(item => item.salaryType === 'DEDUCTION')
+          .map(item => ({
+            name: item.name,
+            property: `deduction_${item.id}` // 동적 프로퍼티명 생성
+          }))
+        
+        // 기본급 항목을 지급항목 맨 앞으로 정렬
+        this.allowanceItems = allowanceItems.sort((a, b) => {
+          if (a.name === '기본급') return -1
+          if (b.name === '기본급') return 1
+          return 0
+        })
+        
+        this.deductionItems = deductionItems
+        
+      } catch (error) {
+        console.error('급여 항목 로드 실패:', error)
+        this.allowanceItems = []
+        this.deductionItems = []
+      }
     },
-    savePayroll() {
-      this.success('급여 정보를 저장했습니다.')
+
+    // API 응답 데이터를 테이블 구조로 변환
+    transformApiData(apiData) {
+      return apiData.map(salary => {
+        const transformed = {
+          salaryId: salary.salaryId,
+          employeeId: salary.memberId,
+          name: salary.memberName,
+          department: salary.department,
+          workDays: salary.workingDays,
+          periodStartDate: salary.periodStartDate,
+          periodEndDate: salary.periodEndDate,
+          paymentDate: salary.paymentDate,
+          totalAllowance: salary.totalAllowance || 0,
+          totalDeduction: salary.totalDeduction || 0,
+          netPay: salary.netPay || 0
+        }
+
+        // 지급항목 매핑 - 동적으로 프로퍼티 생성
+        if (salary.allowanceList) {
+          salary.allowanceList.forEach(item => {
+            // 항목 이름으로 해당하는 항목 찾기
+            const allowanceItem = this.allowanceItems.find(a => a.name === item.salaryName)
+            if (allowanceItem) {
+              transformed[allowanceItem.property] = Number(item.amount) || 0
+            }
+          })
+        }
+
+        // 공제항목 매핑 - 동적으로 프로퍼티 생성
+        if (salary.deductionList) {
+          salary.deductionList.forEach(item => {
+            // 항목 이름으로 해당하는 항목 찾기
+            const deductionItem = this.deductionItems.find(d => d.name === item.salaryName)
+            if (deductionItem) {
+              transformed[deductionItem.property] = Number(item.amount) || 0
+            }
+          })
+        }
+
+        return transformed
+      })
     },
-    deletePayroll() {
-      this.warning('급여 정보를 삭제했습니다.')
+
+    async searchPayroll() {
+      try {
+        this.loading = true
+        const companyId = 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        // '2025.09' 형식을 'YYYY-MM' 형식으로 변환
+        const yearMonth = this.searchForm.payrollMonth.replace('.', '-') // '2025-09' 형식
+        
+        // 급여 정보 조회
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary/calculate`, {
+          companyId: companyId,
+          yearMonth: yearMonth
+        })
+        
+        console.log('========== 급여 정보 응답 ==========')
+        console.log('전체 응답:', response)
+        console.log('응답 데이터:', response.data)
+        console.log('응답 데이터 타입:', typeof response.data)
+        console.log('응답 데이터 배열 여부:', Array.isArray(response.data))
+        
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          console.log('첫 번째 급여 데이터 상세:', JSON.stringify(response.data[0], null, 2))
+          console.log('totalAllowance:', response.data[0].totalAllowance)
+          console.log('totalDeduction:', response.data[0].totalDeduction)
+          console.log('netPay:', response.data[0].netPay)
+        }
+        
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          console.log('조회된 급여 데이터 개수:', response.data.length)
+          console.log('첫 번째 급여 데이터:', response.data[0])
+          this.payrollData = this.transformApiData(response.data)
+          console.log('변환된 급여 데이터:', this.payrollData)
+          this.success('급여 정보를 조회했습니다.')
+        } else if (response.data && !Array.isArray(response.data)) {
+          console.log('응답이 배열이 아닙니다. 응답 구조:', response.data)
+          // response.data가 success, data 형태일 수 있음
+          if (response.data.data && Array.isArray(response.data.data)) {
+            console.log('response.data.data에서 데이터 추출')
+            console.log('조회된 급여 데이터 개수:', response.data.data.length)
+            this.payrollData = this.transformApiData(response.data.data)
+            this.success('급여 정보를 조회했습니다.')
+          } else {
+            console.log('유효한 데이터가 없습니다.')
+            this.payrollData = []
+            this.warning('조회된 급여 정보가 없습니다.')
+          }
+        } else {
+          console.log('조회된 급여 정보가 없습니다.')
+          this.payrollData = []
+          this.warning('조회된 급여 정보가 없습니다.')
+        }
+      } catch (err) {
+        console.error('========== 급여 조회 실패 ==========')
+        console.error('에러:', err)
+        console.error('에러 메시지:', err.message)
+        console.error('에러 응답:', err.response)
+        if (err.response) {
+          console.error('에러 상태:', err.response.status)
+          console.error('에러 데이터:', err.response.data)
+        }
+        this.error('급여 정보 조회에 실패했습니다.')
+        this.payrollData = []
+      } finally {
+        this.loading = false
+        console.log('========== 급여 정보 조회 종료 ==========')
+      }
     },
+    
+    async savePayroll() {
+      if (this.selectedEmployees.length === 0) {
+        this.warning('저장할 사원을 선택해주세요.')
+        return
+      }
+      try {
+        // TODO: 저장 로직 구현
+        // await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary`, data)
+        this.success('급여 정보를 저장했습니다.')
+      } catch (err) {
+        console.error('급여 저장 실패:', err)
+        this.error('급여 정보 저장에 실패했습니다.')
+      }
+    },
+    
+    async deletePayroll() {
+      if (this.selectedEmployees.length === 0) {
+        this.warning('삭제할 사원을 선택해주세요.')
+        return
+      }
+      
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        // 선택된 사원들의 급여 ID로 삭제
+        for (const employee of this.selectedEmployees) {
+          if (employee.salaryId) {
+            await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary/${employee.salaryId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          }
+        }
+        this.success('급여 정보를 삭제했습니다.')
+        await this.searchPayroll() // 삭제 후 재조회
+      } catch (err) {
+        console.error('급여 삭제 실패:', err)
+        this.error('급여 정보 삭제에 실패했습니다.')
+      }
+    },
+    
     printPayroll() {
       this.info('급여 정보를 인쇄합니다.')
     },
+    
     calculatePayroll() {
       this.success('급여 계산이 완료되었습니다.')
     },
+    
     adjustBonus() {
       this.info('상여조정 기능을 실행합니다.')
     },
+    
     copyPayroll() {
       this.info('급여복사 기능을 실행합니다.')
     },
+    
     annualLeavePayment() {
       this.info('연차지급 기능을 실행합니다.')
     }
+  },
+  
+  async mounted() {
+    // 급여 항목 목록 로드
+    await this.loadPayrollItems()
+    // 컴포넌트 마운트 시 자동 조회
+    await this.searchPayroll()
   }
 }
 </script>
 
 <style scoped>
 .payroll-actual-calculation {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
+  padding: 20px;
 }
 
 .page-header {
@@ -644,13 +677,29 @@ export default {
 .search-row {
   margin-bottom: 20px;
   align-items: flex-end;
-  width: 100%;
-  display: flex;
+  width: 100% !important;
+  display: flex !important;
+  box-sizing: border-box;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* 검색 행 스타일 */
+.search-row :deep(.el-row) {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
 .search-row .el-col {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.search-row .el-col:first-child {
   padding-left: 0;
+}
+
+.search-row .el-col:last-child {
   padding-right: 0;
 }
 

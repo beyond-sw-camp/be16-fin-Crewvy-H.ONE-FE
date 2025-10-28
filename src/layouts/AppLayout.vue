@@ -130,6 +130,12 @@
             <template #title>
               <span>급여 관리</span>
             </template>
+              <el-menu-item index="/payroll/policy-settings">
+                <span>급여 정책 설정</span>
+              </el-menu-item>
+            <el-menu-item index="/payroll/item-management">
+              <span>급여 기초 정보</span>
+            </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
               <span>급여 기본 정보</span>
             </el-menu-item>
@@ -417,7 +423,7 @@
             value-format="YYYY-MM-DD" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="시간">
-          <el-time-picker v-model="eventForm.time" placeholder="시간 선택" format="HH:mm" value-format="HH:mm"
+          <el-time-picker v-model="eventForm.time" placeholder="시간 선택"   format="HH:mm" value-format="HH:mm"
             style="width: 100%;" />
         </el-form-item>
         <el-form-item label="유형">
@@ -758,7 +764,9 @@ export default {
         '/performance/my-goal': '내 목표 관리',
         '/performance/review': '평가 관리',
         '/payroll': '급여 관리',
-        '/payroll/basic-info': '급여 기본 정보',
+            '/payroll/policy-settings': '급여 정책 설정',
+            '/payroll/item-management': '급여 기초 정보',
+            '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
         '/payroll/transfer-output': '급여 이체 출력',
         '/payroll/statement-output': '명세서 출력',
@@ -1001,10 +1009,15 @@ export default {
         // 현재 시간 업데이트 (반응성 트리거)
         this.currentTime = new Date()
 
-        const now = this.currentTime.getTime()
-        const expiry = this.sessionExpiryTime.getTime()
-        const diff = expiry - now
+        // const now = this.currentTime.getTime()
+        // const expiry = this.sessionExpiryTime.getTime()
+        // const diff = expiry - now
 
+        // if (diff <= 0) {
+        //   this.handleSessionExpiry()
+        // } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고
+        //   this.showSessionWarning()
+        // }
         if (diff <= 0) {
           // this.handleSessionExpiry()
         } else if (diff <= 5 * 60 * 1000 && diff > 4 * 60 * 1000) { // 5분 남았을 때 한 번만 경고

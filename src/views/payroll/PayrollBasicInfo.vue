@@ -95,7 +95,7 @@
                 :key="item.id" 
                 :prop="getItemProperty(item.name)" 
                 :label="item.name" 
-                :width="getColumnWidth(item.name)" 
+                :width="getColumnWidth()" 
                 align="center"
                 class-name="allowance-item"
               >
@@ -117,7 +117,7 @@
                 :key="item.id"
                 :prop="getItemProperty(item.name)" 
                 :label="item.name" 
-                :width="getColumnWidth(item.name)" 
+                :width="getColumnWidth()" 
                 align="center"
                 class-name="deduction-item"
               >
@@ -255,13 +255,17 @@ export default {
     }
   },
   computed: {
-    // 지급 항목들만 필터링
+    // 지급 항목들만 필터링 (사전 순 정렬)
     allowanceItems() {
-      return this.payrollItems.filter(item => item.type === 'ALLOWANCE')
+      return this.payrollItems
+        .filter(item => item.type === 'ALLOWANCE')
+        .sort((a, b) => a.name.localeCompare(b.name))
     },
-    // 공제 항목들만 필터링
+    // 공제 항목들만 필터링 (사전 순 정렬)
     deductionItems() {
-      return this.payrollItems.filter(item => item.type === 'DEDUCTION')
+      return this.payrollItems
+        .filter(item => item.type === 'DEDUCTION')
+        .sort((a, b) => a.name.localeCompare(b.name))
     },
     // 작은 화면 여부 확인
     isSmallScreen() {
@@ -281,6 +285,11 @@ export default {
     }
   },
   methods: {
+    // 회사 ID 가져오기
+    getCompanyId() {
+      return 'f1e85c26-14fa-4603-8edd-bfbdd82234ab'
+    },
+    
     // 화면 크기 변경 핸들러
     handleResize() {
       this.screenWidth = window.innerWidth
@@ -316,7 +325,7 @@ export default {
         this.loading = true
         
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
-          params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+          params: { companyId: this.getCompanyId() }
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -350,44 +359,18 @@ export default {
 
     // 급여 항목명을 속성명으로 변환
     getItemProperty(itemName) {
-      const propertyMap = {
-        '기본급': 'baseSalary',
-        '직책수당': 'otComm',
-        '야간수당': 'nightPay',
-        '연장수당': 'otCenter',
-        '식비지원': 'mealNontax',
-        '교통비': 'bizExpense',
-        '복리후생비': 'otEtc',
-        '성과급': 'annualPay',
-        '특별수당': 'holidayPay',
-        '국민연금': 'nationalPension',
-        '건강보험': 'healthInsurance',
-        '고용보험': 'employmentInsurance',
-        '소득세': 'incomeTax',
-        '지방소득세': 'localIncomeTax'
-      }
-      return propertyMap[itemName] || itemName.toLowerCase().replace(/\s+/g, '')
+      // 동적 속성명 생성: 한글을 영문으로 변환하거나 기존 패턴 사용
+      return itemName.toLowerCase()
+        .replace(/[가-힣]/g, '') // 한글 제거
+        .replace(/\s+/g, '') // 공백 제거
+        .replace(/[^a-zA-Z0-9]/g, '') // 특수문자 제거
+        .substring(0, 20) // 길이 제한
     },
 
     // 컬럼 너비 설정
-    getColumnWidth(itemName) {
-      const widthMap = {
-        '기본급': 140,
-        '직책수당': 160,
-        '야간수당': 130,
-        '연장수당': 160,
-        '식비지원': 130,
-        '교통비': 130,
-        '복리후생비': 150,
-        '성과급': 130,
-        '특별수당': 150,
-        '국민연금': 130,
-        '건강보험': 130,
-        '고용보험': 130,
-        '소득세': 130,
-        '지방소득세': 150
-      }
-      return widthMap[itemName] || 130
+    getColumnWidth() {
+      // 모든 항목에 대해 기본 너비 사용
+      return 130
     },
 
     // 합계 계산
@@ -526,7 +509,7 @@ export default {
       }
     },
 
-    // 변경된 데이터 감지
+    // 변경된 데이터 감지 (POST 요청용)
     getChangedData() {
       const changedData = []
       
@@ -542,8 +525,8 @@ export default {
             const amount = currentEmployee[property] || 0
             if (amount > 0) {
               changedData.push({
-                id: this.generateUUID(), // PUT 요청용 ID
-                companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
+                companyId: this.getCompanyId(),
+                memberId: currentEmployee.memberId,
                 payrollItemId: item.id,
                 amount: amount
               })
@@ -559,11 +542,9 @@ export default {
           const originalAmount = originalEmployee[property] || 0
           
           if (currentAmount !== originalAmount) {
-            // 기존 데이터의 ID 사용, 없으면 새로 생성
-            const existingId = originalEmployee[property + 'Id'] || this.generateUUID()
             changedData.push({
-              id: existingId, // PUT 요청용 ID
-              companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e',
+              companyId: this.getCompanyId(),
+              memberId: currentEmployee.memberId,
               payrollItemId: item.id,
               amount: currentAmount
             })
@@ -587,9 +568,9 @@ export default {
           return
         }
 
-        // PUT 요청으로 변경된 데이터만 전송
-        const response = await axios.put(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salaryInfo/update`,
+        // POST 요청으로 변경된 데이터만 전송
+        const response = await axios.post(
+          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salaryInfo/save`,
           changedData
         )
 
@@ -601,7 +582,6 @@ export default {
           throw new Error(response.data?.message || '저장에 실패했습니다.')
         }
       } catch (error) {
-        console.error('급여 데이터 저장 실패:', error)
         this.error(`급여 데이터 저장 중 오류가 발생했습니다: ${error.message}`)
       } finally {
         this.saving = false
@@ -627,19 +607,16 @@ export default {
 
     // 급여 데이터 조회
     async fetchPayrollData() {
-      console.log('데이터 조회 시작 - loading:', this.loading)
       this.loading = true
-      console.log('로딩 상태 설정 - loading:', this.loading)
       
       try {
         const response = await axios.get(
           `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salaryInfo/list`,
           {
-            params: { companyId: 'e0b3b4a0-9b1e-4e6a-8b0c-3e2b1f3b3b1e' }
+            params: { companyId: this.getCompanyId() }
           }
         )
 
-        
         if (response.data.data && Array.isArray(response.data.data)) {
           // 백엔드 데이터를 화면용 데이터로 변환
           this.processFetchedData(response.data.data)
@@ -650,12 +627,9 @@ export default {
           this.originalRows = []
         }
       } catch (error) {
-        console.error('급여 데이터 조회 실패:', error)
         this.error('급여 데이터 조회 중 오류가 발생했습니다.')
       } finally {
-        console.log('데이터 조회 완료 - loading:', this.loading)
         this.loading = false
-        console.log('로딩 상태 해제 - loading:', this.loading)
       }
     },
 
@@ -678,6 +652,8 @@ export default {
       // 각 memberId별로 사원 정보 생성 및 데이터 매핑
       const employeeData = Object.values(groupedByMember).map((memberData, index) => {
         const employee = this.createEmployeeInfo(index)
+        // memberId 추가
+        employee.memberId = memberData.memberId
         
         // 급여 항목 데이터 매핑
         memberData.payrollItems.forEach(payrollItem => {
@@ -1036,6 +1012,29 @@ export default {
   justify-content: center;
   padding: 40px 20px;
   text-align: center;
+  width: 100%;
+}
+
+/* 테이블이 비어있을 때 헤더가 전체 너비를 차지하도록 설정 */
+.el-table__empty-block {
+  width: 100% !important;
+}
+
+.el-table__empty-text {
+  width: 100%;
+}
+
+/* 테이블 헤더가 전체 너비를 차지하도록 설정 */
+.payroll-employee-table .el-table__header-wrapper {
+  width: 100% !important;
+}
+
+.payroll-employee-table .el-table__header {
+  width: 100% !important;
+}
+
+.payroll-employee-table .el-table__header th {
+  width: auto !important;
 }
 
 /* 로딩 컨테이너 스타일 */
