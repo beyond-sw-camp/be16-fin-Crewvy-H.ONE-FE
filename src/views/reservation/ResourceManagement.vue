@@ -6,6 +6,10 @@
         <p>회의실, 차량 등 공용 자원을 관리하세요.</p>
       </div>
       <div class="header-actions">
+        <el-button @click="showStatisticsModal">
+          <el-icon><DataAnalysis /></el-icon>
+          <span style="margin-left: 8px;">통계</span>
+        </el-button>
         <el-button type="success" @click="showCategoryDialog">
           <el-icon><Setting /></el-icon>
           <span style="margin-left: 8px;">카테고리 관리</span>
@@ -74,7 +78,7 @@
         <el-table-column prop="reservationCategoryName" label="카테고리" width="120">
           <template #default="{ row }">
             <el-tag :type="getCategoryTagTypeByName(row.reservationCategoryName)">
-              {{ row.reservationCategoryName || '카테고리 없음' }}
+              {{ row.reservationCategoryName || '기타' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -246,21 +250,65 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 통계 모달 -->
+    <el-dialog
+      v-model="showStatistics"
+      title="자원 이용 통계"
+      width="1000px"
+    >
+      <div class="statistics-content">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h4>이용률</h4>
+            <div class="stat-value">{{ statistics.usageRate }}%</div>
+          </div>
+          <div class="stat-card">
+            <h4>Peak Time</h4>
+            <div class="stat-value">{{ statistics.peakTime }}</div>
+          </div>
+          <div class="stat-card">
+            <h4>No Show</h4>
+            <div class="stat-value">{{ statistics.noShow }}건</div>
+          </div>
+          <div class="stat-card">
+            <h4>총 예약</h4>
+            <div class="stat-value">{{ statistics.totalReservations }}건</div>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <h4>월별 이용 현황</h4>
+          <div class="chart-container">
+            <canvas ref="monthlyChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <h4>카테고리별 이용률</h4>
+          <div class="chart-container">
+            <canvas ref="resourceChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { ElMessageBox } from 'element-plus'
-import { Plus, Search, Setting } from '@element-plus/icons-vue'
+import { Plus, Search, Setting, DataAnalysis } from '@element-plus/icons-vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import axios from 'axios'
+import Chart from 'chart.js/auto'
 
 export default {
   name: 'ResourceManagement',
   components: {
     Plus,
     Search,
-    Setting
+    Setting,
+    DataAnalysis
   },
   setup() {
     const { success, error } = useSnackbar()
@@ -315,6 +363,18 @@ export default {
       
       // 자원 목록 데이터
       resources: [],
+      
+      // 통계 관련
+      showStatistics: false,
+      statistics: {
+        usageRate: 0,
+        peakTime: '',
+        noShow: 0,
+        totalReservations: 0
+      },
+      allReservations: [], // 전체 예약 목록 (통계용)
+      monthlyChartInstance: null,
+      resourceChartInstance: null,
       
       // 폼 데이터
       resourceForm: {
@@ -387,7 +447,7 @@ export default {
       this.loading = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -395,8 +455,8 @@ export default {
           id: item.id || item.uuid || item.reservationTypeId,
           name: item.name || item.resourceName,
           reservationCategoryId: item.reservationCategory?.id || item.reservationCategoryId || null,
-          reservationCategoryName: item.categoryName || item.reservationCategory?.name || '',
-          category: item.category || (item.categoryName || item.reservationCategory?.name || '').toLowerCase().replace(/\s+/g, '_'),
+          reservationCategoryName: item.categoryName || item.reservationCategory?.name || item.reservationCategoryName || '',
+          category: item.category || (item.categoryName || item.reservationCategory?.name || item.reservationCategoryName || '').toLowerCase().replace(/\s+/g, '_'),
           location: item.location || '',
           capacity: item.capacity ?? 1,
           facilities: item.facilities || '',
@@ -691,7 +751,7 @@ export default {
       this.categorySaving = true
       try {
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab' }
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' }
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -748,7 +808,7 @@ export default {
           // 추가: POST /register
           await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
             name: this.categoryForm.name,
-            companyId: 'f1e85c26-14fa-4603-8edd-bfbdd82234ab'
+            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
           })
           this.success('카테고리가 추가되었습니다.')
         }
@@ -810,6 +870,312 @@ export default {
       this.editingCategoryIndex = -1
       if (this.$refs.categoryForm) {
         this.$refs.categoryForm.clearValidate()
+      }
+    },
+    
+    // 통계 모달 표시
+    async showStatisticsModal() {
+      this.showStatistics = true
+      
+      // 자원 데이터가 없으면 먼저 로드
+      if (this.resources.length === 0) {
+        await this.loadResources()
+      }
+      
+      // 예약 데이터 로드
+      await this.loadAllReservationsForStatistics()
+      
+      // 통계 계산
+      this.calculateStatistics()
+      
+      // 차트 생성
+      this.$nextTick(() => {
+        setTimeout(() => {
+          this.createMonthlyChart()
+          this.createResourceChart()
+        }, 100)
+      })
+    },
+    
+    // 통계용 예약 데이터 로드
+    async loadAllReservationsForStatistics() {
+      try {
+        const memberPositionId = localStorage.getItem('memberPositionId')
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
+          params: { 
+            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+          },
+          headers: {
+            'X-User-MemberPositionId': memberPositionId
+          }
+        })
+        const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
+        
+        // 예약 데이터 변환 (date, startTime, endTime 추가)
+        this.allReservations = list.map(item => {
+          const startDateTime = new Date(item.startDateTime)
+          const endDateTime = new Date(item.endDateTime)
+          
+          return {
+            id: item.id,
+            reservationTypeId: item.reservationTypeId,
+            memberId: item.memberId,
+            companyId: item.companyId,
+            status: item.status,
+            startDateTime: item.startDateTime,
+            endDateTime: item.endDateTime,
+            date: startDateTime.toISOString().split('T')[0],
+            startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            resourceName: item.resourceName || '알 수 없음'
+          }
+        })
+      } catch (error) {
+        console.error('통계용 예약 데이터 로드 실패:', error)
+        this.allReservations = []
+      }
+    },
+    
+    // 통계 계산
+    calculateStatistics() {
+      const reservations = this.allReservations
+      
+      if (reservations.length === 0) {
+        this.statistics = {
+          usageRate: 0,
+          peakTime: '데이터 없음',
+          noShow: 0,
+          totalReservations: 0
+        }
+        return
+      }
+      
+      // 총 예약 수
+      const totalReservations = reservations.length
+      
+      // 이용률 계산 (USED 상태의 예약 비율)
+      const usedReservations = reservations.filter(r => r.status === 'USED').length
+      const usageRate = totalReservations > 0 ? Math.round((usedReservations / totalReservations) * 100) : 0
+      
+      // No Show 계산 (BEFORE 상태의 예약 수)
+      const noShow = reservations.filter(r => r.status === 'BEFORE').length
+      
+      // Peak Time 계산 (가장 많이 예약된 시간대)
+      const timeSlotCounts = {}
+      reservations.forEach(reservation => {
+        if (reservation.startTime) {
+          const startHour = parseInt(reservation.startTime.split(':')[0])
+          const timeSlot = `${startHour}:00-${startHour + 1}:00`
+          timeSlotCounts[timeSlot] = (timeSlotCounts[timeSlot] || 0) + 1
+        }
+      })
+      
+      let peakTime = '데이터 없음'
+      let maxCount = 0
+      Object.entries(timeSlotCounts).forEach(([timeSlot, count]) => {
+        if (count > maxCount) {
+          maxCount = count
+          peakTime = timeSlot
+        }
+      })
+      
+      this.statistics = {
+        usageRate,
+        peakTime,
+        noShow,
+        totalReservations
+      }
+    },
+    
+    // 월별 차트 생성
+    createMonthlyChart() {
+      // 기존 차트가 있으면 제거
+      if (this.monthlyChartInstance) {
+        this.monthlyChartInstance.destroy()
+      }
+      
+      const monthlyData = this.generateMonthlyData()
+      
+      const ctx = this.$refs.monthlyChart?.getContext('2d')
+      if (!ctx) return
+      
+      this.monthlyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: monthlyData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '월별 예약 현황',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            legend: {
+              display: true,
+              position: 'top'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '예약 건수'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: '월'
+              }
+            }
+          }
+        }
+      })
+    },
+    
+    // 카테고리별 차트 생성
+    createResourceChart() {
+      // 기존 차트가 있으면 제거
+      if (this.resourceChartInstance) {
+        this.resourceChartInstance.destroy()
+      }
+      
+      const categoryData = this.generateCategoryData()
+      
+      const ctx = this.$refs.resourceChart?.getContext('2d')
+      if (!ctx) return
+      
+      this.resourceChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: categoryData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '카테고리별 이용률',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            legend: {
+              display: true,
+              position: 'right'
+            }
+          }
+        }
+      })
+    },
+    
+    // 월별 데이터 생성
+    generateMonthlyData() {
+      const reservations = this.allReservations
+      
+      // 최근 12개월 데이터 생성
+      const months = []
+      const counts = []
+      
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        months.push(monthKey)
+        
+        // 해당 Month의 예약 수 계산
+        const monthReservations = reservations.filter(reservation => {
+          if (!reservation.date) return false
+          const reservationDate = new Date(reservation.date)
+          const reservationMonth = `${reservationDate.getFullYear()}-${String(reservationDate.getMonth() + 1).padStart(2, '0')}`
+          return reservationMonth === monthKey
+        })
+        
+        counts.push(monthReservations.length)
+      }
+      
+      return {
+        labels: months,
+        datasets: [{
+          label: '예약 수',
+          data: counts,
+          backgroundColor: 'rgba(79, 70, 229, 0.2)',
+          borderColor: 'rgba(79, 70, 229, 1)',
+          borderWidth: 2,
+          tension: 0.4
+        }]
+      }
+    },
+    
+    // 카테고리별 데이터 생성
+    generateCategoryData() {
+      const reservations = this.allReservations
+      const resourceCounts = {}
+      
+      // 카테고리별 예약 수 계산
+      reservations.forEach(reservation => {
+        // 자원 정보 찾기
+        const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+        
+        if (resource) {
+          // 카테고리명 사용 (reservationCategoryName 또는 categoryName)
+          const categoryName = resource.reservationCategoryName || resource.categoryName || '기타'
+          resourceCounts[categoryName] = (resourceCounts[categoryName] || 0) + 1
+        } else {
+          // 자원을 찾을 수 없는 경우
+          const fallbackCategory = '알 수 없음'
+          resourceCounts[fallbackCategory] = (resourceCounts[fallbackCategory] || 0) + 1
+        }
+      })
+      
+      const labels = Object.keys(resourceCounts)
+      const data = Object.values(resourceCounts)
+      
+      // 카테고리별 색상 매핑
+      const categoryColors = {
+        '회의실': 'rgba(79, 70, 229, 0.8)',
+        '차량': 'rgba(16, 185, 129, 0.8)',
+        '기타': 'rgba(245, 158, 11, 0.8)',
+        '알 수 없음': 'rgba(239, 68, 68, 0.8)'
+      }
+      
+      // 기본 색상 배열
+      const defaultColors = [
+        'rgba(139, 92, 246, 0.8)',
+        'rgba(236, 72, 153, 0.8)',
+        'rgba(6, 182, 212, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(251, 146, 60, 0.8)',
+        'rgba(168, 85, 247, 0.8)',
+        'rgba(20, 184, 166, 0.8)',
+        'rgba(244, 63, 94, 0.8)'
+      ]
+      
+      // 각 라벨에 대한 색상 생성
+      const backgroundColor = labels.map((label, index) => {
+        // 카테고리별 색상 우선 적용
+        for (const [category, color] of Object.entries(categoryColors)) {
+          if (label.includes(category)) {
+            return color
+          }
+        }
+        // 기본 색상 적용
+        return defaultColors[index % defaultColors.length]
+      })
+      
+      return {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor,
+          borderColor: backgroundColor.map(color => color.replace('0.8', '1')),
+          borderWidth: 2
+        }]
       }
     }
   }
@@ -1090,5 +1456,51 @@ export default {
 .category-list :deep(.el-table th) {
   background-color: #f8f9fa;
   font-weight: 600;
+}
+
+/* 통계 모달 스타일 */
+.statistics-content {
+  padding: 20px 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+
+.stat-card h4 {
+  margin: 0 0 10px 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.chart-section {
+  margin-top: 30px;
+}
+
+.chart-section h4 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.chart-container {
+  position: relative;
+  height: 300px;
 }
 </style>
