@@ -71,23 +71,11 @@
           <div class="pending-approvals">
             <div class="section-header">
               <h3>대기 중인 결재</h3>
-              <div class="filter-options">
-                <el-select v-model="selectedType" placeholder="결재 유형" style="width: 150px">
-                  <el-option label="전체" value="" />
-                  <el-option label="휴가 신청" value="vacation" />
-                  <el-option label="비용 정산" value="expense" />
-                  <el-option label="보고서" value="report" />
-                </el-select>
-                <el-select v-model="selectedPriority" placeholder="우선순위" style="width: 120px">
-                  <el-option label="전체" value="" />
-                  <el-option label="긴급" value="high" />
-                  <el-option label="일반" value="normal" />
-                </el-select>
-              </div>
+
             </div>
             
             <div class="approval-list">
-              <div class="approval-item" v-for="approval in filteredPendingApprovals" :key="approval.approvalId">
+              <div class="approval-item" v-for="approval in pendingApprovalsList" :key="approval.approvalId">
                 <div class="approval-info">
                   <div class="approval-header">
                     <div class="approval-title">{{ approval.title }}</div>
@@ -246,7 +234,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '@/api/http';
 import { useSnackbar } from '@/composables/useSnackbar';
@@ -266,8 +254,7 @@ export default {
     const activeTab = ref('pending');
     const showTemplateSelector = ref(false);
     const showTemplate = ref(false);
-    const selectedType = ref('');
-    const selectedPriority = ref('');
+
     const selectedStatus = ref('');
     const dateRange = ref([]);
     const showMyRequestsTable = ref(true);
@@ -477,18 +464,13 @@ export default {
       router.push('/approval/templates/list');
     };
 
-    const filteredPendingApprovals = computed(() => {
-      // TODO: Re-implement filtering based on new data structure
-      return pendingApprovalsList.value;
-    });
+
 
     return {
       success, error, warning, info, router,
       activeTab,
       showTemplateSelector,
       showTemplate,
-      selectedType,
-      selectedPriority,
       selectedStatus,
       dateRange,
       pendingApprovals,
@@ -511,7 +493,6 @@ export default {
       cancelRequest,
       viewCompletedDetails,
       downloadApproval,
-      filteredPendingApprovals,
       showMyRequestsTable,
       temporarySaves,
       continueWriting,
