@@ -161,7 +161,7 @@
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
+            <!-- <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag> -->
             <el-tag v-if="grade.isActive === false && grade.ynDel === false" type="warning" size="small">비활성화</el-tag>
           </div>
           <p v-if="filteredGradeHistorySet.length === 0">진급 이력이 없습니다.</p>
@@ -187,11 +187,10 @@
           <div v-for="(position, index) in filteredPositions" :key="position.memberPositionId || index" class="position-item">
             <div class="position-item-header">
               <h4>직무 {{ index + 1 }}</h4>
-              <el-button @click="removePosition(index)" type="danger" circle v-if="filteredPositions.length > 1">
-                <el-icon>
-                  <Delete />
-                </el-icon>
-              </el-button>
+              <div class="position-item-actions">
+                <el-button @click="softDeletePosition(position)" type="warning" plain size="small" v-if="!position.ynDel">직무 종료</el-button>
+                <el-button @click="permanentDeletePosition(position.memberPositionId, index)" type="danger" size="small" v-if="position.ynDel">영구 삭제</el-button>
+              </div>
             </div>
             <el-row :gutter="24">
               <el-col :span="12">
@@ -230,7 +229,8 @@
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-tag v-if="position.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
+            <!-- <el-tag v-if="position.ynDel === true" type="danger" size="small">삭제 예정</el-tag> -->
+            <el-button v-if="position.ynDel === true" @click="permanentDeletePosition(position.memberPositionId, index)" type="danger" size="small" plain class="permanent-delete-btn">영구 삭제</el-button>
             <el-tag v-if="position.isActive === false && position.ynDel === false" type="warning" size="small">비활성화</el-tag>
           </div>
         </div>
@@ -330,10 +330,19 @@ export default {
       return this.form.gradeHistorySet.filter(gh => gh.isActive === true);
     },
     filteredPositions() {
+      // Create a copy to avoid mutating the original array, then sort
+      const sortedPositions = [...this.form.positions].sort((a, b) => {
+        const dateA = a.startDate ? new Date(a.startDate) : 0;
+        const dateB = b.startDate ? new Date(b.startDate) : 0;
+        return dateB - dateA; // Sort in descending order
+      });
+
       if (this.showAllPositions) {
-        return this.form.positions;
+        return sortedPositions;
       }
-      return this.form.positions.filter(p => p.isActive === true);
+      
+      // By default, show only active (not soft-deleted) positions
+      return sortedPositions.filter(p => p.ynDel === false);
     }
   },
   methods: {
@@ -388,7 +397,8 @@ export default {
             roleId: p.role ? p.role.id : null,
             startDate: p.startDate, // startDate 추가
             endDate: p.endDate, // endDate 추가
-            isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true) // boolean으로 변환
+            isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true), // boolean으로 변환
+            ynDel: typeof p.ynDel === 'string' ? p.ynDel.toUpperCase() === 'TRUE' : (p.ynDel ?? false) // ynDel 추가
           })) || []
         };
 
@@ -490,29 +500,68 @@ export default {
         organizationId: null, // null로 초기화
         titleId: null,       // null로 초기화
         roleId: null,        // null로 초기화
-        startDate: new Date().toISOString().slice(0, 19) + 'Z', // ISO 8601 형식 (시간 정보 포함)
-        isActive: true // 새로 추가된 직무는 기본적으로 활성으로 표시
+        startDate: new Date().toISOString().slice(0, 10),
+        isActive: true, // 새로 추가된 직무는 기본적으로 활성으로 표시
+        ynDel: false // 새로 추가된 직무는 삭제되지 않은 상태
       });
     },
-    removePosition(index) {
-      if (this.form.positions.length > 1) {
-        ElMessageBox.confirm('해당 직무 정보를 삭제하시겠습니까?', '경고', {
+
+
+    softDeletePosition(position) {
+      ElMessageBox.confirm(
+        '이 직무를 종료 처리하시겠습니까? 최종 반영을 위해 저장 버튼을 눌러야 합니다.',
+        '직무 종료 확인',
+        {
           confirmButtonText: '확인',
           cancelButtonText: '취소',
-          type: 'warning'
-        }).then(() => {
-          this.form.positions.splice(index, 1);
-          ElMessage.success('직무 정보가 삭제되었습니다.');
-        }).catch(() => {
-          ElMessage.info('직무 정보 삭제가 취소되었습니다.');
-        });
-      } else {
-        ElMessage.warning('최소 하나 이상의 직무 정보가 필요합니다.');
-      }
+          type: 'warning',
+        }
+      ).then(() => {
+        const originalIndex = this.form.positions.findIndex(p => p.memberPositionId === position.memberPositionId);
+        if (originalIndex !== -1) {
+            this.form.positions.splice(originalIndex, 1);
+        }
+        ElMessage.success('직무가 종료 처리되었습니다. 저장 버튼을 눌러 최종 반영해주세요.');
+      }).catch(() => {
+        ElMessage.info('직무 종료가 취소되었습니다.');
+      });
     },
     getDisplayName(list, id) {
       const item = list.find(item => item.id === id);
       return item ? item.name : '';
+    },
+    async permanentDeletePosition(positionId, index) {
+      if (!positionId) {
+        this.form.positions.splice(index, 1);
+        ElMessage.info('새로 추가된 항목이 삭제되었습니다.');
+        return;
+      }
+      
+      try {
+        await ElMessageBox.confirm(
+          '이 직무 이력을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?',
+          '영구 삭제 확인',
+          {
+            confirmButtonText: '삭제',
+            cancelButtonText: '취소',
+            type: 'error',
+          }
+        );
+        
+        await employeeService.hardDeleteMemberPosition(positionId);
+        
+        this.form.positions.splice(index, 1);
+        
+        ElMessage.success('직무 이력이 영구적으로 삭제되었습니다.');
+        
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error("직무 이력 영구 삭제에 실패했습니다:", error);
+          ElMessage.error(error.response?.data?.message || '영구 삭제에 실패했습니다.');
+        } else {
+          ElMessage.info('영구 삭제가 취소되었습니다.');
+        }
+      }
     }
   },
   created() {

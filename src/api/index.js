@@ -10,9 +10,13 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem('accessToken');
+    const companyId = localStorage.getItem('companyId');
 
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    if (companyId) {
+      config.headers['X-User-CompanyId'] = companyId;
     }
     return config;
   },
