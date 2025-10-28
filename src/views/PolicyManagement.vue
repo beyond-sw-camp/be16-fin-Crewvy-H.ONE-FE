@@ -3,10 +3,12 @@
     <div class="content-card">
       <div class="card-header">
         <h3>근태 정책 관리</h3>
-        <el-button type="primary" @click="goToCreatePage">
-          <el-icon><Plus /></el-icon>
-          <span style="margin-left: 8px;">새 정책 추가</span>
-        </el-button>
+        <div class="header-actions">
+          <el-button type="primary" @click="goToCreatePage">
+            <el-icon><Plus /></el-icon>
+            <span style="margin-left: 8px;">새 정책 추가</span>
+          </el-button>
+        </div>
       </div>
       <div class="policy-layout" v-loading="isLoading">
         <div class="policy-list-panel">
@@ -28,6 +30,7 @@
             <h4>{{ selectedPolicy.name }} 상세</h4>
             <div>
               <el-button v-if="!selectedPolicy.isActive" type="success" @click="handleActivate(selectedPolicy.policyId)">활성화</el-button>
+              <el-button v-if="selectedPolicy.isActive" type="warning" plain @click="handleDeactivate(selectedPolicy.policyId)">비활성화</el-button>
               <el-button type="danger" plain @click="handleDelete(selectedPolicy.policyId)">삭제</el-button>
               <el-button type="primary" plain @click="editPolicy(selectedPolicy)">정책 수정</el-button>
             </div>
@@ -60,9 +63,9 @@
 <script>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useStore } from 'vuex';
-import { Document, Plus} from '@element-plus/icons-vue';
-import { getPolicies, deletePolicy, activatePolicy } from '@/api/attendance';
+// import { useStore } from 'vuex'; // TODO: 토큰에 companyId 추가되면 복구
+import { Document, Plus } from '@element-plus/icons-vue';
+import { getPolicies, deletePolicy, activatePolicies, deactivatePolicies } from '@/api/attendance';
 import { useSnackbar } from '@/composables/useSnackbar';
 import { ElMessageBox } from 'element-plus';
 
@@ -71,14 +74,11 @@ export default {
   components: { Document, Plus },
   setup() {
     const router = useRouter();
-    const store = useStore();
     const { success, error } = useSnackbar();
 
     const policies = ref([]);
     const isLoading = ref(false);
     const selectedPolicyId = ref(null);
-
-    const companyId = computed(() => store.state.user?.companyId);
 
     const policyTypeNames = {
       leave: '연차 정책',
@@ -99,13 +99,9 @@ export default {
     );
 
     const fetchPolicies = async () => {
-      if (!companyId.value) {
-        error('회사 정보를 찾을 수 없습니다.');
-        return;
-      }
       isLoading.value = true;
       try {
-        const params = { companyId: companyId.value, page: 0, size: 20 };
+        const params = { page: 0, size: 20 }; // companyId 제거
         const response = await getPolicies(params);
         policies.value = response.content.map(policy => ({ ...policy, isActive: policy.isActive ?? false }));
         if (policies.value.length > 0 && !selectedPolicyId.value) {
@@ -128,6 +124,10 @@ export default {
       router.push({ name: 'PolicyCreate' });
     };
 
+    const goToAssignPage = () => {
+      router.push({ name: 'PolicyAssignment' });
+    };
+
     const editPolicy = (policy) => {
       router.push({ name: 'PolicyEdit', params: { policyId: policy.policyId } });
     };
@@ -148,11 +148,24 @@ export default {
 
     const handleActivate = async (policyId) => {
       try {
-        await activatePolicy(policyId);
+        await activatePolicies([policyId]); // 배열을 직접 전달
         success('정책이 성공적으로 활성화되었습니다.');
         fetchPolicies();
       } catch (err) {
         error(err.message || '정책 활성화에 실패했습니다.');
+      }
+    };
+
+    const handleDeactivate = async (policyId) => {
+      try {
+        await ElMessageBox.confirm('이 정책을 비활성화하시겠습니까?', '비활성화 확인', { type: 'warning' });
+        await deactivatePolicies([policyId]); // 배열을 직접 전달
+        success('정책이 비활성화되었습니다.');
+        fetchPolicies();
+      } catch (err) {
+        if (err !== 'cancel') {
+          error(err.message || '정책 비활성화에 실패했습니다.');
+        }
       }
     };
 
@@ -165,9 +178,11 @@ export default {
       selectedPolicy,
       handlePolicySelect,
       goToCreatePage,
+      goToAssignPage,
       editPolicy,
       handleDelete,
       handleActivate,
+      handleDeactivate,
     };
   },
 };
@@ -198,6 +213,11 @@ export default {
   font-size: 18px;
   font-weight: 600;
   color: #2c3e50;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .policy-layout {
