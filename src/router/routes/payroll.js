@@ -9,8 +9,7 @@ import PayrollInsuranceDeduction from '../../views/payroll/PayrollInsuranceDeduc
 import PayrollStatusOutput from '../../views/payroll/PayrollStatusOutput.vue'
 import PayrollWithholdingReport from '../../views/payroll/PayrollWithholdingReport.vue'
 import PayrollElderlyIncentive from '../../views/payroll/PayrollElderlyIncentive.vue'
-import PayrollItemManagement from '../../views/payroll/PayrollItemManagement.vue'
-import PayrollPolicySettings from '../../views/payroll/PayrollPolicySettings.vue'
+import PayrollSettings from '../../views/payroll/PayrollSettings.vue'
 
 const routes = [
   {
@@ -19,14 +18,9 @@ const routes = [
     component: Payroll
   },
   {
-    path: '/payroll/policy-settings',
-    name: 'PayrollPolicySettings',
-    component: PayrollPolicySettings
-  },
-  {
-    path: '/payroll/item-management',
-    name: 'PayrollItemManagement',
-    component: PayrollItemManagement
+    path: '/payroll/settings',
+    name: 'PayrollSettings',
+    component: PayrollSettings
   },
   {
     path: '/payroll/basic-info',
