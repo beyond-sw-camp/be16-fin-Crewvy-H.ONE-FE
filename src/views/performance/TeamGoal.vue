@@ -25,6 +25,19 @@
           </div>
         </div>
       </el-card>
+      <div v-if="teamGoals.length === 0" class="empty-state">
+        <p>팀 목표가 없습니다.</p>
+      </div>
+    </div>
+
+    <div v-if="totalTeamGoalPages > 1" class="pagination-container">
+      <el-pagination
+        background
+        layout="prev, pager, next"
+        :total="totalTeamGoalPages * 10"
+        v-model:current-page="currentTeamGoalPage"
+        @current-change="handleTeamGoalPageChange"
+      />
     </div>
 
   </div>
@@ -38,25 +51,17 @@ export default {
   data() {
     return {
       teamGoals: [],
+      totalTeamGoalPages: 0,
+      currentTeamGoalPage: 1,
     };
   },
   methods: {
-    async fetchTeamGoals() {
+    async fetchTeamGoals(page = 0) {
       try {
-        // In a real environment, you would uncomment the following lines:
-        const response = await apiClient.get('/workforce-service/performance/team-goal');
-        this.teamGoals = response.data.data;
-
-        // Using mock data provided by the user:
-        // this.teamGoals = [
-        //   {
-        //       "teamGoalId": "36e7c5a6-8df6-4c0a-9efa-c5f66377b431",
-        //       "title": "2025년 4분기 팀 매출 20% 성장 달성",
-        //       "contents": "신규 고객 확보 및 기존 고객 유지 전략을 통해 4분기 팀 목표 매출액 1억 2천만원을 달성하는 것을 목표로 합니다.",
-        //       "startDate": "2025-10-01",
-        //       "endDate": "2025-12-31"
-        //   }
-        // ];
+        const response = await apiClient.get(`/workforce-service/performance/team-goal?page=${page}`);
+        this.teamGoals = response.data.data.content;
+        this.totalTeamGoalPages = response.data.data.totalPages;
+        this.currentTeamGoalPage = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching team goals:', error);
       }
@@ -73,6 +78,9 @@ export default {
       if (status === '삭제') return 'info';
       if (status === '평가대기') return 'primary';
       return '';
+    },
+    handleTeamGoalPageChange(page) {
+      this.fetchTeamGoals(page - 1);
     },
   },
   created() {
@@ -184,5 +192,17 @@ export default {
 .goal-period {
   font-size: 14px;
   color: #909399;
+}
+
+.empty-state {
+  text-align: center;
+  color: #909399;
+  padding: 20px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>

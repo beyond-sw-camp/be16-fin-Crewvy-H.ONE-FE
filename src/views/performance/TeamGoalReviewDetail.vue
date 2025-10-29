@@ -36,52 +36,79 @@
     <el-divider></el-divider>
 
     <div class="sub-goal-section">
-      <h2>본인 평가 완료</h2>
-      <div v-if="completedGoals.length > 0" class="sub-goal-list">
-        <el-card v-for="goal in completedGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId)">
-          <div class="sub-goal-content">
-            <div class="sub-goal-details">
-              <h4 class="sub-goal-title">{{ goal.title }}</h4>
-              <p class="sub-goal-description">{{ goal.contents }}</p>
-              <div class="sub-goal-user-info">
-                <span class="user-name">{{ goal.memberName }}</span>
-                <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+      <div v-if="currentMode !== 'complete'">
+        <h2>본인 평가 완료</h2>
+        <div v-if="completedGoals.length > 0" class="sub-goal-list">
+          <el-card v-for="goal in completedGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId, 'review')">
+            <div class="sub-goal-content">
+              <div class="sub-goal-details">
+                <h4 class="sub-goal-title">{{ goal.title }}</h4>
+                <p class="sub-goal-description">{{ goal.contents }}</p>
+                <div class="sub-goal-user-info">
+                  <span class="user-name">{{ goal.memberName }}</span>
+                  <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+                </div>
+                <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
               </div>
-              <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
+              <div class="sub-goal-meta">
+                <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
+              </div>
             </div>
-            <div class="sub-goal-meta">
-              <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
+          </el-card>
+        </div>
+        <div v-else>
+          <p>평가 완료된 목표가 없습니다.</p>
+        </div>
+
+        <el-divider></el-divider>
+
+        <h2>평가 대기</h2>
+        <div v-if="pendingGoals.length > 0" class="sub-goal-list">
+          <el-card v-for="goal in pendingGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId, 'edit')">
+            <div class="sub-goal-content">
+              <div class="sub-goal-details">
+                <h4 class="sub-goal-title">{{ goal.title }}</h4>
+                <p class="sub-goal-description">{{ goal.contents }}</p>
+                <div class="sub-goal-user-info">
+                  <span class="user-name">{{ goal.memberName }}</span>
+                  <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+                </div>
+                <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
+              </div>
+              <div class="sub-goal-meta">
+                <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
+              </div>
             </div>
-          </div>
-        </el-card>
-      </div>
-      <div v-else>
-        <p>평가 완료된 목표가 없습니다.</p>
+          </el-card>
+        </div>
+        <div v-else>
+          <p>평가 대기중인 목표가 없습니다.</p>
+        </div>
       </div>
 
-      <el-divider></el-divider>
-
-      <h2>평가 대기</h2>
-      <div v-if="pendingGoals.length > 0" class="sub-goal-list">
-        <el-card v-for="goal in pendingGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId)">
-          <div class="sub-goal-content">
-            <div class="sub-goal-details">
-              <h4 class="sub-goal-title">{{ goal.title }}</h4>
-              <p class="sub-goal-description">{{ goal.contents }}</p>
-              <div class="sub-goal-user-info">
-                <span class="user-name">{{ goal.memberName }}</span>
-                <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+      <div v-if="currentMode === 'complete'">
+        <h2>평가 완료</h2>
+        <div v-if="finalCompletedGoals.length > 0" class="sub-goal-list">
+          <el-card v-for="goal in finalCompletedGoals" :key="goal.goalId" class="sub-goal-card" @click="goToMemberGoalDetail(goal.goalId, 'complete')">
+            <div class="sub-goal-content">
+              <div class="sub-goal-details">
+                <h4 class="sub-goal-title">{{ goal.title }}</h4>
+                <p class="sub-goal-description">{{ goal.contents }}</p>
+                <div class="sub-goal-user-info">
+                  <span class="user-name">{{ goal.memberName }}</span>
+                  <span class="user-details"> ({{ goal.memberOrganization }} / {{ goal.memberPostion }})</span>
+                </div>
+                <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
               </div>
-              <p class="sub-goal-period">기간: {{ goal.startDate }} ~ {{ goal.endDate }}</p>
+              <div class="sub-goal-meta">
+                <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
+              </div>
             </div>
-            <div class="sub-goal-meta">
-              <el-tag :type="getStatusType(goal.status)" class="sub-goal-status" effect="dark">{{ goal.status }}</el-tag>
-            </div>
-          </div>
-        </el-card>
-      </div>
-      <div v-else>
-        <p>평가 대기중인 목표가 없습니다.</p>
+          </el-card>
+        </div>
+        <div v-else>
+          <p>최종 평가 완료된 목표가 없습니다.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -109,6 +136,7 @@ export default {
         memberPositionId: null, // Manager's memberPositionId for this team goal
       },
       myMemberPositionId: null, // Current user's memberPositionId
+      currentMode: 'review', // Default mode
     };
   },
   computed: {
@@ -117,6 +145,9 @@ export default {
     },
     pendingGoals() {
       return this.teamGoalDetail.goalList.filter(goal => goal.status === '평가 대기');
+    },
+    finalCompletedGoals() {
+      return this.teamGoalDetail.goalList.filter(goal => goal.status === '최종 평가 완료');
     },
   },
   methods: {
@@ -151,13 +182,16 @@ export default {
       if (status === 'CANCELED') return 'info';
       return '';
     },
-    goToMemberGoalDetail(memberGoalId) {
+    goToMemberGoalDetail(memberGoalId, mode) {
       const teamGoalId = this.$route.params.id;
-      this.$router.push({ path: `/performance/team-goal/${teamGoalId}/member-goal/${memberGoalId}`, query: { mode: 'review' } });
+      this.$router.push({ path: `/performance/team-goal/${teamGoalId}/member-goal/${memberGoalId}`, query: { mode: mode } });
     },
   },
   created() {
     this.myMemberPositionId = localStorage.getItem('memberPositionId');
+    if (this.$route.query.mode) {
+      this.currentMode = this.$route.query.mode;
+    }
     this.fetchTeamGoalDetail();
   },
 };

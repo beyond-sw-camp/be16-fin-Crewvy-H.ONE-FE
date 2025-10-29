@@ -26,6 +26,19 @@
           </div>
         </template>
       </el-card>
+      <div v-if="myGoals.length === 0" class="empty-state">
+        <p>내 목표가 없습니다.</p>
+      </div>
+    </div>
+
+    <div v-if="totalMyGoalPages > 1" class="pagination-container">
+      <el-pagination
+        background
+        layout="prev, pager, next"
+        :total="totalMyGoalPages * 10"
+        v-model:current-page="currentMyGoalPage"
+        @current-change="handleMyGoalPageChange"
+      />
     </div>
 
     <el-dialog v-model="newGoalDialogVisible" title="팀 목표 선택" width="500px">
@@ -85,6 +98,8 @@
       data() {
         return {
           myGoals: [], // API로부터 데이터를 받아올 배열
+          totalMyGoalPages: 0,
+          currentMyGoalPage: 1,
           newGoalDialogVisible: false,
           selectedTeamGoal: null,
           teamGoalsForSelection: [], // 이 부분도 필요 시 API로 받아올 수 있습니다.
@@ -93,11 +108,13 @@
         };
       },
       methods: {
-        async fetchMyGoals() {
+        async fetchMyGoals(page = 0) {
           try {
             // In a real environment, you would use the actual API call:
-            const response = await apiClient.get('/workforce-service/performance/get-my-goal');
-            this.myGoals = response.data.data;
+            const response = await apiClient.get(`/workforce-service/performance/get-my-goal?page=${page}`);
+            this.myGoals = response.data.data.content;
+            this.totalMyGoalPages = response.data.data.totalPages;
+            this.currentMyGoalPage = response.data.data.number + 1;
     
             // Using mock data provided by the user for demonstration:
             // this.myGoals = [
@@ -169,6 +186,9 @@
         },
         goToDetail(id) {
           this.$router.push(`/performance/my-goal/${id}`);
+        },
+        handleMyGoalPageChange(page) {
+          this.fetchMyGoals(page - 1);
         },
       },  created() {
     this.fetchMyGoals();
@@ -297,5 +317,17 @@
 .dialog-team-goal-description {
     font-size: 12px;
     color: #909399;
+}
+
+.empty-state {
+  text-align: center;
+  color: #909399;
+  padding: 20px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>

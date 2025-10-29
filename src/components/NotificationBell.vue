@@ -81,7 +81,7 @@ const handleNotificationClick = async (notification) => {
       try {
         const response = await apiClient.get(`http://localhost:8080/workforce-service/performance/get-goal-detail/${targetId}`);
         const teamGoalId = response.data.data.teamGoalId;
-        url = `/performance/team-member-goal/${teamGoalId}/${targetId}?mode=review`;
+        url = `/performance/team-goal/${teamGoalId}/member-goal/${targetId}?mode=review`;
       } catch (error) {
         console.error('NT009 알림 처리 중 팀 목표 ID를 가져오는 데 실패했습니다:', error);
       }

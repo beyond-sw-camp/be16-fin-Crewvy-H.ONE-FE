@@ -16,7 +16,7 @@
           <el-icon><Clock /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">진행중인 평가</div>
+          <div class="card-title">내 목표 평가</div>
           <div class="card-value">{{ inProgressReviews }}</div>
           <div class="card-subtitle">내가 할 평가</div>
         </div>
@@ -27,7 +27,7 @@
           <el-icon><Document /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">내 평가</div>
+          <div class="card-title">팀 목표 평가</div>
           <div class="card-value">{{ myReviewsCount }}</div>
           <div class="card-subtitle">피평가</div>
         </div>
@@ -38,7 +38,7 @@
           <el-icon><Check /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">완료된 평가</div>
+          <div class="card-title">완료된 개인 목표</div>
           <div class="card-value">{{ completedReviews }}</div>
           <div class="card-subtitle">이번 분기</div>
         </div>
@@ -49,7 +49,7 @@
           <el-icon><User /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">팀 평균</div>
+          <div class="card-title">완료된 팀 목표</div>
           <div class="card-value">{{ teamAverageScore }}</div>
           <div class="card-subtitle"></div>
         </div>
@@ -81,6 +81,16 @@
                   </el-button>
                 </div>
               </div>
+              <p v-if="myReviews.length === 0">평가 대상이 없습니다.</p>
+            </div>
+            <div v-if="myReviewsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="myReviewsTotalPages * 10"
+                v-model:current-page="myReviewsCurrentPage"
+                @current-change="handleMyReviewsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -108,6 +118,16 @@
                   </el-button>
                 </div>
               </div>
+              <p v-if="teamReviews.length === 0">평가 대상이 없습니다.</p>
+            </div>
+            <div v-if="teamReviewsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="teamReviewsTotalPages * 10"
+                v-model:current-page="teamReviewsCurrentPage"
+                @current-change="handleTeamReviewsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -136,6 +156,15 @@
                 </div>
               </div>
               <p v-if="completedMyGoals.length === 0">완료된 개인 목표 평가가 없습니다.</p>
+            </div>
+            <div v-if="completedMyGoalsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="completedMyGoalsTotalPages * 10"
+                v-model:current-page="completedMyGoalsCurrentPage"
+                @current-change="handleCompletedMyGoalsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -166,6 +195,15 @@
               </div>
               <p v-if="completedTeamGoals.length === 0">완료된 팀 목표 평가가 없습니다.</p>
             </div>
+            <div v-if="completedTeamGoalsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="completedTeamGoalsTotalPages * 10"
+                v-model:current-page="completedTeamGoalsCurrentPage"
+                @current-change="handleCompletedTeamGoalsPageChange"
+              />
+            </div>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -194,42 +232,72 @@ export default {
     const completedReviews = ref(0);
     const teamAverageScore = ref('-');
 
+    const fetchEvaluationStats = async () => {
+      try {
+        const response = await apiClient.get('/workforce-service/performance/get-stat');
+        const stats = response.data.data;
+        inProgressReviews.value = stats.myGoalCount; // Assuming myGoalCount is for '내 목표 평가'
+        myReviewsCount.value = stats.teamGoalCount; // Assuming teamGoalCount is for '팀 목표 평가'
+        completedReviews.value = stats.myGoalCompleteCount; // Assuming myGoalCompleteCount is for '완료된 개인 목표'
+        teamAverageScore.value = stats.teamGoalCompleteCount; // Assuming teamGoalCompleteCount is for '완료된 팀 목표'
+      } catch (error) {
+        console.error('Error fetching evaluation stats:', error);
+      }
+    };
+
     const myReviews = ref([]);
     const teamReviews = ref([]);
     const completedMyGoals = ref([]); // New ref
     const completedTeamGoals = ref([]); // New ref
 
-    const fetchMyGoalReviews = async () => {
+    const myReviewsTotalPages = ref(0);
+    const myReviewsCurrentPage = ref(1);
+    const teamReviewsTotalPages = ref(0);
+    const teamReviewsCurrentPage = ref(1);
+    const completedMyGoalsTotalPages = ref(0);
+    const completedMyGoalsCurrentPage = ref(1);
+    const completedTeamGoalsTotalPages = ref(0);
+    const completedTeamGoalsCurrentPage = ref(1);
+
+    const fetchMyGoalReviews = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-goal-evaluation');
-        myReviews.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-goal-evaluation?page=${page}`);
+        myReviews.value = response.data.data.content;
+        myReviewsTotalPages.value = response.data.data.totalPages;
+        myReviewsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching my goal reviews:', error);
       }
     };
 
-    const fetchTeamGoalReviews = async () => {
+    const fetchTeamGoalReviews = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-teamgoal-evaluation');
-        teamReviews.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-teamgoal-evaluation?page=${page}`);
+        teamReviews.value = response.data.data.content;
+        teamReviewsTotalPages.value = response.data.data.totalPages;
+        teamReviewsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching team goal reviews:', error);
       }
     };
 
-    const fetchCompletedMyGoals = async () => { // New function
+    const fetchCompletedMyGoals = async (page = 0) => { // New function
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-complete-goal');
-        completedMyGoals.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-complete-goal?page=${page}`);
+        completedMyGoals.value = response.data.data.content;
+        completedMyGoalsTotalPages.value = response.data.data.totalPages;
+        completedMyGoalsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching completed my goals:', error);
       }
     };
 
-    const fetchCompletedTeamGoals = async () => { // New function
+    const fetchCompletedTeamGoals = async (page = 0) => { // New function
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-complete-teamgoal');
-        completedTeamGoals.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-complete-teamgoal?page=${page}`);
+        completedTeamGoals.value = response.data.data.content;
+        completedTeamGoalsTotalPages.value = response.data.data.totalPages;
+        completedTeamGoalsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching completed team goals:', error);
       }
@@ -238,14 +306,30 @@ export default {
     const handleTabChange = (tabName) => {
       activeTab.value = tabName;
       if (tabName === 'my-goal-reviews') {
-        fetchMyGoalReviews();
+        fetchMyGoalReviews(0);
       } else if (tabName === 'team-goal-reviews') {
-        fetchTeamGoalReviews();
+        fetchTeamGoalReviews(0);
       } else if (tabName === 'completed-my-goals') {
-        fetchCompletedMyGoals();
+        fetchCompletedMyGoals(0);
       } else if (tabName === 'completed-team-goals') {
-        fetchCompletedTeamGoals();
+        fetchCompletedTeamGoals(0);
       }
+    };
+
+    const handleMyReviewsPageChange = (page) => {
+      fetchMyGoalReviews(page - 1);
+    };
+
+    const handleTeamReviewsPageChange = (page) => {
+      fetchTeamGoalReviews(page - 1);
+    };
+
+    const handleCompletedMyGoalsPageChange = (page) => {
+      fetchCompletedMyGoals(page - 1);
+    };
+
+    const handleCompletedTeamGoalsPageChange = (page) => {
+      fetchCompletedTeamGoals(page - 1);
     };
 
     const viewCompletedMyGoalDetails = (goal) => {
@@ -253,22 +337,23 @@ export default {
     };
 
     const viewCompletedTeamGoalDetails = (goal) => {
-      router.push(`/performance/team-goal-review/${goal.teamGoalId}?mode=review`);
+      router.push(`/performance/team-goal-review/${goal.teamGoalId}?mode=complete`);
     };
 
     const viewReviewDetails = (review) => {
       if (activeTab.value === 'my-goal-reviews') {
         router.push(`/performance/my-goal/${review.goalId}?from=review`);
-      } else {
-        router.push(`/performance/team-goal-review/${review.teamGoalId}`);
+      } else { // This 'else' block is for 'team-goal-reviews'
+        router.push(`/performance/team-goal-review/${review.teamGoalId}?mode=review`);
       }
     };
 
     onMounted(() => {
-      fetchMyGoalReviews();
-      fetchTeamGoalReviews();
-      fetchCompletedMyGoals();
-      fetchCompletedTeamGoals();
+      fetchMyGoalReviews(0);
+      fetchTeamGoalReviews(0);
+      fetchCompletedMyGoals(0);
+      fetchCompletedTeamGoals(0);
+      fetchEvaluationStats(); // Call the new stats function
     });
 
     return {
@@ -285,6 +370,10 @@ export default {
       viewReviewDetails,
       viewCompletedMyGoalDetails, // New method
       viewCompletedTeamGoalDetails, // New method
+      handleMyReviewsPageChange,
+      handleTeamReviewsPageChange,
+      handleCompletedMyGoalsPageChange,
+      handleCompletedTeamGoalsPageChange,
     };
   },
 }
@@ -452,4 +541,9 @@ export default {
   display: flex;
   gap: 8px;
 }
-</style>
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}</style>

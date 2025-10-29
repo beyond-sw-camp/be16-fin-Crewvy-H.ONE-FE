@@ -374,7 +374,7 @@ export default {
   },
   created() {
     this.myMemberPositionId = localStorage.getItem('memberPositionId'); // Added this
-    this.isReviewMode = this.$route.query.mode === 'review'; // Set based on query param
+    this.isReviewMode = this.$route.query.mode === 'review' || this.$route.query.mode === 'complete'; // Set based on query param
     this.fetchGoalDetail();
   },
 };
