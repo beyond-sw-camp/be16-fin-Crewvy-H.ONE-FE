@@ -101,6 +101,15 @@
           <p>댓글이 없습니다.</p>
         </div>
       </div>
+      <div class="pagination-container">
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          :total="totalCommentPages * 10"
+          v-model:current-page="currentCommentPage"
+          @current-change="handleCommentPageChange"
+        />
+      </div>
       <div class="comment-form">
         <el-input
           v-model="newComment"
@@ -149,19 +158,20 @@ export default {
   setup() {
     const router = useRouter();
     const route = useRoute();
-    const approvalId = ref(null);
-    
-    const formSchema = ref(null);
-    const formData = ref({});
-    const formTitle = ref('');
-    const approvalTitle = ref('');
-    const currentApprovalLine = ref([]);
-    const comments = ref([]);
-    const newComment = ref('');
-    const attachments = ref([]); // For attachment list
-    const isCurrentUserTurn = ref(false);
-    const showRejectModal = ref(false);
-    const rejectionReason = ref('');
+        const approvalId = ref(null);
+    const totalCommentPages = ref(0);
+    const currentCommentPage = ref(1);
+        const formSchema = ref(null);
+        const formData = ref({});
+        const formTitle = ref('');
+        const approvalTitle = ref('');
+        const currentApprovalLine = ref([]);
+        const comments = ref([]);
+        const newComment = ref('');
+        const attachments = ref([]); // For attachment list
+        const isCurrentUserTurn = ref(false);
+        const showRejectModal = ref(false);
+        const rejectionReason = ref('');
 
     const getKoreanStatus = (status) => {
       const statusMap = {
@@ -221,10 +231,10 @@ export default {
       }
     };
 
-    const fetchComments = async (id) => {
+    const fetchComments = async (id, page = 0) => {
       try {
-        const response = await apiClient.get(`/workforce-service/approval/find-reply/${id}`);
-        comments.value = response.data.data.map(comment => {
+        const response = await apiClient.get(`/workforce-service/approval/find-reply/${id}?page=${page}`);
+        comments.value = response.data.data.content.map(comment => {
           const formattedDate = comment.createdAt ? comment.createdAt.substring(0, 16).replace('T', ' ') : '';
           return {
             id: comment.memberPositionId + comment.createdAt,
@@ -233,12 +243,30 @@ export default {
             date: formattedDate
           };
         });
+        totalCommentPages.value = response.data.data.totalPages;
+        currentCommentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Failed to fetch comments:', error);
         comments.value = [];
       }
     };
-    
+
+    const handleCommentPageChange = (page) => {
+      fetchComments(approvalId.value, page - 1);
+    };
+
+
+    const formatApprovalDate = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    };
+
     onMounted(() => {
       approvalId.value = route.params.id;
       if (approvalId.value) {
@@ -258,7 +286,7 @@ export default {
         await apiClient.post(`/workforce-service/approval/create-reply/${approvalId.value}`, replyRequestDto);
         newComment.value = '';
         // Re-fetch comments to get the updated list
-        await fetchComments(approvalId.value); 
+        await fetchComments(approvalId.value, currentCommentPage.value - 1); 
       } catch (error) {
         console.error('Failed to add comment:', error);
         // alert('댓글 작성에 실패했습니다.');
@@ -309,17 +337,6 @@ export default {
       }
     };
 
-    const formatApprovalDate = (dateString) => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
-    };
-
     return {
       approvalId,
       formSchema,
@@ -340,6 +357,9 @@ export default {
       showRejectModal,
       rejectionReason,
       handleReject,
+      totalCommentPages,
+      currentCommentPage,
+      handleCommentPageChange,
     };
   },
 };
@@ -431,4 +451,5 @@ export default {
 .comment-content { font-size: 14px; }
 .comment-form { margin-top: 20px; }
 .comment-form-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.pagination-container { margin-top: 20px; display: flex; justify-content: center; }
 </style>
