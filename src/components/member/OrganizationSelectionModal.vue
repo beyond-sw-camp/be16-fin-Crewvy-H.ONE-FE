@@ -1,16 +1,22 @@
 <template>
   <el-dialog v-model="visible" title="조직 선택" width="400px">
-    <el-tree
-      ref="orgTreeRef"
-      :data="orgTree"
-      :props="defaultProps"
-      node-key="id"
-      :default-expanded-keys="expandedKeys"
-      :expand-on-click-node="false"
-      @node-click="handleNodeClick"
-      class="org-tree"
-    >
-    </el-tree>
+    <div class="org-tree-container-modal">
+      <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
+      <div class="tree-container">
+        <el-tree
+          ref="orgTreeRef"
+          :data="orgTree"
+          :props="defaultProps"
+          node-key="id"
+          :default-expanded-keys="expandedKeys"
+          :expand-on-click-node="false"
+          @node-click="handleNodeClick"
+          :filter-node-method="filterNode"
+          class="org-tree"
+        >
+        </el-tree>
+      </div>
+    </div>
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="close">취소</el-button>
@@ -21,7 +27,7 @@
 </template>
 
 <script setup>
-import { ref, defineEmits, defineExpose } from 'vue';
+import { ref, defineEmits, defineExpose, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import organizationService from '@/api/organizationService';
 
@@ -31,6 +37,7 @@ const defaultProps = { children: 'children', label: 'label' };
 const expandedKeys = ref([]);
 const orgTreeRef = ref(null);
 const selectedNode = ref(null);
+const orgSearch = ref('');
 
 const emit = defineEmits(['organization-selected']);
 
@@ -39,6 +46,8 @@ const fetchOrganizations = async () => {
     const response = await organizationService.getOrganizationTreeForCreation();
     if (response.data && Array.isArray(response.data.data)) {
       orgTree.value = response.data.data;
+      // Expand top-level nodes by default
+      expandedKeys.value = orgTree.value.map(org => org.id);
     } else {
       console.error("Fetched data is not in the expected format.", response.data);
       orgTree.value = []; // Ensure tree is empty on bad data
@@ -73,17 +82,46 @@ const close = () => {
   visible.value = false;
 };
 
+const filterNode = (value, data) => {
+  if (!value) return true;
+  return data.label.indexOf(value) !== -1;
+};
+
+watch(orgSearch, (val) => {
+  orgTreeRef.value.filter(val);
+});
+
 defineExpose({
   open
 });
 </script>
 
 <style scoped>
-.search-input {
+.org-tree-container-modal {
+  display: flex;
+  flex-direction: column;
+}
+.search-input-modal {
   margin-bottom: 16px;
 }
-.org-tree {
+.tree-container {
+  flex: 1;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 8px;
   max-height: 400px;
   overflow-y: auto;
+}
+.custom-tree-node-modal {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  padding-right: 8px;
+}
+.member-count {
+  color: #909399;
+  font-size: 12px;
 }
 </style>

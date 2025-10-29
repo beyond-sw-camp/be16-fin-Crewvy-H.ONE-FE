@@ -36,26 +36,26 @@
           <span>통합 검색</span>
         </el-menu-item>
 
-        <el-sub-menu index="employee">
+        <el-sub-menu index="employee" v-if="hasEmployeeReadCompanyOrSystem || hasEmployeeReadDepartment">
           <template #title>
             <el-icon>
               <User />
             </el-icon>
             <span>직원 관리</span>
           </template>
-          <el-menu-item index="/employee">
+          <el-menu-item index="/employee" v-if="hasEmployeeReadCompanyOrSystem || hasEmployeeReadDepartment">
             <span>직원 목록</span>
           </el-menu-item>
-          <el-menu-item index="/organization">
+          <el-menu-item index="/organization" v-if="hasEmployeeReadCompanyOrSystem">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/title">
+          <el-menu-item index="/employee/title" v-if="hasEmployeeReadCompanyOrSystem">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grade">
+          <el-menu-item index="/employee/grade" v-if="hasEmployeeReadCompanyOrSystem">
             <span>직급 관리</span>
           </el-menu-item>
-          <el-sub-menu index="roles">
+          <el-sub-menu index="roles" v-if="hasEmployeeReadCompanyOrSystem">
             <template #title>
               <span>역할 관리</span>
             </template>
@@ -130,9 +130,9 @@
             <template #title>
               <span>급여 관리</span>
             </template>
-              <el-menu-item index="/payroll/policy-settings">
-                <span>급여 정책 설정</span>
-              </el-menu-item>
+            <el-menu-item index="/payroll/policy-settings">
+              <span>급여 정책 설정</span>
+            </el-menu-item>
             <el-menu-item index="/payroll/item-management">
               <span>급여 기초 정보</span>
             </el-menu-item>
@@ -280,8 +280,9 @@
             <div class="org-tree-container-modal">
               <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
               <div class="tree-container">
-                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id" @node-click="handleOrgNodeClick"
-                  :filter-node-method="filterNode" :expand-on-click-node="false" :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
+                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id"
+                  @node-click="handleOrgNodeClick" :filter-node-method="filterNode" :expand-on-click-node="false"
+                  :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
                   <template #default="{ node, data }">
                     <div class="custom-tree-node-modal">
                       <span>{{ node.label }}</span>
@@ -424,7 +425,7 @@
             value-format="YYYY-MM-DD" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="시간">
-          <el-time-picker v-model="eventForm.time" placeholder="시간 선택"   format="HH:mm" value-format="HH:mm"
+          <el-time-picker v-model="eventForm.time" placeholder="시간 선택" format="HH:mm" value-format="HH:mm"
             style="width: 100%;" />
         </el-form-item>
         <el-form-item label="유형">
@@ -451,10 +452,8 @@
 import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
 import { useSnackbar } from '@/composables/useSnackbar';
 import SnackbarContainer from '../components/SnackbarContainer.vue';
-
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import employeeService from '@/api/employeeService';
-
 import organizationService from '@/api/organizationService';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
@@ -490,12 +489,6 @@ export default {
       activeOrgTab: 'org',
       orgSearch: '',
       employeeSearch: '',
-      currentDate: new Date(2025, 8, 1), // 2025년 9월
-      weekdays: ['일', '월', '화', '수', '목', '금', '토'],
-      sessionExpiryTime: null,
-      sessionTimer: null,
-      currentTime: new Date(),
-      sessionWarningShown: false, // 세션 경고 표시 여부 추적
       expandedDepartments: {
         management: false,
         sales: true
@@ -509,6 +502,14 @@ export default {
       allEmployees: [],
       searchedEmployees: [],
       hasSearched: false, // 검색 실행 여부 상태
+
+      currentDate: new Date(2025, 8, 1), // 2025년 9월
+      weekdays: ['일', '월', '화', '수', '목', '금', '토'],
+      sessionExpiryTime: null,
+      sessionTimer: null,
+      currentTime: new Date(),
+      sessionWarningShown: false, // 세션 경고 표시 여부 추적
+
       events: [
         {
           id: 1,
@@ -667,6 +668,13 @@ export default {
     }
   },
   computed: {
+    ...mapState('auth', ['permissions']),
+    hasEmployeeReadCompanyOrSystem() {
+      return this.$store.getters['auth/hasEmployeeReadCompanyOrSystem'];
+    },
+    hasEmployeeReadDepartment() {
+      return this.$store.getters['auth/hasEmployeeReadDepartment'];
+    },
     userAvatarUrl() {
       return this.user?.avatar || this.defaultAvatarSvg;
     },
@@ -741,9 +749,6 @@ export default {
     }
   },
   watch: {
-    orgSearch(val) {
-      this.$refs.orgTree.filter(val);
-    },
     '$route'() {
       this.updatePayrollMenuState()
     }
@@ -771,9 +776,9 @@ export default {
         '/performance/my-goal': '내 목표 관리',
         '/performance/review': '평가 관리',
         '/payroll': '급여 관리',
-            '/payroll/policy-settings': '급여 정책 설정',
-            '/payroll/item-management': '급여 기초 정보',
-            '/payroll/basic-info': '급여 기본 정보',
+        '/payroll/policy-settings': '급여 정책 설정',
+        '/payroll/item-management': '급여 기초 정보',
+        '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
         '/payroll/transfer-output': '급여 이체 출력',
         '/payroll/statement-output': '명세서 출력',
@@ -950,7 +955,6 @@ export default {
         this.searchedEmployees = [];
       }
     },
-
     openCalendarModal() {
       this.showCalendarModal = true
     },
@@ -1072,9 +1076,10 @@ export default {
       })
     }
   },
-  created() {
+  async created() {
     if (localStorage.getItem('accessToken')) {
-      this.fetchOrganizationTree();
+      await this.fetchOrganizationTree();
+      this.$store.dispatch('auth/fetchPermissions');
     }
   },
   mounted() {
@@ -1463,7 +1468,8 @@ export default {
   overflow-y: auto;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  min-height: calc(100vh - 500px); /* Responsive minimum height */
+  min-height: calc(100vh - 500px);
+  /* Responsive minimum height */
 }
 
 .org-tree-container-modal {

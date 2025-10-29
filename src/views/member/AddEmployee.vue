@@ -126,7 +126,7 @@
                 <el-form-item label="부서" prop="positions[0].organizationId">
                   <el-input v-model="form.positions[0].department" placeholder="부서명">
                     <template #append>
-                      <el-button @click="openOrganizationModal(0)">조직도에서 선택</el-button>
+                      <el-button @click="openOrganizationModal(0)">조직도</el-button>
                     </template>
                   </el-input>
                 </el-form-item>
