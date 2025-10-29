@@ -1,8 +1,8 @@
 <template>
   <div class="payroll-basic-info">
     <div class="page-header">
-      <h1>급여 기본 정보</h1>
-      <p>사원별 급여 항목과 합계를 확인하고 입력 방법을 전환할 수 있습니다.</p>
+      <h1>급여 계약 정보 설정</h1>
+      <p>직원별 기본급과 매월 고정적으로 지급되는 수당 항목을 관리합니다.</p>
     </div>
 
     <div class="switch-bar">
@@ -81,55 +81,37 @@
             <el-table-column prop="empNo" label="사번" width="100" align="center" fixed="left" />
             <el-table-column prop="name" label="성명" width="120" align="center" fixed="left" />
             <el-table-column prop="dept" label="부서" width="120" align="center" />
-            <el-table-column prop="position" label="직급" width="120" align="center" />
             <el-table-column prop="payTotal" label="지급합계" width="140" align="right" header-align="center">
               <template #default="{ row }">{{ format(row.payTotal) }}</template>
             </el-table-column>
-            <el-table-column prop="deductTotal" label="공제합계" width="140" align="right" header-align="center">
-              <template #default="{ row }">{{ format(row.deductTotal) }}</template>
+            <el-table-column prop="baseSalary" label="기본급" width="140" align="right" header-align="center">
+              <template #default="{ row }">
+                <el-input
+                  v-model="row.baseSalaryDisplay"
+                  size="small"
+                  @input="(value) => handleCurrencyInput(row, 'baseSalary', value)"
+                  placeholder="0"
+                />
+              </template>
             </el-table-column>
-            <!-- 지급항목 그룹 -->
-            <el-table-column label="지급항목" align="center" v-if="allowanceItems.length > 0" class-name="allowance-group">
-              <el-table-column 
-                v-for="item in allowanceItems" 
-                :key="item.id" 
-                :prop="getItemProperty(item.name)" 
-                :label="item.name" 
-                :width="getColumnWidth()" 
-                align="center"
-                class-name="allowance-item"
-              >
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row[getItemProperty(item.name) + 'Display']"
-                    size="small"
-                    @input="(value) => handleCurrencyInput(row, getItemProperty(item.name), value)"
-                    placeholder="0"
-                  />
-                </template>
-              </el-table-column>
-            </el-table-column>
-            
-            <!-- 공제항목 그룹 -->
-            <el-table-column label="공제항목" align="center" v-if="deductionItems.length > 0" class-name="deduction-group">
-              <el-table-column 
-                v-for="item in deductionItems" 
-                :key="item.id"
-                :prop="getItemProperty(item.name)" 
-                :label="item.name" 
-                :width="getColumnWidth()" 
-                align="center"
-                class-name="deduction-item"
-              >
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row[getItemProperty(item.name) + 'Display']"
-                    size="small"
-                    @input="(value) => handleCurrencyInput(row, getItemProperty(item.name), value)"
-                    placeholder="0"
-                  />
-                </template>
-              </el-table-column>
+            <!-- 고정 수당 항목들을 단독 컬럼으로 표시 -->
+            <el-table-column 
+              v-for="item in allowanceItems" 
+              :key="item.id" 
+              :prop="getItemProperty(item.name)" 
+              :label="item.name" 
+              :width="getColumnWidth()" 
+              align="right"
+              header-align="center"
+            >
+              <template #default="{ row }">
+                <el-input
+                  v-model="row[getItemProperty(item.name) + 'Display']"
+                  size="small"
+                  @input="(value) => handleCurrencyInput(row, getItemProperty(item.name), value)"
+                  placeholder="0"
+                />
+              </template>
             </el-table-column>
             
             <!-- 데이터가 없을 때 표시할 내용 -->
@@ -239,12 +221,10 @@ export default {
     return {
       inputMode: '사원별',
       rows: [],
-      originalRows: [], // 원본 데이터 저장소 (변경 감지용)
       filteredRows: [], // 필터링된 데이터
       itemRows: [],
       payrollItems: [], // API에서 가져온 급여 항목 목록
       loading: false,
-      saving: false,
       screenWidth: window.innerWidth,
       // 필터링 관련 데이터
       selectedDepartment: '',
@@ -287,7 +267,7 @@ export default {
   methods: {
     // 회사 ID 가져오기
     getCompanyId() {
-      return 'f1e85c26-14fa-4603-8edd-bfbdd82234ab'
+      return 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
     },
     
     // 화면 크기 변경 핸들러
@@ -319,12 +299,12 @@ export default {
       row[displayField] = this.formatCurrency(parsedValue)
     },
 
-    // 급여 항목 목록 로드
+    // 급여 항목 목록 로드 (고정 수당 항목)
     async loadPayrollItems() {
       try {
         this.loading = true
         
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/fixed-allowance`, {
           params: { companyId: this.getCompanyId() }
         })
         
@@ -335,18 +315,17 @@ export default {
             items = response.data
           } else if (response.data.data && Array.isArray(response.data.data)) {
             items = response.data.data
-          } else if (response.data.payrollItems && Array.isArray(response.data.payrollItems)) {
-            items = response.data.payrollItems
           }
         }
         
         // 백엔드 데이터를 프론트엔드 형식으로 변환
+        // 모든 항목을 지급 항목으로 처리
         this.payrollItems = items.map(item => ({
-          id: item.id,
-          type: item.salaryType || item.type,
-          name: item.name || item.itemName,
+          id: item.id || this.generateUUID(),
+          type: 'ALLOWANCE',
+          name: item.allowanceName || item.name,
           description: item.description || '',
-          isActive: item.isActive === 'TRUE' || item.isActive === true,
+          isActive: true,
         }))
         
       } catch (error) {
@@ -359,12 +338,16 @@ export default {
 
     // 급여 항목명을 속성명으로 변환
     getItemProperty(itemName) {
-      // 동적 속성명 생성: 한글을 영문으로 변환하거나 기존 패턴 사용
-      return itemName.toLowerCase()
-        .replace(/[가-힣]/g, '') // 한글 제거
-        .replace(/\s+/g, '') // 공백 제거
-        .replace(/[^a-zA-Z0-9]/g, '') // 특수문자 제거
-        .substring(0, 20) // 길이 제한
+      if (!itemName) return ''
+      // 간단한 해시 함수: 문자열을 숫자로 변환
+      let hash = 0
+      for (let i = 0; i < itemName.length; i++) {
+        const char = itemName.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash // 32비트 정수로 변환
+      }
+      // 절댓값 사용하고 'item' 접두어 추가
+      return 'item' + Math.abs(hash).toString()
     },
 
     // 컬럼 너비 설정
@@ -375,17 +358,14 @@ export default {
 
     // 합계 계산
     calculateTotals(row) {
-      // 지급합계 계산 (동적으로 지급 항목들의 합계)
-      row.payTotal = this.allowanceItems.reduce((sum, item) => {
+      // 기본급을 먼저 더하고, 그 다음 지급 항목들의 합계 계산
+      row.payTotal = (row.baseSalary || 0) + this.allowanceItems.reduce((sum, item) => {
         const property = this.getItemProperty(item.name)
         return sum + (row[property] || 0)
       }, 0)
       
-      // 공제합계 계산 (동적으로 공제 항목들의 합계)
-      row.deductTotal = this.deductionItems.reduce((sum, item) => {
-        const property = this.getItemProperty(item.name)
-        return sum + (row[property] || 0)
-      }, 0)
+      // 공제합계는 0으로 설정 (새 API에서는 공제 항목이 없음)
+      row.deductTotal = 0
     },
 
     format(val) {
@@ -395,9 +375,65 @@ export default {
     getSummaries({ columns, data }) {
       const sums = []
       columns.forEach((column, index) => {
+        // 첫 번째 컬럼 (사번)
         if (index === 0) { sums[index] = ''; return }
-        if (['성명','부서','직급'].includes(column.label)) { sums[index] = ''; return }
-        const values = data.map(item => Number(item[column.property]))
+        // 성명, 부서는 빈 문자열
+        if (['name', 'dept'].includes(column.property)) { sums[index] = ''; return }
+        
+        // 지급합계는 payTotal 값 사용
+        if (column.property === 'payTotal') {
+          const values = data.map(item => Number(item.payTotal) || 0)
+          const total = values.reduce((acc, cur) => acc + (isNaN(cur) ? 0 : cur), 0)
+          sums[index] = this.format(total)
+          return
+        }
+        
+        // 기본급은 baseSalaryDisplay 사용
+        if (column.property === 'baseSalary') {
+          const values = data.map(item => {
+            const value = item.baseSalaryDisplay || '0'
+            return Number(value.toString().replace(/,/g, '')) || 0
+          })
+          const total = values.reduce((acc, cur) => acc + (isNaN(cur) ? 0 : cur), 0)
+          sums[index] = this.format(total)
+          return
+        }
+        
+        // 동적 항목들: label을 기반으로 itemName 찾아서 property 매핑
+        const label = column.label
+        if (!label) {
+          sums[index] = ''
+          return
+        }
+        
+        // allowanceItems에서 label과 일치하는 항목 찾기
+        const matchingItem = this.allowanceItems.find(item => item.name === label)
+        if (!matchingItem) {
+          sums[index] = ''
+          return
+        }
+        
+        // property 이름 생성
+        const property = this.getItemProperty(label)
+        if (!property) {
+          sums[index] = ''
+          return
+        }
+        
+        // 합계 계산 - Display 필드 사용
+        const values = data.map(item => {
+          const displayProp = property + 'Display'
+          if (item[displayProp] !== undefined && item[displayProp] !== null) {
+            // 콤마 제거
+            return Number(item[displayProp].toString().replace(/,/g, '')) || 0
+          }
+          // Display 필드가 없으면 원본 필드 사용
+          if (item[property] !== undefined && item[property] !== null) {
+            return Number(item[property]) || 0
+          }
+          return 0
+        })
+        
         const total = values.reduce((acc, cur) => acc + (isNaN(cur) ? 0 : cur), 0)
         sums[index] = this.format(total)
       })
@@ -509,101 +545,6 @@ export default {
       }
     },
 
-    // 변경된 데이터 감지 (POST 요청용)
-    getChangedData() {
-      const changedData = []
-      
-      this.filteredRows.forEach((currentEmployee) => {
-        const originalEmployee = this.originalRows.find(orig => 
-          orig.empNo === currentEmployee.empNo && orig.name === currentEmployee.name
-        )
-        
-        if (!originalEmployee) {
-          // 새로운 사원인 경우 모든 데이터를 변경된 것으로 처리
-          this.payrollItems.forEach(item => {
-            const property = this.getItemProperty(item.name)
-            const amount = currentEmployee[property] || 0
-            if (amount > 0) {
-              changedData.push({
-                companyId: this.getCompanyId(),
-                memberId: currentEmployee.memberId,
-                payrollItemId: item.id,
-                amount: amount
-              })
-            }
-          })
-          return
-        }
-        
-        // 기존 사원의 경우 변경된 항목만 찾기
-        this.payrollItems.forEach(item => {
-          const property = this.getItemProperty(item.name)
-          const currentAmount = currentEmployee[property] || 0
-          const originalAmount = originalEmployee[property] || 0
-          
-          if (currentAmount !== originalAmount) {
-            changedData.push({
-              companyId: this.getCompanyId(),
-              memberId: currentEmployee.memberId,
-              payrollItemId: item.id,
-              amount: currentAmount
-            })
-          }
-        })
-      })
-      
-      return changedData
-    },
-
-    // 급여 데이터 저장
-    async savePayrollData() {
-      this.saving = true
-      
-      try {
-        // 변경된 데이터만 가져오기
-        const changedData = this.getChangedData()
-        
-        if (changedData.length === 0) {
-          this.info('변경된 데이터가 없습니다.')
-          return
-        }
-
-        // POST 요청으로 변경된 데이터만 전송
-        const response = await axios.post(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salaryInfo/save`,
-          changedData
-        )
-
-        if (response.data && response.data.success) {
-          this.success(`${changedData.length}개의 급여 항목이 업데이트되었습니다.`)
-          // 성공 시 원본 데이터 업데이트
-          this.originalRows = JSON.parse(JSON.stringify(this.rows))
-        } else {
-          throw new Error(response.data?.message || '저장에 실패했습니다.')
-        }
-      } catch (error) {
-        this.error(`급여 데이터 저장 중 오류가 발생했습니다: ${error.message}`)
-      } finally {
-        this.saving = false
-      }
-    },
-
-    // 필터 초기화
-    resetFilters() {
-      this.selectedDepartment = ''
-      this.searchEmpNo = ''
-      this.searchName = ''
-      // resetFilters 호출 시에는 performSearch가 자동으로 실행됨
-    },
-
-    // UUID 생성 함수
-    generateUUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0
-        const v = c === 'x' ? r : (r & 0x3 | 0x8)
-        return v.toString(16)
-      })
-    },
 
     // 급여 데이터 조회
     async fetchPayrollData() {
@@ -611,20 +552,27 @@ export default {
       
       try {
         const response = await axios.get(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salaryInfo/list`,
+          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-config/list`,
           {
             params: { companyId: this.getCompanyId() }
           }
         )
 
-        if (response.data.data && Array.isArray(response.data.data)) {
+        let dataList = []
+        if (response.data) {
+          if (Array.isArray(response.data)) {
+            dataList = response.data
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            dataList = response.data.data
+          }
+        }
+
+        if (dataList.length > 0) {
           // 백엔드 데이터를 화면용 데이터로 변환
-          this.processFetchedData(response.data.data)
+          this.processFetchedData(dataList)
           this.success('급여 데이터를 성공적으로 조회했습니다.')
         } else {
           this.warning('조회된 급여 데이터가 없습니다.')
-          // 데이터가 없을 때도 원본 데이터 초기화
-          this.originalRows = []
         }
       } catch (error) {
         this.error('급여 데이터 조회 중 오류가 발생했습니다.')
@@ -635,35 +583,33 @@ export default {
 
     // 조회된 데이터를 화면용으로 변환
     processFetchedData(backendData) {
-      // memberId별로 그룹화
-      const groupedByMember = {}
-      
-      backendData.forEach(item => {
-        const memberId = item.memberId
-        if (!groupedByMember[memberId]) {
-          groupedByMember[memberId] = {
-            memberId: memberId,
-            payrollItems: []
-          }
+      const employeeData = backendData.map((employeeConfig) => {
+        const employee = {
+          memberId: employeeConfig.memberId,
+          empNo: employeeConfig.sabun,
+          name: employeeConfig.memberName,
+          dept: employeeConfig.department,
+          position: '', // 직급 정보가 없음
+          // 기본급 설정
+          baseSalary: employeeConfig.baseSalary || 0,
+          baseSalaryDisplay: this.formatCurrency(employeeConfig.baseSalary || 0)
         }
-        groupedByMember[memberId].payrollItems.push(item)
-      })
-
-      // 각 memberId별로 사원 정보 생성 및 데이터 매핑
-      const employeeData = Object.values(groupedByMember).map((memberData, index) => {
-        const employee = this.createEmployeeInfo(index)
-        // memberId 추가
-        employee.memberId = memberData.memberId
         
-        // 급여 항목 데이터 매핑
-        memberData.payrollItems.forEach(payrollItem => {
-          const item = this.payrollItems.find(p => p.id === payrollItem.payrollItemId)
-          if (item) {
-            const property = this.getItemProperty(item.name)
-            employee[property] = payrollItem.amount
-            employee[property + 'Display'] = this.formatCurrency(payrollItem.amount)
-            // 각 급여 항목의 ID 저장 (PUT 요청용)
-            employee[property + 'Id'] = payrollItem.id
+        // fixedAllowanceList가 있으면 각 항목을 매핑
+        if (employeeConfig.fixedAllowanceList && employeeConfig.fixedAllowanceList.length > 0) {
+          employeeConfig.fixedAllowanceList.forEach(allowance => {
+            const property = this.getItemProperty(allowance.allowanceName)
+            employee[property] = allowance.amount || 0
+            employee[property + 'Display'] = this.formatCurrency(allowance.amount || 0)
+          })
+        }
+        
+        // 모든 급여 항목에 대해 속성이 없으면 0으로 초기화
+        this.payrollItems.forEach(item => {
+          const property = this.getItemProperty(item.name)
+          if (!Object.prototype.hasOwnProperty.call(employee, property)) {
+            employee[property] = 0
+            employee[property + 'Display'] = '0'
           }
         })
 
@@ -674,7 +620,6 @@ export default {
       })
 
       this.rows = employeeData
-      this.originalRows = JSON.parse(JSON.stringify(employeeData)) // 원본 데이터 깊은 복사
       this.filteredRows = [...employeeData]
       this.generateDepartmentList()
     },
@@ -692,19 +637,7 @@ export default {
         position: positions[index % positions.length],
         // 급여 항목들은 기본값 0으로 초기화
         baseSalary: 0,
-        nightPay: 0,
-        otCenter: 0,
-        mealNontax: 0,
-        bizExpense: 0,
-        otComm: 0,
-        otEtc: 0,
-        annualPay: 0,
-        holidayPay: 0,
-        nationalPension: 0,
-        healthInsurance: 0,
-        employmentInsurance: 0,
-        incomeTax: 0,
-        localIncomeTax: 0,
+        baseSalaryDisplay: '0',
         payTotal: 0,
         deductTotal: 0
       }
@@ -809,10 +742,6 @@ export default {
 
 .filter-actions .el-button {
   min-width: 80px;
-}
-
-.table-wrap {
-  overflow-x: auto;
 }
 
 .pay-grid .el-table__footer-wrapper .cell {
@@ -924,6 +853,17 @@ export default {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* 테이블이 전체 너비를 사용하도록 설정 */
+.payroll-employee-table :deep(.el-table__header-wrapper),
+.payroll-employee-table :deep(.el-table__body-wrapper) {
+  width: 100% !important;
+}
+
+.payroll-employee-table :deep(.el-table__body),
+.payroll-employee-table :deep(.el-table__header) {
+  width: 100% !important;
+}
+
 .payroll-employee-table .amount {
   font-weight: 500;
   color: #2c3e50;
@@ -965,13 +905,15 @@ export default {
   
   /* 작은 화면에서만 컬럼 너비를 유연하게 조정 */
   .payroll-employee-table :deep(.el-table__header-wrapper),
-  .payroll-employee-table :deep(.el-table__body-wrapper) {
+  .payroll-employee-table :deep(.el-table__body-wrapper),
+  .payroll-employee-table :deep(.el-table__footer-wrapper) {
     width: 100% !important;
   }
   
   /* 컬럼들을 min-width로 변경하여 유연하게 조정 */
   .payroll-employee-table :deep(.el-table__header th),
-  .payroll-employee-table :deep(.el-table__body td) {
+  .payroll-employee-table :deep(.el-table__body td),
+  .payroll-employee-table :deep(.el-table__footer th) {
     min-width: auto !important;
   }
 }
@@ -999,7 +941,8 @@ export default {
   
   /* 작은 화면에서만 컬럼 너비를 유연하게 조정 */
   .payroll-employee-table :deep(.el-table__header-wrapper),
-  .payroll-employee-table :deep(.el-table__body-wrapper) {
+  .payroll-employee-table :deep(.el-table__body-wrapper),
+  .payroll-employee-table :deep(.el-table__footer-wrapper) {
     width: 100% !important;
   }
 }
@@ -1035,6 +978,30 @@ export default {
 
 .payroll-employee-table .el-table__header th {
   width: auto !important;
+}
+
+/* 테이블 footer(tfoot) 스타일 */
+.payroll-employee-table :deep(.el-table__footer-wrapper) {
+  width: 100% !important;
+}
+
+.payroll-employee-table :deep(.el-table__footer) {
+  width: 100% !important;
+}
+
+.payroll-employee-table :deep(.el-table__footer th) {
+  background-color: #fafafa;
+  font-weight: 600;
+  color: #606266;
+  padding: 8px 4px;
+  border-bottom: 1px solid #ebeef5;
+  border-right: none;
+  font-size: 12px;
+}
+
+.payroll-employee-table :deep(.el-table__footer td) {
+  border-right: none;
+  border-bottom: 1px solid #ebeef5;
 }
 
 /* 로딩 컨테이너 스타일 */
