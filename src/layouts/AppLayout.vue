@@ -257,6 +257,7 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="my-info">내 정보</el-dropdown-item>
                 <el-dropdown-item command="notification-settings">알림 설정</el-dropdown-item>
+                <el-dropdown-item command="select-position">직무 선택</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>로그아웃</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -279,7 +280,7 @@
             <div class="org-tree-container-modal">
               <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
               <div class="tree-container">
-                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" @node-click="handleOrgNodeClick"
+                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id" @node-click="handleOrgNodeClick"
                   :filter-node-method="filterNode" :expand-on-click-node="false" :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
                   <template #default="{ node, data }">
                     <div class="custom-tree-node-modal">
@@ -440,6 +441,9 @@
 
     <!-- 스낵바 컨테이너 -->
     <SnackbarContainer />
+
+    <!-- 직무 선택 모달 -->
+    <SelectPositionModal v-if="showSelectPositionModal" @close="showSelectPositionModal = false" />
   </div>
 </template>
 
@@ -455,10 +459,11 @@ import organizationService from '@/api/organizationService';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
 import NotificationBell from '@/components/NotificationBell.vue';
+import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer, NotificationBell },
+  components: { SnackbarContainer, NotificationBell, SelectPositionModal },
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const { connect, disconnect } = useSse();
@@ -477,6 +482,7 @@ export default {
   },
   data() {
     return {
+      showSelectPositionModal: false,
       defaultAvatarSvg, // Expose to template
       sidebarCollapsed: false,
       showOrgModal: false,
@@ -494,6 +500,7 @@ export default {
         management: false,
         sales: true
       },
+      defaultExpandedOrgKeys: [],
       orgTreeData: [],
       defaultProps: {
         children: 'children',
@@ -791,6 +798,9 @@ export default {
         case 'notification-settings':
           this.$router.push('/my-info/notification-settings');
           break;
+        case 'select-position':
+          this.showSelectPositionModal = true;
+          break;
         case 'logout':
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
@@ -863,38 +873,40 @@ export default {
         return [];
       }
       const map = {};
-      // First pass: create map and transform nodes
+      // First pass: create map and initialize children array
       flatList.forEach(org => {
-        map[org.organizationId] = { 
-          ...org, 
-          id: org.organizationId, // Set the 'id' for node-key
-          label: org.label,      // Set the 'label' for the tree prop
-          children: [] 
+        map[org.organizationId] = {
+          ...org,
+          id: org.organizationId,
+          label: org.label,
+          children: []
         };
       });
 
-      const tree = [];
-      // Second pass: link children
-      flatList.forEach(org => {
-        if (org.parentId) {
-          const parent = map[org.parentId];
+      const roots = [];
+      // Second pass: link children to parents and find roots
+      Object.values(map).forEach(node => {
+        if (node.parentId) {
+          const parent = map[node.parentId];
           if (parent) {
-            parent.children.push(map[org.organizationId]);
-          } else {
-            // If parent not found, treat as a root
-            tree.push(map[org.organizationId]);
+            parent.children.push(node);
           }
         } else {
           // No parent, it's a root
-          tree.push(map[org.organizationId]);
+          roots.push(node);
         }
       });
-      return tree;
+      return roots;
     },
     async fetchOrganizationTree() {
       try {
         const orgTreeData = (await organizationService.getOrganizationTree()).data.data;
         this.orgTreeData = this.buildOrganizationTree(orgTreeData);
+
+        // Expand all top-level nodes by default
+        if (this.orgTreeData && this.orgTreeData.length > 0) {
+          this.defaultExpandedOrgKeys = this.orgTreeData.map(rootNode => rootNode.id);
+        }
 
       } catch (error) {
         console.error('Failed to fetch organization tree:', error);
@@ -910,14 +922,7 @@ export default {
       this.hasSearched = false; // 검색 상태 초기화
 
       // Always fetch the latest organization tree data when the modal is opened
-      this.fetchOrganizationTree().then(() => {
-        this.$nextTick(() => {
-          const orgTreeInstance = this.$refs.orgTree;
-          if (orgTreeInstance && orgTreeInstance.expandNode && this.orgTreeData.length > 0 && this.orgTreeData[0].children && this.orgTreeData[0].children.length > 0) {
-            orgTreeInstance.expandNode(this.orgTreeData[0].id, true);
-          }
-        });
-      });
+      this.fetchOrganizationTree();
       // this.fetchAllEmployees(); // This is for the employee tab, can be fetched when that tab is active or on demand.
     },
     async fetchAllEmployees() {

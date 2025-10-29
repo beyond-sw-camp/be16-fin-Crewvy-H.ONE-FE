@@ -251,7 +251,7 @@ export default {
     },
     handleOrganizationSelected(organization) {
       if (this.editingPositionIndex !== null) {
-        this.form.positions[this.editingPositionIndex].department = organization.name;
+        this.form.positions[this.editingPositionIndex].department = organization.label;
         this.form.positions[this.editingPositionIndex].organizationId = organization.id;
       }
     },

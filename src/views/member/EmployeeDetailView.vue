@@ -341,7 +341,12 @@ const fetchEmployeeDetails = async (id) => {
     }
   } catch (err) {
     console.error('직원 상세 정보를 불러오는 데 실패했습니다:', err);
-    error(err.response?.data?.message || '서버 오류가 발생했습니다.');
+    if (err.response && err.response.status === 403) {
+      error('해당 직원의 정보에 접근할 권한이 없습니다.');
+      router.back();
+    } else {
+      error(err.response?.data?.message || '서버 오류가 발생했습니다.');
+    }
   }
 };
 

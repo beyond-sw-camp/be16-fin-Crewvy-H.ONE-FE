@@ -50,7 +50,10 @@
             <template #header>
                 <div class="card-header">
                     <span>상세 정보</span>
-                    <el-button type="primary" plain @click="goToEdit">정보 수정</el-button>
+                    <div>
+                        <el-button @click="goToDetails">상세보기</el-button>
+                        <el-button type="primary" plain @click="goToEdit">정보 수정</el-button>
+                    </div>
                 </div>
             </template>
           <div class="info-section">
@@ -90,6 +93,7 @@ export default {
     return {
       defaultAvatarSvg, // Expose to template
       userInfo: {
+        memberId: null,
         email: '',
         name: '',
         phone_number: '',
@@ -145,10 +149,19 @@ export default {
     goToEdit() {
       this.$router.push('/my-info/edit');
     },
+    goToDetails() {
+      if (this.userInfo.memberId) {
+        this.$router.push({ name: 'EmployeeDetailView', params: { id: this.userInfo.memberId } });
+      } else {
+        console.error('Member ID is not available.');
+        // Optionally, show a message to the user
+      }
+    },
     async fetchMyPageInfo() {
       try {
         const data = await memberService.getMyPage();
         this.userInfo = {
+          memberId: data.memberId, // Assuming the ID is in memberId field
           email: data.email,
           name: data.memberName,
           phone_number: data.phoneNumber,

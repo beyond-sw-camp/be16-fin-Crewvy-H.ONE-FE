@@ -1,6 +1,5 @@
 <template>
   <el-dialog v-model="visible" title="조직 선택" width="400px">
-    <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
     <el-tree
       ref="orgTreeRef"
       :data="orgTree"
@@ -8,7 +7,6 @@
       node-key="id"
       :default-expanded-keys="expandedKeys"
       :expand-on-click-node="false"
-      :filter-node-method="filterNode"
       @node-click="handleNodeClick"
       class="org-tree"
     >
@@ -23,39 +21,33 @@
 </template>
 
 <script setup>
-import { ref, watch, defineEmits, defineExpose } from 'vue';
+import { ref, defineEmits, defineExpose } from 'vue';
 import { ElMessage } from 'element-plus';
 import organizationService from '@/api/organizationService';
 
 const visible = ref(false);
-const orgSearch = ref('');
 const orgTree = ref([]);
-const defaultProps = { children: 'children', label: 'name' };
+const defaultProps = { children: 'children', label: 'label' };
 const expandedKeys = ref([]);
 const orgTreeRef = ref(null);
 const selectedNode = ref(null);
 
 const emit = defineEmits(['organization-selected']);
 
-watch(orgSearch, (val) => {
-  orgTreeRef.value.filter(val);
-});
-
-// Simplified fetchOrganizations for debugging
 const fetchOrganizations = async () => {
-  console.log("MODAL: Attempting to fetch organizations...");
   try {
-    const response = await organizationService.getOrganizationTree();
-    console.log("MODAL API SUCCESS:", response);
-    console.log("Raw data from API:", response.data.data);
+    const response = await organizationService.getOrganizationTreeForCreation();
+    if (response.data && Array.isArray(response.data.data)) {
+      orgTree.value = response.data.data;
+    } else {
+      console.error("Fetched data is not in the expected format.", response.data);
+      orgTree.value = []; // Ensure tree is empty on bad data
+    }
   } catch (error) {
-    console.error("MODAL API ERROR:", error);
+    console.error("Failed to fetch organization tree:", error);
+    ElMessage.error('조직도 정보를 불러오는 데 실패했습니다.');
+    orgTree.value = []; // Ensure tree is empty on error
   }
-};
-
-const filterNode = (value, data) => {
-  if (!value) return true;
-  return data.name.toLowerCase().includes(value.toLowerCase());
 };
 
 const handleNodeClick = (data) => {
@@ -66,7 +58,8 @@ const confirmSelection = () => {
   if (selectedNode.value) {
     emit('organization-selected', selectedNode.value);
     close();
-  } else {
+  }
+  else {
     ElMessage.warning('조직을 선택해주세요.');
   }
 };
