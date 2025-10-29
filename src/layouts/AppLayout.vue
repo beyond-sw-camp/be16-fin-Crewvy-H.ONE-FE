@@ -148,7 +148,7 @@
               <span>급여 설정</span>
             </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
-              <span>급여 기본 정보</span>
+              <span>급여 계약 정보</span>
             </el-menu-item>
             <el-menu-item index="/payroll/actual-calculation">
               <span>급여 계산</span>
