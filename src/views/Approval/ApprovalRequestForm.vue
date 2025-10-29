@@ -151,7 +151,7 @@ export default {
     UploadFilled,
   },
   setup() {
-    const { showSnackbar } = useSnackbar();
+    const { success, error } = useSnackbar();
     const router = useRouter();
     const route = useRoute();
     const documentId = ref(null); // For the template
@@ -177,8 +177,9 @@ export default {
         if (response.data.data && response.data.data.length > 0) {
           memberInfo.value = response.data.data[0];
         }
-      } catch (error) {
-        console.error('Failed to fetch member info:', error);
+      } catch (err) {
+        console.error('Failed to fetch member info:', err);
+        error('회원 정보를 불러오는 데 실패했습니다.');
       }
     };
 
@@ -237,11 +238,18 @@ export default {
               };
             });
 
-            currentApprovalLine.value.push(...policyApprovers);
+            // Filter out the current user if they are already the first approver
+            const currentUserMemberPositionId = memberInfo.value ? memberInfo.value.memberPositionId : null;
+            const filteredPolicyApprovers = policyApprovers.filter(approver => 
+              approver.memberPositionId !== currentUserMemberPositionId
+            );
+
+            currentApprovalLine.value.push(...filteredPolicyApprovers);
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch form schema:', error);
+      } catch (err) {
+        console.error('Failed to fetch form schema:', err);
+        error('결재 양식 스키마를 불러오는 데 실패했습니다.');
       }
     };
 
@@ -288,8 +296,9 @@ export default {
             currentApprovalLine.value = draftData.lineList;
         }
 
-      } catch (error) {
-        console.error('Failed to fetch draft data:', error);
+      } catch (err) {
+        console.error('Failed to fetch draft data:', err);
+        error('임시 저장된 결재 데이터를 불러오는 데 실패했습니다.');
       }
     };
 
@@ -353,7 +362,7 @@ export default {
         });
       } catch (error) {
         console.error('File upload failed:', error);
-        showSnackbar('파일 업로드에 실패했습니다.', 'error');
+        error('파일 업로드에 실패했습니다.');
       }
     };
 
@@ -383,11 +392,11 @@ export default {
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
         }
-        showSnackbar('결재 요청이 성공적으로 전송되었습니다.');
+        success('결재 요청이 성공적으로 전송되었습니다.');
         router.push('/approval');
       } catch (error) {
         console.error('결재 요청 실패:', error);
-        showSnackbar('결재 요청에 실패했습니다.', 'error');
+        error('결재 요청에 실패했습니다.');
       }
     };
 
@@ -415,11 +424,11 @@ export default {
         if (newApprovalId) {
           await handleFileUpload(newApprovalId);
         }
-        showSnackbar('결재가 임시저장되었습니다.');
+        success('결재가 임시저장되었습니다.');
         router.push('/approval');
       } catch (error) {
         console.error('임시저장 실패:', error);
-        showSnackbar('임시저장에 실패했습니다.', 'error');
+        error('임시저장에 실패했습니다.');
       }
     };
 
@@ -429,11 +438,11 @@ export default {
       if (confirm('이 임시저장 문서를 삭제하시겠습니까?')) {
         try {
           await apiClient.delete(`/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
-          showSnackbar('문서가 삭제되었습니다.');
+          success('문서가 삭제되었습니다.');
           router.push('/approval');
         } catch (error) {
           console.error('삭제 실패:', error);
-          showSnackbar('삭제에 실패했습니다.', 'error');
+          error('삭제에 실패했습니다.');
         }
       }
     };
