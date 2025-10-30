@@ -47,7 +47,14 @@
                   <el-switch v-model="form.isAddressDisclosure" active-text="공개" inactive-text="비공개" inline-prompt size="small" />
                 </div>
               </template>
-              <el-input v-model="form.address"></el-input>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
@@ -139,6 +146,7 @@ export default {
         extensionNumber: '',
         telNumber: '',
         address: '',
+        detailAddress: '',
         isAddressDisclosure: false,
         bank: '',
         bankAccount: '',
@@ -168,6 +176,31 @@ export default {
     },
     onCancel() {
       this.$router.push('/my-info');
+    },
+    openAddressSearch() {
+      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
+        this.$message.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
+        return;
+      }
+      new daum.Postcode({
+        oncomplete: (data) => {
+          let roadAddr = data.roadAddress;
+          let extraRoadAddr = '';
+
+          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+            extraRoadAddr += data.bname;
+          }
+          if (data.buildingName !== '' && data.apartment === 'Y') {
+            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          if (extraRoadAddr !== '') {
+            extraRoadAddr = ' (' + extraRoadAddr + ')';
+          }
+
+          this.form.address = roadAddr + extraRoadAddr;
+          this.form.detailAddress = '';
+        }
+      }).open();
     },
     beforeAvatarUpload(file) {
       const isJPG = file.type === 'image/jpeg';
@@ -201,6 +234,7 @@ export default {
             this.form.extensionNumber = data.extensionNumber;
             this.form.telNumber = data.telNumber;
             this.form.address = data.address;
+            this.form.detailAddress = data.detailAddress;
             this.form.isAddressDisclosure = data.addressDisclosure;
             this.form.bank = data.bank;
             this.form.bankAccount = data.bankAccount;

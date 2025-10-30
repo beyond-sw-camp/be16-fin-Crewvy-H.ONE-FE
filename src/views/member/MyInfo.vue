@@ -34,7 +34,10 @@
             <div class="info-item">
               <el-icon><Location /></el-icon>
               <div class="info-item-content">
-                <span>{{ userInfo.address }}</span>
+                <div>
+                  <span>{{ userInfo.address }}</span><br>
+                  <span v-if="userInfo.detailAddress">{{ userInfo.detailAddress }}</span>
+                </div>
                 <el-tag :type="userInfo.is_address_disclosure ? 'success' : 'info'" size="small" effect="plain">
                   {{ userInfo.is_address_disclosure ? '공개' : '비공개' }}
                 </el-tag>
@@ -50,7 +53,10 @@
             <template #header>
                 <div class="card-header">
                     <span>상세 정보</span>
-                    <el-button type="primary" plain @click="goToEdit">정보 수정</el-button>
+                    <div>
+                        <el-button @click="goToDetails">상세보기</el-button>
+                        <el-button type="primary" plain @click="goToEdit">정보 수정</el-button>
+                    </div>
                 </div>
             </template>
           <div class="info-section">
@@ -90,11 +96,13 @@ export default {
     return {
       defaultAvatarSvg, // Expose to template
       userInfo: {
+        memberId: null,
         email: '',
         name: '',
         phone_number: '',
         is_phone_number_public: false,
         address: '',
+        detailAddress: '',
         is_address_disclosure: false,
         sabun: '',
         bank: '',
@@ -145,15 +153,25 @@ export default {
     goToEdit() {
       this.$router.push('/my-info/edit');
     },
+    goToDetails() {
+      if (this.userInfo.memberId) {
+        this.$router.push({ name: 'EmployeeDetailView', params: { id: this.userInfo.memberId } });
+      } else {
+        console.error('Member ID is not available.');
+        // Optionally, show a message to the user
+      }
+    },
     async fetchMyPageInfo() {
       try {
         const data = await memberService.getMyPage();
         this.userInfo = {
+          memberId: data.memberId, // Assuming the ID is in memberId field
           email: data.email,
           name: data.memberName,
           phone_number: data.phoneNumber,
           is_phone_number_public: data.phoneNumberPublic,
           address: data.address,
+          detailAddress: data.detailAddress,
           is_address_disclosure: data.addressDisclosure,
           sabun: data.sabun,
           bank: data.bank,
