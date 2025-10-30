@@ -24,7 +24,7 @@
           <el-icon><Clock /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">대기 중인 결재</div>
+          <div class="card-title">결재 대기함</div>
           <div class="card-value">{{ pendingApprovals }}</div>
           <div class="card-subtitle">승인 대기</div>
         </div>
@@ -35,7 +35,7 @@
           <el-icon><Document /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">진행 중인 결재</div>
+          <div class="card-title">내 기안(진행중)</div>
           <div class="card-value">{{ inProgressApprovals }}</div>
           <div class="card-subtitle">내 결재</div>
         </div>
@@ -46,9 +46,20 @@
           <el-icon><Check /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">완료된 결재</div>
+          <div class="card-title">내 기안(완료)</div>
           <div class="card-value">{{ completedApprovals }}</div>
           <div class="card-subtitle">이번 달</div>
+        </div>
+      </div>
+      
+      <div class="approval-card">
+        <div class="card-icon">
+          <el-icon><Check /></el-icon>
+        </div>
+        <div class="card-content">
+          <div class="card-title">내 결재(완료)</div>
+          <div class="card-value">{{ myApprovalsCompleted }}</div>
+          <div class="card-subtitle"></div>
         </div>
       </div>
       
@@ -57,7 +68,7 @@
           <el-icon><Edit /></el-icon>
         </div>
         <div class="card-content">
-          <div class="card-title">임시저장된 결재</div>
+          <div class="card-title">임시저장</div>
           <div class="card-value">{{ draftApprovals }}</div>
           <div class="card-subtitle"></div>
         </div>
@@ -67,7 +78,7 @@
     <!-- 탭 메뉴 -->
     <div class="approval-tabs">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="승인 대기" name="pending">
+        <el-tab-pane label="결재 대기함" name="pending">
           <div class="pending-approvals">
             <div class="section-header">
               <h3>대기 중인 결재</h3>
@@ -97,11 +108,23 @@
                   </div>
                 </div>
               </div>
+              <div v-if="pendingApprovalsList.length === 0" class="empty-state">
+                <p>결재 내역이 없습니다.</p>
+              </div>
+            </div>
+            <div v-if="pendingTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="pendingTotalPages * 10"
+                v-model:current-page="pendingCurrentPage"
+                @current-change="handlePendingPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
         
-        <el-tab-pane label="결재 내역" name="my-requests">
+        <el-tab-pane label="내 기안(진행중)" name="my-requests">
           <div class="my-requests">
             <div class="section-header">
               <h3>내 결재 신청</h3>
@@ -131,10 +154,19 @@
                 <p>결재 내역이 없습니다.</p>
               </div>
             </div>
+            <div v-if="myRequestsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="myRequestsTotalPages * 10"
+                v-model:current-page="myRequestsCurrentPage"
+                @current-change="handleMyRequestsPageChange"
+              />
+            </div>
           </div>
         </el-tab-pane>
         
-        <el-tab-pane label="결재 완료" name="completed">
+        <el-tab-pane label="내 기안(완료)" name="completed">
           <div class="completed-approvals">
             <div class="section-header">
               <h3>완료된 결재</h3>
@@ -184,6 +216,66 @@
                   </div>
                 </div>
               </div>
+              <div v-if="completedList.length === 0" class="empty-state">
+                <p>결재 내역이 없습니다.</p>
+              </div>
+            </div>
+            <div v-if="completedTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="completedTotalPages * 10"
+                v-model:current-page="completedCurrentPage"
+                @current-change="handleCompletedPageChange"
+              />
+            </div>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="내 결재(완료)" name="my-approvals-completed">
+          <div class="completed-approvals">
+            <div class="section-header">
+              <h3>내 결재(완료)</h3>
+            </div>
+            <div class="completed-list">
+              <div class="completed-item" v-for="approval in myApprovalsCompletedList" :key="approval.approvalId">
+                <div class="completed-info">
+                  <div class="completed-header">
+                    <div class="completed-title">{{ approval.title }}</div>
+                  </div>
+                  <div class="completed-details">
+                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
+                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
+                  </div>
+                </div>
+                <div class="completed-meta-actions">
+                  <div class="completed-meta-actions-row">
+                    <div class="completed-meta">
+                      <el-tag :type="getStatusType(approval.status)" size="small">
+                        {{ getKoreanStatus(approval.status) }}
+                      </el-tag>
+                      <span class="completed-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
+                    </div>
+                    <div class="completed-actions">
+                      <el-button size="small" @click="viewCompletedDetails(approval)">
+                        <el-icon><View /></el-icon>
+                        상세
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="myApprovalsCompletedList.length === 0" class="empty-state">
+                <p>내 결재(완료) 내역이 없습니다.</p>
+              </div>
+            </div>
+            <div v-if="myApprovalsCompletedTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="myApprovalsCompletedTotalPages * 10"
+                v-model:current-page="myApprovalsCompletedCurrentPage"
+                @current-change="handleMyApprovalsCompletedPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -219,6 +311,15 @@
             <div v-else class="empty-state">
               <p>임시저장된 결재가 없습니다.</p>
             </div>
+          </div>
+          <div v-if="temporarySavesTotalPages > 1" class="pagination-container">
+            <el-pagination
+              background
+              layout="prev, pager, next"
+              :total="temporarySavesTotalPages * 10"
+              v-model:current-page="temporarySavesCurrentPage"
+              @current-change="handleTemporarySavesPageChange"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -264,6 +365,7 @@ export default {
     const inProgressApprovals = ref(0);
     const completedApprovals = ref(0);
     const draftApprovals = ref(0);
+    const myApprovalsCompleted = ref(0);
 
     // Hardcoded data for demonstration (can be replaced with API calls)
     const pendingApprovalsList = ref([
@@ -286,18 +388,19 @@ export default {
     ]);
     const myRequests = ref([]); // This will be filled by the API call
     const temporarySaves = ref([]);
-    const completedList = ref([
-        {
-          id: 1,
-          title: '회의실 예약 신청',
-          type: '기타',
-          requester: '김철수',
-          completedDate: '2024-01-12',
-          status: '승인',
-          amount: 0,
-          description: '대회의실 예약 신청입니다.'
-        },
-    ]);
+    const completedList = ref([]);
+    const myApprovalsCompletedList = ref([]);
+
+    const pendingTotalPages = ref(0);
+    const pendingCurrentPage = ref(1);
+    const myRequestsTotalPages = ref(0);
+    const myRequestsCurrentPage = ref(1);
+    const completedTotalPages = ref(0);
+    const completedCurrentPage = ref(1);
+    const myApprovalsCompletedTotalPages = ref(0);
+    const myApprovalsCompletedCurrentPage = ref(1);
+    const temporarySavesTotalPages = ref(0);
+    const temporarySavesCurrentPage = ref(1);
 
     const fetchApprovalStats = async () => {
       try {
@@ -307,72 +410,115 @@ export default {
         inProgressApprovals.value = stats.requestCount;
         completedApprovals.value = stats.completeCount;
         draftApprovals.value = stats.draftCount;
+        myApprovalsCompleted.value = stats.approveCompleteCount;
       } catch (err) {
         error('통계 정보를 불러오는 데 실패했습니다.');
         console.error(err);
       }
     };
 
-    const fetchPendingApprovals = async () => {
+    const fetchPendingApprovals = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/approval/find-pending-list');
-        pendingApprovalsList.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/approval/find-pending-list?page=${page}`);
+        pendingApprovalsList.value = response.data.data.content;
+        pendingTotalPages.value = response.data.data.totalPages;
+        pendingCurrentPage.value = response.data.data.number + 1;
       } catch (err) {
         error('대기 중인 결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);
       }
     };
 
-    const fetchMyRequests = async () => {
+    const fetchMyRequests = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/approval/find-approval-list');
-        myRequests.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/approval/find-approval-list?page=${page}`);
+        myRequests.value = response.data.data.content;
+        myRequestsTotalPages.value = response.data.data.totalPages;
+        myRequestsCurrentPage.value = response.data.data.number + 1;
       } catch (err) {
         error('결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);
       }
     };
 
-    const fetchTemporarySaves = async () => {
+    const fetchTemporarySaves = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/approval/find-draft-list');
-        temporarySaves.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/approval/find-draft-list?page=${page}`);
+        temporarySaves.value = response.data.data.content;
+        temporarySavesTotalPages.value = response.data.data.totalPages;
+        temporarySavesCurrentPage.value = response.data.data.number + 1;
       } catch (err) {
         error('임시저장 내역을 불러오는 데 실패했습니다.');
         console.error(err);
       }
     };
 
-    const fetchCompletedApprovals = async () => {
+    const fetchCompletedApprovals = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/approval/find-complete-list');
-        completedList.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/approval/find-complete-list?page=${page}`);
+        completedList.value = response.data.data.content;
+        completedTotalPages.value = response.data.data.totalPages;
+        completedCurrentPage.value = response.data.data.number + 1;
       } catch (err) {
         error('완료된 결재 내역을 불러오는 데 실패했습니다.');
         console.error(err);
       }
     };
 
+    const fetchMyApprovalsCompleted = async (page = 0) => {
+      try {
+        const response = await apiClient.get(`/workforce-service/approval/find-approve-complete-list?page=${page}`);
+        myApprovalsCompletedList.value = response.data.data.content;
+        myApprovalsCompletedTotalPages.value = response.data.data.totalPages;
+        myApprovalsCompletedCurrentPage.value = response.data.data.number + 1;
+      } catch (err) {
+        error('내 결재(완료) 내역을 불러오는 데 실패했습니다.');
+        console.error(err);
+      }
+    };
+
+    const handlePendingPageChange = (page) => {
+      fetchPendingApprovals(page - 1);
+    };
+
+    const handleMyRequestsPageChange = (page) => {
+      fetchMyRequests(page - 1);
+    };
+
+    const handleCompletedPageChange = (page) => {
+      fetchCompletedApprovals(page - 1);
+    };
+
+    const handleMyApprovalsCompletedPageChange = (page) => {
+      fetchMyApprovalsCompleted(page - 1);
+    };
+
+    const handleTemporarySavesPageChange = (page) => {
+      fetchTemporarySaves(page - 1);
+    };
+
     const handleTabChange = (tabName) => {
       activeTab.value = tabName;
       if (tabName === 'pending') {
-        fetchPendingApprovals();
+        fetchPendingApprovals(0);
       } else if (tabName === 'my-requests') {
         showMyRequestsTable.value = false;
-        fetchMyRequests();
+        fetchMyRequests(0);
         nextTick(() => {
           showMyRequestsTable.value = true;
         });
       } else if (tabName === 'temporary') {
-        fetchTemporarySaves();
+        fetchTemporarySaves(0);
       } else if (tabName === 'completed') {
-        fetchCompletedApprovals();
+        fetchCompletedApprovals(0);
+      } else if (tabName === 'my-approvals-completed') {
+        fetchMyApprovalsCompleted(0);
       }
     };
 
     onMounted(() => {
       // Fetch initial data for the default tab
-      fetchPendingApprovals();
+      fetchPendingApprovals(0);
       fetchApprovalStats();
     });
 
@@ -477,10 +623,13 @@ export default {
       inProgressApprovals,
       completedApprovals,
       draftApprovals,
+      myApprovalsCompleted,
       pendingApprovalsList,
       myRequests,
       completedList,
+      myApprovalsCompletedList,
       handleTabChange,
+      fetchMyApprovalsCompleted,
       openTemplateSelector,
       handleTemplateSelect,
       getPriorityType,
@@ -497,13 +646,35 @@ export default {
       temporarySaves,
       continueWriting,
       deleteTemporary,
-      goToTemplateList
+      goToTemplateList,
+
+      pendingTotalPages,
+      pendingCurrentPage,
+      myRequestsTotalPages,
+      myRequestsCurrentPage,
+      completedTotalPages,
+      completedCurrentPage,
+      myApprovalsCompletedTotalPages,
+      myApprovalsCompletedCurrentPage,
+      temporarySavesTotalPages,
+      temporarySavesCurrentPage,
+
+      handlePendingPageChange,
+      handleMyRequestsPageChange,
+      handleCompletedPageChange,
+      handleMyApprovalsCompletedPageChange,
+      handleTemporarySavesPageChange,
     };
   },
 }
 </script>
 
 <style scoped>
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
 .approval {
   max-width: 1200px;
   margin: 0 auto;
@@ -534,13 +705,15 @@ export default {
 }
 
 .approval-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  display: flex;
+  flex-wrap: nowrap; /* Prevent wrapping */
+  overflow-x: auto; /* Enable horizontal scrolling if cards exceed screen width */
   gap: 20px;
   margin-bottom: 24px;
 }
 
 .approval-card {
+  flex: 1; /* Make cards grow and shrink to fill space */
   background: white;
   padding: 24px;
   border-radius: 12px;
