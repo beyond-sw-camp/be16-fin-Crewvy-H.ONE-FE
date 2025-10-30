@@ -113,7 +113,16 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="주소">
-              <el-input v-model="form.address"></el-input>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
@@ -280,6 +289,7 @@ export default {
         extensionNumber: '',
         telNumber: '',
         address: '',
+        detailAddress: '',
         bank: '',
         bankAccount: '',
         joinDate: '',
@@ -404,6 +414,7 @@ export default {
           extensionNumber: editData.memberDetail.extensionNumber,
           telNumber: editData.memberDetail.telNumber,
           address: editData.memberDetail.address,
+          detailAddress: editData.memberDetail.detailAddress,
           bank: editData.memberDetail.bank,
           bankAccount: editData.memberDetail.bankAccount,
           joinDate: editData.memberDetail.joinDate,
@@ -463,6 +474,8 @@ export default {
       try {
         const updatePayload = {
           name: this.form.name,
+          address: this.form.address,
+          detailAddress: this.form.detailAddress,
           accountStatusCodeValue: this.accountStatusMapping[this.form.accountStatus] || this.form.accountStatus,
           employmentTypeCodeValue: this.employmentTypeMapping[this.form.employmentType] || this.form.employmentType,
           memberStatusCodeValue: this.memberStatusMapping[this.form.memberStatus] || this.form.memberStatus,
@@ -509,9 +522,14 @@ export default {
         confirmButtonText: '확인',
         cancelButtonText: '취소',
         type: 'warning'
-      }).then(() => {
-        // TODO: Implement actual password reset API call
-        ElMessage.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+      }).then(async () => {
+        try {
+          await employeeService.resetPassword(this.form.email);
+          ElMessage.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+        } catch (error) {
+          console.error("비밀번호 초기화 실패:", error);
+          ElMessage.error(error.response?.data?.message || '비밀번호 초기화에 실패했습니다.');
+        }
       }).catch(() => {
         ElMessage.info('비밀번호 초기화가 취소되었습니다.');
       });
@@ -681,10 +699,8 @@ export default {
         let targetIndex = -1;
 
         if (typeof this.editingPositionIdentifier === 'string' && !this.editingPositionIdentifier.startsWith('new-position-')) {
-          // Existing position, find by memberPositionId (which is a string UUID)
           targetIndex = this.form.positions.findIndex(p => p.memberPositionId === this.editingPositionIdentifier);
         } else if (typeof this.editingPositionIdentifier === 'string' && this.editingPositionIdentifier.startsWith('new-position-')) {
-          // New position, find by its temporary ID
           targetIndex = this.form.positions.findIndex(p => p.tempId === this.editingPositionIdentifier);
         }
 
@@ -693,12 +709,36 @@ export default {
           updatedPosition.organizationId = organization.id;
           updatedPosition.organizationName = organization.name;
           this.form.positions.splice(targetIndex, 1, updatedPosition);
-          console.log(`Updated position ${targetIndex} organizationName to: ${updatedPosition.organizationName}`);
         } else {
           console.warn('Could not find target position for update with identifier:', this.editingPositionIdentifier);
         }
       }
       this.isOrgModalVisible = false;
+    },
+    openAddressSearch() {
+      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
+        ElMessage.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
+        return;
+      }
+      new daum.Postcode({
+        oncomplete: (data) => {
+          let roadAddr = data.roadAddress;
+          let extraRoadAddr = '';
+
+          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+            extraRoadAddr += data.bname;
+          }
+          if (data.buildingName !== '' && data.apartment === 'Y') {
+            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          if (extraRoadAddr !== '') {
+            extraRoadAddr = ' (' + extraRoadAddr + ')';
+          }
+
+          this.form.address = roadAddr + extraRoadAddr;
+          this.form.detailAddress = ''; // Clear detail address for new input
+        }
+      }).open();
     }
   },
   created() {

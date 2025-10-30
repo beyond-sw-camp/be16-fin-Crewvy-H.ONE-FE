@@ -34,7 +34,10 @@
             <div class="info-item">
               <el-icon><Location /></el-icon>
               <div class="info-item-content">
-                <span>{{ userInfo.address }}</span>
+                <div>
+                  <span>{{ userInfo.address }}</span><br>
+                  <span v-if="userInfo.detailAddress">{{ userInfo.detailAddress }}</span>
+                </div>
                 <el-tag :type="userInfo.is_address_disclosure ? 'success' : 'info'" size="small" effect="plain">
                   {{ userInfo.is_address_disclosure ? '공개' : '비공개' }}
                 </el-tag>
@@ -99,6 +102,7 @@ export default {
         phone_number: '',
         is_phone_number_public: false,
         address: '',
+        detailAddress: '',
         is_address_disclosure: false,
         sabun: '',
         bank: '',
@@ -167,6 +171,7 @@ export default {
           phone_number: data.phoneNumber,
           is_phone_number_public: data.phoneNumberPublic,
           address: data.address,
+          detailAddress: data.detailAddress,
           is_address_disclosure: data.addressDisclosure,
           sabun: data.sabun,
           bank: data.bank,

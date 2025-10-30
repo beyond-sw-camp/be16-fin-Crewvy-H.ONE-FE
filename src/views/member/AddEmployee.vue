@@ -20,9 +20,14 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="비밀번호" prop="password">
-              <el-input v-model="form.password" placeholder="비밀번호">
+              <el-input v-model="form.password" :type="passwordFieldType" placeholder="비밀번호">
                 <template #append>
-                  <el-button>자동생성</el-button>
+                  <el-button @click="generatePassword">자동생성</el-button>
+                </template>
+                <template #suffix>
+                  <el-icon class="el-input__icon" @click="togglePasswordVisibility">
+                    <component :is="passwordFieldType === 'password' ? 'View' : 'Hide'" />
+                  </el-icon>
                 </template>
               </el-input>
             </el-form-item>
@@ -39,8 +44,20 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="생년월일">
-              <el-date-picker v-model="form.birthDate" type="date" placeholder="생년월일 선택" style="width: 100%;"
-                value-format="YYYY-MM-DD"></el-date-picker>
+              <el-input v-model="form.birthDate" placeholder="YYYY-MM-DD" @input="formatBirthDateInput">
+                <template #append>
+                  <el-button @click="openDatePicker">
+                    <el-icon><Calendar /></el-icon>
+                  </el-button>
+                </template>
+              </el-input>
+              <el-date-picker
+                ref="birthDatePicker"
+                v-model="form.birthDate"
+                type="date"
+                value-format="YYYY-MM-DD"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1;"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -56,7 +73,16 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="자택 주소">
-              <el-input v-model="form.address" placeholder="자택 주소"></el-input>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
@@ -169,11 +195,16 @@ import gradeService from '@/api/gradeService';
 import titleService from '@/api/titleService';
 import roleService from '@/api/roleService';
 import { useSnackbar } from '@/composables/useSnackbar';
+import employeeService from '@/api/employeeService';
+import { View, Hide, Calendar } from '@element-plus/icons-vue';
 
 export default {
   name: 'AddEmployee',
   components: {
-    OrganizationSelectionModal
+    OrganizationSelectionModal,
+    View,
+    Hide,
+    Calendar,
   },
   setup() {
     const { error } = useSnackbar();
@@ -190,6 +221,7 @@ export default {
         emergencyContact: '',
         birthDate: '',
         address: '',
+        detailAddress: '',
         bank: '',
         accountNumber: '',
         sabun: '',
@@ -226,6 +258,7 @@ export default {
       allGrades: [],
       allTitles: [],
       allRoles: [],
+      passwordFieldType: 'password', // Add this for password visibility toggle
     };
   },
   watch: {
@@ -245,6 +278,39 @@ export default {
         ElMessage.error('직책, 직급, 역할 목록을 불러오는 데 실패했습니다.');
       }
     },
+    async generatePassword() {
+      try {
+        const response = await employeeService.generateRandomPassword();
+        this.form.password = response.data.data; // Assuming the password is in response.data.data
+        ElMessage.success('비밀번호가 자동 생성되었습니다.');
+        this.$refs.employeeForm.clearValidate('password');
+      } catch (error) {
+        console.error('비밀번호 자동 생성 오류:', error);
+        ElMessage.error(error.response?.data?.message || '비밀번호 자동 생성에 실패했습니다.');
+      }
+    },
+    togglePasswordVisibility() {
+      this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
+    },
+    openDatePicker() {
+      this.$refs.birthDatePicker.focus();
+    },
+    formatBirthDateInput(value) {
+      if (value) {
+        const digitsOnly = value.replace(/\D/g, '');
+        let formatted = digitsOnly.substring(0, 4);
+        if (digitsOnly.length > 4) {
+          formatted += '-' + digitsOnly.substring(4, 6);
+        }
+        if (digitsOnly.length > 6) {
+          formatted += '-' + digitsOnly.substring(6, 8);
+        }
+        
+        if (formatted !== value) {
+          this.form.birthDate = formatted;
+        }
+      }
+    },
     openOrganizationModal(index) {
       this.editingPositionIndex = index;
       this.$refs.orgModal.open();
@@ -254,6 +320,31 @@ export default {
         this.form.positions[this.editingPositionIndex].department = organization.label;
         this.form.positions[this.editingPositionIndex].organizationId = organization.id;
       }
+    },
+    openAddressSearch() {
+      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
+        ElMessage.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
+        return;
+      }
+      new daum.Postcode({
+        oncomplete: (data) => {
+          let roadAddr = data.roadAddress;
+          let extraRoadAddr = '';
+
+          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+            extraRoadAddr += data.bname;
+          }
+          if (data.buildingName !== '' && data.apartment === 'Y') {
+            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          if (extraRoadAddr !== '') {
+            extraRoadAddr = ' (' + extraRoadAddr + ')';
+          }
+
+          this.form.address = roadAddr + extraRoadAddr;
+          this.form.detailAddress = '';
+        }
+      }).open();
     },
     formatPhoneNumber(field) {
       let value = this.form[field].replace(/\D/g, '');
@@ -312,6 +403,7 @@ export default {
           formData.append('phoneNumber', this.form.phone);
           formData.append('emergencyContact', this.form.emergencyContact);
           formData.append('address', this.form.address);
+          formData.append('detailAddress', this.form.detailAddress);
           formData.append('bank', this.form.bank);
           formData.append('bankAccount', this.form.accountNumber);
           formData.append('sabun', this.form.sabun);

@@ -87,20 +87,23 @@
                   <span class="value">{{ employee.joinDate }}</span>
                 </div>
                 <div class="info-item-page">
-                  <span class="label">근속기간</span>
-                  <span class="value">{{ employee.lengthOfService }}</span>
+                  <span class="label">재직 상태</span>
+                  <span class="value">{{ employee.memberStatusName }}</span>
                 </div>
                 <div class="info-item-page">
-                  <span class="label">주소</span>
-                  <span class="value">{{ employee.address || '-' }}</span>
+                  <span class="label">근속기간</span>
+                  <span class="value">{{ employee.lengthOfService }}</span>
                 </div>
                 <div class="info-item-page">
                   <span class="label">고용형태</span>
                   <span class="value">{{ employee.employmentTypeName }}</span>
                 </div>
                 <div class="info-item-page">
-                  <span class="label">재직 상태</span>
-                  <span class="value">{{ employee.memberStatusName }}</span>
+                  <span class="label">주소</span>
+                  <span class="value">
+                    <div>{{ employee.address || '-' }}</div>
+                    <div v-if="employee.detailAddress">{{ employee.detailAddress }}</div>
+                  </span>
                 </div>
                 <div class="info-item-page">
                   <span class="label">계정 상태</span>
@@ -214,20 +217,23 @@
                 <span class="value">{{ employee.joinDate }}</span>
               </div>
               <div class="info-item-page">
-                <span class="label">근속기간</span>
-                <span class="value">{{ employee.lengthOfService }}</span>
+                <span class="label">재직 상태</span>
+                <span class="value">{{ employee.memberStatusName }}</span>
               </div>
               <div class="info-item-page">
-                <span class="label">주소</span>
-                <span class="value">{{ employee.address || '-' }}</span>
+                <span class="label">근속기간</span>
+                <span class="value">{{ employee.lengthOfService }}</span>
               </div>
               <div class="info-item-page">
                 <span class="label">고용형태</span>
                 <span class="value">{{ employee.employmentTypeName }}</span>
               </div>
               <div class="info-item-page">
-                <span class="label">재직 상태</span>
-                <span class="value">{{ employee.memberStatusName }}</span>
+                <span class="label">주소</span>
+                <span class="value">
+                  <div>{{ employee.address || '-' }}</div>
+                  <div v-if="employee.detailAddress">{{ employee.detailAddress }}</div>
+                </span>
               </div>
               <div class="info-item-page">
                 <span class="label">계정 상태</span>
@@ -569,9 +575,7 @@ defineExpose({ goBack, editEmployee, printToPdf });
   border-bottom: 1px solid #f0f0f0;
 }
 
-.info-item-page:last-child {
-  border-bottom: none;
-}
+
 
 .info-item-page .label {
   font-weight: 500;

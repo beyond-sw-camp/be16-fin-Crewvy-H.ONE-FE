@@ -12,7 +12,7 @@
         </el-button>
         <el-button @click="exportEmployees">
           <el-icon><Download /></el-icon>
-          <span style="margin-left: 8px;">내보내기</span>
+          <span style="margin-left: 8px;">Excel 다운로드</span>
         </el-button>
       </div>
     </div>
@@ -114,7 +114,7 @@
 
       <!-- 테이블 뷰 -->
       <div v-else class="employee-table">
-        <el-table :data="filteredEmployees" style="width: 100%">
+        <el-table :data="filteredEmployees" style="width: 100%" @row-click="selectEmployee">
           <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip>
             <template #default="scope">
               <div class="table-employee">
@@ -228,16 +228,19 @@
                   <span class="value">{{ selectedEmployee.lengthOfService }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="label">주소</span>
-                  <span class="value">{{ selectedEmployee.address || '-' }}</span>
+                  <span class="label">재직 상태</span>
+                  <span class="value">{{ selectedEmployee.memberStatusName }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">고용형태</span>
                   <span class="value">{{ selectedEmployee.employmentTypeName }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="label">재직 상태</span>
-                  <span class="value">{{ selectedEmployee.memberStatusName }}</span>
+                  <span class="label">주소</span>
+                  <span class="value">
+                    <div>{{ selectedEmployee.address || '-' }}</div>
+                    <div v-if="selectedEmployee.detailAddress">{{ selectedEmployee.detailAddress }}</div>
+                  </span>
                 </div>
                 <div class="info-item">
                   <span class="label">계정 상태</span>
@@ -316,6 +319,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import * as XLSX from 'xlsx';
 import { useRouter } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
 import { usePermissions } from '@/composables/usePermissions';
@@ -486,8 +490,27 @@ const restoreEmployee = (employee) => {
 };
 
 const exportEmployees = () => {
-  success('직원 목록을 내보냅니다.');
-  // TODO: 내보내기 로직 구현
+  if (filteredEmployees.value.length === 0) {
+    error('내보낼 데이터가 없습니다.');
+    return;
+  }
+
+  const dataToExport = filteredEmployees.value.map(emp => ({
+    '이름': emp.name,
+    '사번': emp.sabun,
+    '직책': emp.position,
+    '부서': emp.department,
+    '이메일': emp.email,
+    '전화번호': emp.phone,
+    '입사일': emp.joinDate,
+    '상태': formatMemberStatus(emp.status)
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, '직원 목록');
+  XLSX.writeFile(workbook, '직원_목록.xlsx');
+  success('엑셀 파일이 다운로드되었습니다.');
 };
 
 const resetFilters = () => {
