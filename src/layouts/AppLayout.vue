@@ -243,7 +243,7 @@
               <el-icon><Clock /></el-icon>
               <span :class="{ 'low-time': isTimeLow }">{{ sessionTimeLeft }}</span>
             </div>
-            <button class="extend-button" @click="extendSession">
+            <button class="extend-button" @click="extendSession" :disabled="!canExtendSession">
               연장
             </button>
           </div>
@@ -739,6 +739,13 @@ export default {
 
       return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     },
+    canExtendSession() {
+      // Allow extending if there's more than 5 seconds left.
+      // Backend might still validate a truly expired refresh token.
+      if (!this.sessionExpiryTime) return false;
+      const diff = this.sessionExpiryTime.getTime() - this.currentTime.getTime();
+      return diff > 5 * 1000;
+    },
     isTimeLow() {
       if (!this.sessionExpiryTime) return false;
       const diff = this.sessionExpiryTime.getTime() - this.currentTime.getTime();
@@ -1115,7 +1122,7 @@ export default {
       } catch (err) {
         this.error('세션 연장에 실패했습니다. 다시 로그인해주세요.');
         localStorage.clear();
-        this.$router.push('/login');
+        this.$router.push('/landing');
       }
     },
     updatePayrollMenuState() {

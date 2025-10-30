@@ -184,6 +184,7 @@
       <el-button type="primary" @click="handleSubmit">직원 추가</el-button>
     </div>
     <OrganizationSelectionModal ref="orgModal" @organization-selected="handleOrganizationSelected" />
+    <AddressModal v-if="isAddressModalVisible" @close="closeAddressModal" @address-selected="handleAddressSelected" />
   </div>
 </template>
 
@@ -191,6 +192,7 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import OrganizationSelectionModal from '@/components/member/OrganizationSelectionModal.vue';
+import AddressModal from '@/components/member/AddressModal.vue';
 import gradeService from '@/api/gradeService';
 import titleService from '@/api/titleService';
 import roleService from '@/api/roleService';
@@ -202,6 +204,7 @@ export default {
   name: 'AddEmployee',
   components: {
     OrganizationSelectionModal,
+    AddressModal,
     View,
     Hide,
     Calendar,
@@ -259,6 +262,7 @@ export default {
       allTitles: [],
       allRoles: [],
       passwordFieldType: 'password', // Add this for password visibility toggle
+      isAddressModalVisible: false,
     };
   },
   watch: {
@@ -322,29 +326,28 @@ export default {
       }
     },
     openAddressSearch() {
-      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
-        ElMessage.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
-        return;
+      this.isAddressModalVisible = true;
+    },
+    closeAddressModal() {
+      this.isAddressModalVisible = false;
+    },
+    handleAddressSelected(data) {
+      let roadAddr = data.roadAddress;
+      let extraRoadAddr = '';
+
+      if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+        extraRoadAddr += data.bname;
       }
-      new daum.Postcode({
-        oncomplete: (data) => {
-          let roadAddr = data.roadAddress;
-          let extraRoadAddr = '';
+      if (data.buildingName !== '' && data.apartment === 'Y') {
+        extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+      }
+      if (extraRoadAddr !== '') {
+        extraRoadAddr = ' (' + extraRoadAddr + ')';
+      }
 
-          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
-            extraRoadAddr += data.bname;
-          }
-          if (data.buildingName !== '' && data.apartment === 'Y') {
-            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
-          }
-          if (extraRoadAddr !== '') {
-            extraRoadAddr = ' (' + extraRoadAddr + ')';
-          }
-
-          this.form.address = roadAddr + extraRoadAddr;
-          this.form.detailAddress = '';
-        }
-      }).open();
+      this.form.address = roadAddr + extraRoadAddr;
+      this.form.detailAddress = '';
+      this.isAddressModalVisible = false;
     },
     formatPhoneNumber(field) {
       let value = this.form[field].replace(/\D/g, '');
