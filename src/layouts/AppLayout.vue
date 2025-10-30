@@ -226,12 +226,15 @@
         </div>
 
         <div class="header-right">
-          <!-- 세션 타이머 -->
-          <div class="session-timer" @click="extendSession">
-            <el-icon>
-              <Clock />
-            </el-icon>
-            <span class="timer-text">{{ sessionTimeLeft }}</span>
+          <!-- 세션 연장 버튼 -->
+          <div class="session-control">
+            <div class="timer-display" :class="{ blinking: isBlinking }">
+              <el-icon><Clock /></el-icon>
+              <span :class="{ 'low-time': isTimeLow }">{{ sessionTimeLeft }}</span>
+            </div>
+            <button class="extend-button" @click="extendSession">
+              연장
+            </button>
           </div>
 
           <!-- 캘린더 -->
@@ -457,6 +460,8 @@ import employeeService from '@/api/employeeService';
 import organizationService from '@/api/organizationService';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
+import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 import NotificationBell from '@/components/NotificationBell.vue';
 import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
 
@@ -509,6 +514,8 @@ export default {
       sessionTimer: null,
       currentTime: new Date(),
       sessionWarningShown: false, // 세션 경고 표시 여부 추적
+      blinkerInterval: null,
+      isBlinking: false,
 
       events: [
         {
@@ -708,15 +715,23 @@ export default {
       })
     },
     sessionTimeLeft() {
-      if (!this.sessionExpiryTime) return '00:00:00'
-      const now = this.currentTime.getTime()
-      const expiry = this.sessionExpiryTime.getTime()
-      const diff = expiry - now
-      if (diff <= 0) return '00:00:00'
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      if (!this.sessionExpiryTime) return '00:00';
+      const now = this.currentTime.getTime();
+      const expiry = this.sessionExpiryTime.getTime();
+      const diff = expiry - now;
+
+      if (diff <= 0) return '00:00';
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    },
+    isTimeLow() {
+      if (!this.sessionExpiryTime) return false;
+      const diff = this.sessionExpiryTime.getTime() - this.currentTime.getTime();
+      return diff > 0 && diff < 3 * 60 * 1000;
     },
     calendarDays() {
       const year = this.currentDate.getFullYear()
@@ -751,9 +766,24 @@ export default {
   watch: {
     '$route'() {
       this.updatePayrollMenuState()
+    },
+    isTimeLow(newVal, oldVal) {
+      if (newVal && !oldVal) {
+        this.triggerBlink();
+        this.blinkerInterval = setInterval(this.triggerBlink, 30000);
+      } else if (!newVal && oldVal) {
+        clearInterval(this.blinkerInterval);
+        this.blinkerInterval = null;
+      }
     }
   },
   methods: {
+    triggerBlink() {
+      this.isBlinking = true;
+      setTimeout(() => {
+        this.isBlinking = false;
+      }, 500);
+    },
     ...mapMutations(['removeNotification']),
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
@@ -1010,14 +1040,31 @@ export default {
       this.info(`${event.title} 상세보기`)
     },
     initSessionTimer() {
-      // 세션 만료시간을 30분으로 설정
-      this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        try {
+          const decodedToken = jwtDecode(accessToken);
+          const expiryTime = decodedToken.exp * 1000; // Convert to milliseconds
 
-      // 1초마다 타이머 업데이트
+          if (expiryTime > Date.now()) {
+            this.sessionExpiryTime = new Date(expiryTime);
+          } else {
+            this.sessionExpiryTime = new Date(Date.now());
+          }
+        } catch (e) {
+          console.error("Failed to decode token:", e);
+          this.sessionExpiryTime = new Date(Date.now());
+        }
+      } else {
+        this.sessionExpiryTime = new Date(Date.now());
+      }
+
+      if (this.sessionTimer) {
+          clearInterval(this.sessionTimer);
+      }
       this.sessionTimer = setInterval(() => {
-        // 현재 시간 업데이트 (반응성 트리거)
-        this.currentTime = new Date()
-      }, 1000)
+        this.currentTime = new Date();
+      }, 1000);
     },
     // handleSessionExpiry() {
     //   clearInterval(this.sessionTimer)
@@ -1028,10 +1075,36 @@ export default {
     // showSessionWarning() {
     //   this.warning('세션이 곧 만료됩니다. (5분 남음)')
     // },
-    extendSession() {
-      // 세션 연장 (30분 추가)
-      this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
-      this.success('세션이 연장되었습니다.')
+    async extendSession() {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        const memberPositionId = localStorage.getItem('memberPositionId');
+
+        if (!refreshToken) {
+          this.error('세션 연장에 필요한 정보가 없습니다. 다시 로그인해주세요.');
+          return;
+        }
+
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/generate-at`, {
+          refreshToken,
+          memberPositionId
+        });
+
+        if (response.data && response.data.success) {
+          const newAccessToken = response.data.data.accessToken;
+          localStorage.setItem("accessToken", newAccessToken);
+          
+          this.initSessionTimer();
+          
+          this.success('세션이 성공적으로 연장되었습니다.');
+        } else {
+          throw new Error(response.data.message || '세션 연장에 실패했습니다.');
+        }
+      } catch (err) {
+        this.error('세션 연장에 실패했습니다. 다시 로그인해주세요.');
+        localStorage.clear();
+        this.$router.push('/login');
+      }
     },
     updatePayrollMenuState() {
       // DOM 조작을 통한 급여 메뉴 활성화
@@ -1091,6 +1164,9 @@ export default {
   beforeUnmount() {
     if (this.sessionTimer) {
       clearInterval(this.sessionTimer)
+    }
+    if (this.blinkerInterval) {
+      clearInterval(this.blinkerInterval);
     }
   }
 }
@@ -1684,34 +1760,59 @@ export default {
   background: #fee2e2;
 }
 
-/* 세션 타이머 스타일 */
-.session-timer {
+
+
+
+@keyframes red-flash {
+  50% { background-color: #fde2e2; }
+}
+
+.blinking {
+  animation: red-flash 0.5s ease-out;
+}
+
+.session-control {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dcdfe6;
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.timer-display {
+  padding: 6px 12px;
+  background-color: #f5f7fa;
+  color: #606266;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border: 1px solid #0ea5e9;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-right: 8px;
+  font-size: 14px;
 }
 
-.session-timer:hover {
-  background: #e0f2fe;
-  border-color: #0284c7;
-}
-
-.session-timer .el-icon {
+.timer-display .el-icon {
   color: #0ea5e9;
   font-size: 16px;
 }
 
-.timer-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0c4a6e;
+.extend-button {
+  padding: 6px 12px;
+  border: none;
+  background-color: #ffffff;
+  color: #409eff;
+  cursor: pointer;
+  border-left: 1px solid #dcdfe6;
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+}
+
+.extend-button:hover {
+  background-color: #ecf5ff;
+}
+
+.timer-display .low-time {
+  color: #f56c6c; /* Element Plus danger color */
+  font-weight: 600; /* Make it bolder */
 }
 
 .employee-search-modal {

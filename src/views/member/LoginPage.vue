@@ -19,9 +19,7 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item>
-          <el-checkbox v-model="rememberMe">로그인 상태 유지</el-checkbox>
-        </el-form-item>
+
 
         <el-button type="primary" @click="handleLogin" class="login-button" :loading="loading">
           로그인
@@ -60,7 +58,7 @@ const rules = ref({
   email: [{ required: true, message: '이메일을 입력해주세요.', trigger: 'blur' }],
   password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }]
 });
-const rememberMe = ref(false);
+
 const loading = ref(false);
 
 const openPasswordResetModal = () => {
@@ -83,15 +81,10 @@ const handleLogin = async () => {
 
           // 로컬 스토리지에 사용자 정보 저장
           localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
           localStorage.setItem("userName", userName);
           localStorage.setItem("memberId", memberId);
           localStorage.setItem("memberPositionId", memberPositionId);
-
-          if (rememberMe.value) {
-            localStorage.setItem("refreshToken", refreshToken);
-          } else {
-            localStorage.removeItem("refreshToken");
-          }
 
           // Vuex 스토어에 사용자 정보 저장
           const user = { userName, memberId, memberPositionId };
