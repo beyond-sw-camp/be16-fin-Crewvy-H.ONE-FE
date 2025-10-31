@@ -237,7 +237,7 @@
         </div>
 
         <div class="header-right">
-          <!-- 세션 연장 버튼 -->
+          <!-- 토큰 연장 버튼 -->
           <div class="session-control">
             <div class="timer-display" :class="{ blinking: isBlinking }">
               <el-icon><Clock /></el-icon>
@@ -459,6 +459,9 @@
 
     <!-- 직무 선택 모달 -->
     <SelectPositionModal v-if="showSelectPositionModal" @close="showSelectPositionModal = false" />
+
+    <!-- 토큰 만료 모달 -->
+    <SessionExpiredModal v-model="showSessionExpiredModal" @confirm="handleSessionExpiredConfirm" />
   </div>
 </template>
 
@@ -475,10 +478,11 @@ import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import NotificationBell from '@/components/NotificationBell.vue';
 import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
+import SessionExpiredModal from '@/components/SessionExpiredModal.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer, NotificationBell, SelectPositionModal },
+  components: { SnackbarContainer, NotificationBell, SelectPositionModal, SessionExpiredModal },
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const { connect, disconnect } = useSse();
@@ -497,6 +501,7 @@ export default {
   },
   data() {
     return {
+      showSessionExpiredModal: false,
       showSelectPositionModal: false,
       defaultAvatarSvg, // Expose to template
       sidebarCollapsed: false,
@@ -524,9 +529,10 @@ export default {
       sessionExpiryTime: null,
       sessionTimer: null,
       currentTime: new Date(),
-      sessionWarningShown: false, // 세션 경고 표시 여부 추적
+      sessionWarningShown: false,
       blinkerInterval: null,
       isBlinking: false,
+      sessionWarningInterval: null, // Add this line
 
       events: [
         {
@@ -789,13 +795,40 @@ export default {
       if (newVal && !oldVal) {
         this.triggerBlink();
         this.blinkerInterval = setInterval(this.triggerBlink, 30000);
+        this.showSessionWarning(); // 최초 즉시 실행
+        this.sessionWarningInterval = setInterval(this.showSessionWarning, 30000);
       } else if (!newVal && oldVal) {
         clearInterval(this.blinkerInterval);
         this.blinkerInterval = null;
+        clearInterval(this.sessionWarningInterval);
+        this.sessionWarningInterval = null;
+      }
+    },
+    sessionTimeLeft(newVal) {
+      if (newVal === '00:00') {
+        this.logout();
       }
     }
   },
   methods: {
+    logout() {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('memberId');
+      localStorage.removeItem('memberPositionId');
+      localStorage.removeItem('companyId');
+      this.showSessionExpiredModal = true;
+    },
+    handleSessionExpiredConfirm() {
+      this.showSessionExpiredModal = false;
+      this.$router.push('/landing');
+    },
+    showSessionWarning() {
+      if (this.isTimeLow) {
+        this.error(`${this.sessionTimeLeft} 후 자동 로그아웃됩니다.`);
+      }
+    },
     triggerBlink() {
       this.isBlinking = true;
       setTimeout(() => {
@@ -856,13 +889,7 @@ export default {
           this.showSelectPositionModal = true;
           break;
         case 'logout':
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('userName');
-          localStorage.removeItem('memberId');
-          localStorage.removeItem('memberPositionId');
-          localStorage.removeItem('companyId');
-          this.$router.push('/landing');
+          this.logout();
           break
       }
     },
@@ -1085,28 +1112,24 @@ export default {
         this.currentTime = new Date();
       }, 1000);
     },
-    // handleSessionExpiry() {
-    //   clearInterval(this.sessionTimer)
-    //   this.error('세션이 만료되었습니다. 다시 로그인해주세요.')
-    //   // 실제로는 로그인 페이지로 리다이렉트
-    //   this.info('로그인 페이지로 이동합니다.')
-    // },
-    // showSessionWarning() {
-    //   this.warning('세션이 곧 만료됩니다. (5분 남음)')
-    // },
     async extendSession() {
       try {
         const refreshToken = localStorage.getItem('refreshToken');
+        const accessToken = localStorage.getItem('accessToken'); // at 가져오기
         const memberPositionId = localStorage.getItem('memberPositionId');
 
-        if (!refreshToken) {
-          this.error('세션 연장에 필요한 정보가 없습니다. 다시 로그인해주세요.');
+        if (!refreshToken || !accessToken) { // at도 확인
+          this.error('토큰 연장에 필요한 정보가 없습니다. 다시 로그인해주세요.');
           return;
         }
 
         const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/generate-at`, {
           refreshToken,
           memberPositionId
+        }, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
         });
 
         if (response.data && response.data.success) {
@@ -1115,12 +1138,12 @@ export default {
           
           this.initSessionTimer();
           
-          this.success('세션이 성공적으로 연장되었습니다.');
+          this.success('토큰이 성공적으로 연장되었습니다.');
         } else {
-          throw new Error(response.data.message || '세션 연장에 실패했습니다.');
+          throw new Error(response.data.message || '토큰 연장에 실패했습니다.');
         }
       } catch (err) {
-        this.error('세션 연장에 실패했습니다. 다시 로그인해주세요.');
+        this.error('토큰 연장에 실패했습니다. 다시 로그인해주세요.');
         localStorage.clear();
         this.$router.push('/landing');
       }

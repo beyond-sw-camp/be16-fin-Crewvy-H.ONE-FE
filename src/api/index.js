@@ -35,7 +35,7 @@ apiClient.interceptors.response.use(
     response => response,
     async error => {
         if (error.response && error.response.status === 401) {
-            showErrorSnackbar('세션이 만료되었습니다. 다시 로그인해주세요.');
+            showErrorSnackbar('토큰이 만료되었습니다. 다시 로그인해주세요.');
             localStorage.clear();
             window.location.href = "/login";
             return Promise.reject(error);
