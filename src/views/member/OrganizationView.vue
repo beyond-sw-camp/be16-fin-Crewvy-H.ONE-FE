@@ -281,10 +281,12 @@ const handleNodeDrop = async (draggingNode, dropNode, dropType) => {
       }
     });
     ElMessage.success('조직 순서가 변경되었습니다.');
-    fetchOrganizations();
+    fetchOrganizations(); // 성공 시에도 데이터를 다시 불러와서 동기화
   } catch (error) {
-    ElMessage.error('조직 순서 변경에 실패했습니다.');
+    const errorMessage = error.response?.data?.message || '조직 순서 변경에 실패했습니다.';
+    ElMessage.error(errorMessage);
     console.error(error);
+    fetchOrganizations(); // 실패 시 드래그-드롭된 노드를 원위치로 되돌리기 위해 다시 불러옴
   }
 };
 

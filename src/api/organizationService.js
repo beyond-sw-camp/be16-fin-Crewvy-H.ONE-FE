@@ -12,5 +12,12 @@ export default {
   },
   getOrganizationTree() {
     return apiClient.get('/search-service/search/organization');
+  },
+  getOrganizationTreeForCreation() {
+    const uuid = localStorage.getItem('memberId');
+    if (!uuid) {
+      return Promise.reject(new Error('User UUID not found in localStorage.'));
+    }
+    return apiClient.get(`${API_URL}/tree-with-members`, { headers: { 'X-User-UUID': uuid } });
   }
 };

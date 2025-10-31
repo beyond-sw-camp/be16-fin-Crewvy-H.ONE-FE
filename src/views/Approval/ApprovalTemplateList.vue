@@ -2,7 +2,6 @@
   <div class="template-list-container">
     <div class="page-header">
       <h1>결재 템플릿 관리</h1>
-      <el-button type="primary" @click="openCreateModal">새 템플릿 추가</el-button>
     </div>
 
     <el-table :data="templates" style="width: 100%">
@@ -51,11 +50,6 @@ export default {
 
     onMounted(fetchTemplates);
 
-    const openCreateModal = () => {
-      // TODO: Implement create modal
-      console.log('Open create modal');
-    };
-
     const openPolicyEditor = (template) => {
       selectedTemplate.value = template;
       showPolicyEditor.value = true;
@@ -69,7 +63,6 @@ export default {
 
     return {
       templates,
-      openCreateModal,
       showPolicyEditor,
       openPolicyEditor,
       handleSavePolicy,

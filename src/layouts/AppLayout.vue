@@ -36,26 +36,26 @@
           <span>통합 검색</span>
         </el-menu-item>
 
-        <el-sub-menu index="employee">
+        <el-sub-menu index="employee" v-if="hasEmployeeReadCompanyOrSystem || hasEmployeeReadDepartment">
           <template #title>
             <el-icon>
               <User />
             </el-icon>
             <span>직원 관리</span>
           </template>
-          <el-menu-item index="/employee">
+          <el-menu-item index="/employee" v-if="hasEmployeeReadCompanyOrSystem || hasEmployeeReadDepartment">
             <span>직원 목록</span>
           </el-menu-item>
-          <el-menu-item index="/organization">
+          <el-menu-item index="/organization" v-if="hasEmployeeReadCompanyOrSystem">
             <span>조직 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/title">
+          <el-menu-item index="/employee/title" v-if="hasEmployeeReadCompanyOrSystem">
             <span>직책 관리</span>
           </el-menu-item>
-          <el-menu-item index="/employee/grade">
+          <el-menu-item index="/employee/grade" v-if="hasEmployeeReadCompanyOrSystem">
             <span>직급 관리</span>
           </el-menu-item>
-          <el-sub-menu index="roles">
+          <el-sub-menu index="roles" v-if="hasEmployeeReadCompanyOrSystem">
             <template #title>
               <span>역할 관리</span>
             </template>
@@ -145,7 +145,7 @@
               <span>급여 설정</span>
             </el-menu-item>
             <el-menu-item index="/payroll/basic-info">
-              <span>급여 기본 정보</span>
+              <span>급여 계약 정보</span>
             </el-menu-item>
             <el-menu-item index="/payroll/actual-calculation">
               <span>급여 계산</span>
@@ -234,12 +234,15 @@
         </div>
 
         <div class="header-right">
-          <!-- 세션 타이머 -->
-          <div class="session-timer" @click="extendSession">
-            <el-icon>
-              <Clock />
-            </el-icon>
-            <span class="timer-text">{{ sessionTimeLeft }}</span>
+          <!-- 세션 연장 버튼 -->
+          <div class="session-control">
+            <div class="timer-display" :class="{ blinking: isBlinking }">
+              <el-icon><Clock /></el-icon>
+              <span :class="{ 'low-time': isTimeLow }">{{ sessionTimeLeft }}</span>
+            </div>
+            <button class="extend-button" @click="extendSession">
+              연장
+            </button>
           </div>
 
           <!-- 캘린더 -->
@@ -265,6 +268,7 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="my-info">내 정보</el-dropdown-item>
                 <el-dropdown-item command="notification-settings">알림 설정</el-dropdown-item>
+                <el-dropdown-item command="select-position">직무 선택</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>로그아웃</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -287,8 +291,9 @@
             <div class="org-tree-container-modal">
               <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
               <div class="tree-container">
-                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" @node-click="handleOrgNodeClick"
-                  :filter-node-method="filterNode" :expand-on-click-node="false" :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
+                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id"
+                  @node-click="handleOrgNodeClick" :filter-node-method="filterNode" :expand-on-click-node="false"
+                  :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
                   <template #default="{ node, data }">
                     <div class="custom-tree-node-modal">
                       <span>{{ node.label }}</span>
@@ -431,7 +436,7 @@
             value-format="YYYY-MM-DD" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="시간">
-          <el-time-picker v-model="eventForm.time" placeholder="시간 선택"   format="HH:mm" value-format="HH:mm"
+          <el-time-picker v-model="eventForm.time" placeholder="시간 선택" format="HH:mm" value-format="HH:mm"
             style="width: 100%;" />
         </el-form-item>
         <el-form-item label="유형">
@@ -448,6 +453,9 @@
 
     <!-- 스낵바 컨테이너 -->
     <SnackbarContainer />
+
+    <!-- 직무 선택 모달 -->
+    <SelectPositionModal v-if="showSelectPositionModal" @close="showSelectPositionModal = false" />
   </div>
 </template>
 
@@ -455,18 +463,19 @@
 import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
 import { useSnackbar } from '@/composables/useSnackbar';
 import SnackbarContainer from '../components/SnackbarContainer.vue';
-
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import employeeService from '@/api/employeeService';
-
 import organizationService from '@/api/organizationService';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
+import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 import NotificationBell from '@/components/NotificationBell.vue';
+import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer, NotificationBell },
+  components: { SnackbarContainer, NotificationBell, SelectPositionModal },
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const { connect, disconnect } = useSse();
@@ -485,6 +494,7 @@ export default {
   },
   data() {
     return {
+      showSelectPositionModal: false,
       defaultAvatarSvg, // Expose to template
       sidebarCollapsed: false,
       showOrgModal: false,
@@ -492,16 +502,11 @@ export default {
       activeOrgTab: 'org',
       orgSearch: '',
       employeeSearch: '',
-      currentDate: new Date(2025, 8, 1), // 2025년 9월
-      weekdays: ['일', '월', '화', '수', '목', '금', '토'],
-      sessionExpiryTime: null,
-      sessionTimer: null,
-      currentTime: new Date(),
-      sessionWarningShown: false, // 세션 경고 표시 여부 추적
       expandedDepartments: {
         management: false,
         sales: true
       },
+      defaultExpandedOrgKeys: [],
       orgTreeData: [],
       defaultProps: {
         children: 'children',
@@ -510,6 +515,16 @@ export default {
       allEmployees: [],
       searchedEmployees: [],
       hasSearched: false, // 검색 실행 여부 상태
+
+      currentDate: new Date(2025, 8, 1), // 2025년 9월
+      weekdays: ['일', '월', '화', '수', '목', '금', '토'],
+      sessionExpiryTime: null,
+      sessionTimer: null,
+      currentTime: new Date(),
+      sessionWarningShown: false, // 세션 경고 표시 여부 추적
+      blinkerInterval: null,
+      isBlinking: false,
+
       events: [
         {
           id: 1,
@@ -668,6 +683,13 @@ export default {
     }
   },
   computed: {
+    ...mapState('auth', ['permissions']),
+    hasEmployeeReadCompanyOrSystem() {
+      return this.$store.getters['auth/hasEmployeeReadCompanyOrSystem'];
+    },
+    hasEmployeeReadDepartment() {
+      return this.$store.getters['auth/hasEmployeeReadDepartment'];
+    },
     userAvatarUrl() {
       return this.user?.avatar || this.defaultAvatarSvg;
     },
@@ -701,15 +723,23 @@ export default {
       })
     },
     sessionTimeLeft() {
-      if (!this.sessionExpiryTime) return '00:00:00'
-      const now = this.currentTime.getTime()
-      const expiry = this.sessionExpiryTime.getTime()
-      const diff = expiry - now
-      if (diff <= 0) return '00:00:00'
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      if (!this.sessionExpiryTime) return '00:00';
+      const now = this.currentTime.getTime();
+      const expiry = this.sessionExpiryTime.getTime();
+      const diff = expiry - now;
+
+      if (diff <= 0) return '00:00';
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    },
+    isTimeLow() {
+      if (!this.sessionExpiryTime) return false;
+      const diff = this.sessionExpiryTime.getTime() - this.currentTime.getTime();
+      return diff > 0 && diff < 3 * 60 * 1000;
     },
     calendarDays() {
       const year = this.currentDate.getFullYear()
@@ -742,14 +772,26 @@ export default {
     }
   },
   watch: {
-    orgSearch(val) {
-      this.$refs.orgTree.filter(val);
-    },
     '$route'() {
       this.updatePayrollMenuState()
+    },
+    isTimeLow(newVal, oldVal) {
+      if (newVal && !oldVal) {
+        this.triggerBlink();
+        this.blinkerInterval = setInterval(this.triggerBlink, 30000);
+      } else if (!newVal && oldVal) {
+        clearInterval(this.blinkerInterval);
+        this.blinkerInterval = null;
+      }
     }
   },
   methods: {
+    triggerBlink() {
+      this.isBlinking = true;
+      setTimeout(() => {
+        this.isBlinking = false;
+      }, 500);
+    },
     ...mapMutations(['removeNotification']),
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
@@ -773,9 +815,9 @@ export default {
         '/performance/my-goal': '내 목표 관리',
         '/performance/review': '평가 관리',
         '/payroll': '급여 관리',
-            '/payroll/policy-settings': '급여 정책 설정',
-            '/payroll/item-management': '급여 기초 정보',
-            '/payroll/basic-info': '급여 기본 정보',
+        '/payroll/policy-settings': '급여 정책 설정',
+        '/payroll/item-management': '급여 기초 정보',
+        '/payroll/basic-info': '급여 기본 정보',
         '/payroll/calculation': '급여 계산',
         '/payroll/transfer-output': '급여 이체 출력',
         '/payroll/statement-output': '명세서 출력',
@@ -799,6 +841,9 @@ export default {
           break;
         case 'notification-settings':
           this.$router.push('/my-info/notification-settings');
+          break;
+        case 'select-position':
+          this.showSelectPositionModal = true;
           break;
         case 'logout':
           localStorage.removeItem('accessToken');
@@ -872,38 +917,40 @@ export default {
         return [];
       }
       const map = {};
-      // First pass: create map and transform nodes
+      // First pass: create map and initialize children array
       flatList.forEach(org => {
-        map[org.organizationId] = { 
-          ...org, 
-          id: org.organizationId, // Set the 'id' for node-key
-          label: org.label,      // Set the 'label' for the tree prop
-          children: [] 
+        map[org.organizationId] = {
+          ...org,
+          id: org.organizationId,
+          label: org.label,
+          children: []
         };
       });
 
-      const tree = [];
-      // Second pass: link children
-      flatList.forEach(org => {
-        if (org.parentId) {
-          const parent = map[org.parentId];
+      const roots = [];
+      // Second pass: link children to parents and find roots
+      Object.values(map).forEach(node => {
+        if (node.parentId) {
+          const parent = map[node.parentId];
           if (parent) {
-            parent.children.push(map[org.organizationId]);
-          } else {
-            // If parent not found, treat as a root
-            tree.push(map[org.organizationId]);
+            parent.children.push(node);
           }
         } else {
           // No parent, it's a root
-          tree.push(map[org.organizationId]);
+          roots.push(node);
         }
       });
-      return tree;
+      return roots;
     },
     async fetchOrganizationTree() {
       try {
         const orgTreeData = (await organizationService.getOrganizationTree()).data.data;
         this.orgTreeData = this.buildOrganizationTree(orgTreeData);
+
+        // Expand all top-level nodes by default
+        if (this.orgTreeData && this.orgTreeData.length > 0) {
+          this.defaultExpandedOrgKeys = this.orgTreeData.map(rootNode => rootNode.id);
+        }
 
       } catch (error) {
         console.error('Failed to fetch organization tree:', error);
@@ -919,14 +966,7 @@ export default {
       this.hasSearched = false; // 검색 상태 초기화
 
       // Always fetch the latest organization tree data when the modal is opened
-      this.fetchOrganizationTree().then(() => {
-        this.$nextTick(() => {
-          const orgTreeInstance = this.$refs.orgTree;
-          if (orgTreeInstance && orgTreeInstance.expandNode && this.orgTreeData.length > 0 && this.orgTreeData[0].children && this.orgTreeData[0].children.length > 0) {
-            orgTreeInstance.expandNode(this.orgTreeData[0].id, true);
-          }
-        });
-      });
+      this.fetchOrganizationTree();
       // this.fetchAllEmployees(); // This is for the employee tab, can be fetched when that tab is active or on demand.
     },
     async fetchAllEmployees() {
@@ -954,7 +994,6 @@ export default {
         this.searchedEmployees = [];
       }
     },
-
     openCalendarModal() {
       this.showCalendarModal = true
     },
@@ -1010,14 +1049,31 @@ export default {
       this.info(`${event.title} 상세보기`)
     },
     initSessionTimer() {
-      // 세션 만료시간을 30분으로 설정
-      this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        try {
+          const decodedToken = jwtDecode(accessToken);
+          const expiryTime = decodedToken.exp * 1000; // Convert to milliseconds
 
-      // 1초마다 타이머 업데이트
+          if (expiryTime > Date.now()) {
+            this.sessionExpiryTime = new Date(expiryTime);
+          } else {
+            this.sessionExpiryTime = new Date(Date.now());
+          }
+        } catch (e) {
+          console.error("Failed to decode token:", e);
+          this.sessionExpiryTime = new Date(Date.now());
+        }
+      } else {
+        this.sessionExpiryTime = new Date(Date.now());
+      }
+
+      if (this.sessionTimer) {
+          clearInterval(this.sessionTimer);
+      }
       this.sessionTimer = setInterval(() => {
-        // 현재 시간 업데이트 (반응성 트리거)
-        this.currentTime = new Date()
-      }, 1000)
+        this.currentTime = new Date();
+      }, 1000);
     },
     // handleSessionExpiry() {
     //   clearInterval(this.sessionTimer)
@@ -1028,10 +1084,36 @@ export default {
     // showSessionWarning() {
     //   this.warning('세션이 곧 만료됩니다. (5분 남음)')
     // },
-    extendSession() {
-      // 세션 연장 (30분 추가)
-      this.sessionExpiryTime = new Date(Date.now() + 30 * 60 * 1000)
-      this.success('세션이 연장되었습니다.')
+    async extendSession() {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        const memberPositionId = localStorage.getItem('memberPositionId');
+
+        if (!refreshToken) {
+          this.error('세션 연장에 필요한 정보가 없습니다. 다시 로그인해주세요.');
+          return;
+        }
+
+        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/generate-at`, {
+          refreshToken,
+          memberPositionId
+        });
+
+        if (response.data && response.data.success) {
+          const newAccessToken = response.data.data.accessToken;
+          localStorage.setItem("accessToken", newAccessToken);
+          
+          this.initSessionTimer();
+          
+          this.success('세션이 성공적으로 연장되었습니다.');
+        } else {
+          throw new Error(response.data.message || '세션 연장에 실패했습니다.');
+        }
+      } catch (err) {
+        this.error('세션 연장에 실패했습니다. 다시 로그인해주세요.');
+        localStorage.clear();
+        this.$router.push('/login');
+      }
     },
     updatePayrollMenuState() {
       // DOM 조작을 통한 급여 메뉴 활성화
@@ -1076,9 +1158,10 @@ export default {
       })
     }
   },
-  created() {
+  async created() {
     if (localStorage.getItem('accessToken')) {
-      this.fetchOrganizationTree();
+      await this.fetchOrganizationTree();
+      this.$store.dispatch('auth/fetchPermissions');
     }
   },
   mounted() {
@@ -1090,6 +1173,9 @@ export default {
   beforeUnmount() {
     if (this.sessionTimer) {
       clearInterval(this.sessionTimer)
+    }
+    if (this.blinkerInterval) {
+      clearInterval(this.blinkerInterval);
     }
   }
 }
@@ -1467,7 +1553,8 @@ export default {
   overflow-y: auto;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  min-height: calc(100vh - 500px); /* Responsive minimum height */
+  min-height: calc(100vh - 500px);
+  /* Responsive minimum height */
 }
 
 .org-tree-container-modal {
@@ -1682,34 +1769,59 @@ export default {
   background: #fee2e2;
 }
 
-/* 세션 타이머 스타일 */
-.session-timer {
+
+
+
+@keyframes red-flash {
+  50% { background-color: #fde2e2; }
+}
+
+.blinking {
+  animation: red-flash 0.5s ease-out;
+}
+
+.session-control {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dcdfe6;
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.timer-display {
+  padding: 6px 12px;
+  background-color: #f5f7fa;
+  color: #606266;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border: 1px solid #0ea5e9;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-right: 8px;
+  font-size: 14px;
 }
 
-.session-timer:hover {
-  background: #e0f2fe;
-  border-color: #0284c7;
-}
-
-.session-timer .el-icon {
+.timer-display .el-icon {
   color: #0ea5e9;
   font-size: 16px;
 }
 
-.timer-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0c4a6e;
+.extend-button {
+  padding: 6px 12px;
+  border: none;
+  background-color: #ffffff;
+  color: #409eff;
+  cursor: pointer;
+  border-left: 1px solid #dcdfe6;
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+}
+
+.extend-button:hover {
+  background-color: #ecf5ff;
+}
+
+.timer-display .low-time {
+  color: #f56c6c; /* Element Plus danger color */
+  font-weight: 600; /* Make it bolder */
 }
 
 .employee-search-modal {

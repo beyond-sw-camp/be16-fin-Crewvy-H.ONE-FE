@@ -15,7 +15,7 @@
     <el-row :gutter="24">
       <!-- Left Column: Role Cards -->
       <el-col :span="8">
-        <draggable v-model="filteredRole" item-key="id" handle=".role-card" @end="handleRoleReorder"
+        <draggable v-model="draggableRoles" item-key="id" handle=".role-card" @end="handleRoleReorder"
           class="role-cards-container">
           <template #item="{ element }">
             <el-card :key="element.id" class="role-card"
@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { ElMessageBox } from 'element-plus';
@@ -93,17 +93,16 @@ const { checkPermission } = usePermissions();
 const role = ref([]);
 const selectedRole = ref(null);
 const showDeleted = ref(false);
+const draggableRoles = ref([]); // New ref for draggable roles
+
+// Update draggableRoles whenever role.value or showDeleted.value changes
+watch([role, showDeleted], () => {
+  draggableRoles.value = role.value.filter(r => showDeleted.value || !r.ynDel);
+}, { immediate: true }); // Immediate: true to run on initial component mount
 
 const canCreateRole = ref(false);
 const canUpdateRole = ref(false);
 const canDeleteRole = ref(false);
-
-const filteredRole = computed(() => {
-  if (showDeleted.value) {
-    return role.value;
-  }
-  return role.value.filter(r => !r.ynDel);
-});
 
 const checkPermissions = async () => {
   canCreateRole.value = await checkPermission('member', 'CREATE', 'COMPANY');
@@ -199,7 +198,7 @@ const restoreRole = (role) => {
 
 const handleRoleReorder = async () => {
   try {
-    const roleIds = role.value.map(r => r.id);
+    const roleIds = draggableRoles.value.map(r => r.id);
     const memberPositionId = localStorage.getItem('memberPositionId');
     if (!memberPositionId) {
       throw new Error("MemberPositionId not found.");

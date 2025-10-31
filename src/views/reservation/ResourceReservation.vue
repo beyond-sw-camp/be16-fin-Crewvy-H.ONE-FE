@@ -436,17 +436,28 @@
       width="800px"
     >
       <div class="my-reservations">
+        <!-- 필터 옵션 -->
+        <div class="reservation-filter">
+          <el-radio-group v-model="reservationFilter" size="default">
+            <el-radio-button label="all">전체</el-radio-button>
+            <el-radio-button label="BEFORE">이용 전</el-radio-button>
+            <el-radio-button label="USED">이용 완료</el-radio-button>
+          </el-radio-group>
+        </div>
+        
         <div v-if="loadingMyReservations" class="loading-state">
           <el-icon class="is-loading"><Loading /></el-icon>
           <span>예약 목록을 불러오는 중...</span>
         </div>
-        <div v-else-if="sortedMyReservations.length === 0" class="empty-state">
+        <div v-else-if="filteredMyReservations.length === 0" class="empty-state">
           <el-icon><Calendar /></el-icon>
-          <span>예약된 자원이 없습니다.</span>
-          <p>새로운 예약을 만들어보세요!</p>
+          <span v-if="reservationFilter === 'all'">예약된 자원이 없습니다.</span>
+          <span v-else-if="reservationFilter === 'BEFORE'">이용 전 예약이 없습니다.</span>
+          <span v-else-if="reservationFilter === 'USED'">이용 완료된 예약이 없습니다.</span>
+          <p v-if="reservationFilter === 'all'">새로운 예약을 만들어보세요!</p>
         </div>
         <div v-else class="reservation-list">
-          <div class="reservation-item" v-for="reservation in sortedMyReservations" :key="reservation.id">
+          <div class="reservation-item" v-for="reservation in filteredMyReservations" :key="reservation.id">
             <div class="reservation-info">
               <div class="reservation-header">
                 <div class="reservation-title">
@@ -489,21 +500,48 @@
               </div>
             </div>
             <div class="reservation-actions">
-              <el-button @click="editReservation(reservation)">
-                <el-icon><Edit /></el-icon>
-                수정
-              </el-button>
-              <el-button 
-                @click="cancelReservation(reservation)"
-                :disabled="reservation.status === 'IN_USE'"
-              >
-                <el-icon><Close /></el-icon>
-                {{ reservation.status === 'USED' ? '삭제' : '취소' }}
-              </el-button>
-              <el-button v-if="reservation.status === 'IN_USE' || reservation.status === 'BEFORE'" type="success" @click="completeUsage(reservation)">
-                <el-icon><Check /></el-icon>
-                이용 완료
-              </el-button>
+              <!-- 이용 전: 수정, 취소, 이용완료 가능 -->
+              <template v-if="reservation.status === 'BEFORE'">
+                <el-button @click="editReservation(reservation)">
+                  <el-icon><Edit /></el-icon>
+                  수정
+                </el-button>
+                <el-button @click="cancelReservation(reservation)">
+                  <el-icon><Close /></el-icon>
+                  취소
+                </el-button>
+                <el-button type="success" @click="completeUsage(reservation)">
+                  <el-icon><Check /></el-icon>
+                  이용 완료
+                </el-button>
+              </template>
+              
+              <!-- 이용 완료: 삭제만 가능 -->
+              <template v-else-if="reservation.status === 'USED'">
+                <el-button type="danger" @click="cancelReservation(reservation)">
+                  <el-icon><Close /></el-icon>
+                  삭제
+                </el-button>
+              </template>
+              
+              <!-- 기타 상태 (IN_USE, CANCELLED 등) -->
+              <template v-else>
+                <el-button 
+                  @click="cancelReservation(reservation)"
+                  :disabled="reservation.status === 'IN_USE'"
+                >
+                  <el-icon><Close /></el-icon>
+                  취소
+                </el-button>
+                <el-button 
+                  v-if="reservation.status === 'IN_USE'" 
+                  type="success" 
+                  @click="completeUsage(reservation)"
+                >
+                  <el-icon><Check /></el-icon>
+                  이용 완료
+                </el-button>
+              </template>
             </div>
           </div>
         </div>
@@ -684,6 +722,7 @@ export default {
       categories: [],
       showReservation: false,
       showMyReservations: false,
+      reservationFilter: 'all', // 'all', 'BEFORE', 'USED'
       showStatistics: false,
       showResourceDetail: false,
       selectedResource: null,
@@ -751,6 +790,15 @@ export default {
     if (this.resourceChartInstance) {
       this.resourceChartInstance.destroy()
       this.resourceChartInstance = null
+    }
+  },
+  watch: {
+    // 모달이 열릴 때 필터 초기화 (선택사항 - 원하지 않으면 제거 가능)
+    showMyReservations(newVal) {
+      if (newVal) {
+        // 모달이 열릴 때 '전체'로 초기화 (선택사항)
+        // this.reservationFilter = 'all'
+      }
     }
   },
   computed: {
@@ -823,6 +871,20 @@ export default {
         // 같은 상태 내에서는 날짜순으로 정렬 (오름차순)
         return new Date(a.date) - new Date(b.date)
       })
+    },
+    
+    filteredMyReservations() {
+      let filtered = this.sortedMyReservations
+      
+      // 필터 적용
+      if (this.reservationFilter === 'BEFORE') {
+        filtered = filtered.filter(reservation => reservation.status === 'BEFORE')
+      } else if (this.reservationFilter === 'USED') {
+        filtered = filtered.filter(reservation => reservation.status === 'USED')
+      }
+      // 'all'일 때는 필터링하지 않음
+      
+      return filtered
     },
     safeMeetingRooms() {
       // 회의실 카테고리의 자원 중 오늘 예약 가능한 자원만 반환
@@ -2087,6 +2149,12 @@ export default {
       return resource ? resource.name : ''
     },
     editReservation(reservation) {
+      // 이용 전 상태만 수정 가능
+      if (reservation.status !== 'BEFORE') {
+        this.warning('이용 전 상태의 예약만 수정할 수 있습니다.')
+        return
+      }
+      
       // 예약 수정 모달 표시
       this.isEditingMode = true
       this.editingReservationId = reservation.id // 수정할 예약 ID 저장
@@ -2559,6 +2627,27 @@ export default {
 
 .my-reservations {
   padding: 20px 0;
+}
+
+.reservation-filter {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: center;
+}
+
+.reservation-filter :deep(.el-radio-group) {
+  width: 100%;
+}
+
+.reservation-filter :deep(.el-radio-button) {
+  flex: 1;
+}
+
+.reservation-filter :deep(.el-radio-button__inner) {
+  width: 100%;
+  text-align: center;
 }
 
 .loading-state {

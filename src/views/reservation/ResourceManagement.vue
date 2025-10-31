@@ -254,26 +254,36 @@
     <!-- 통계 모달 -->
     <el-dialog
       v-model="showStatistics"
-      title="자원 이용 통계"
       width="1000px"
     >
-      <div class="statistics-content">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <h4>이용률</h4>
-            <div class="stat-value">{{ statistics.usageRate }}%</div>
-          </div>
-          <div class="stat-card">
-            <h4>Peak Time</h4>
-            <div class="stat-value">{{ statistics.peakTime }}</div>
-          </div>
-          <div class="stat-card">
-            <h4>No Show</h4>
-            <div class="stat-value">{{ statistics.noShow }}건</div>
-          </div>
-          <div class="stat-card">
-            <h4>총 예약</h4>
-            <div class="stat-value">{{ statistics.totalReservations }}건</div>
+      <template #header>
+        <div class="statistics-header">
+          <h3 class="statistics-title">자원 이용 통계</h3>
+          <el-button @click="exportToPDF" type="primary" size="default">
+            <el-icon><Download /></el-icon>
+            <span style="margin-left: 8px;">PDF 내보내기</span>
+          </el-button>
+        </div>
+      </template>
+      <div class="statistics-content" id="statistics-report">
+        <div class="stats-summary-section">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h4>이용률</h4>
+              <div class="stat-value">{{ statistics.usageRate }}%</div>
+            </div>
+            <div class="stat-card">
+              <h4>Peak Time</h4>
+              <div class="stat-value">{{ statistics.peakTime || '데이터 없음' }}</div>
+            </div>
+            <div class="stat-card">
+              <h4>No Show</h4>
+              <div class="stat-value">{{ statistics.noShow }}건</div>
+            </div>
+            <div class="stat-card">
+              <h4>총 예약</h4>
+              <div class="stat-value">{{ statistics.totalReservations }}건</div>
+            </div>
           </div>
         </div>
         
@@ -291,16 +301,23 @@
           </div>
         </div>
       </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showStatistics = false">닫기</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
 import { ElMessageBox } from 'element-plus'
-import { Plus, Search, Setting, DataAnalysis } from '@element-plus/icons-vue'
+import { Plus, Search, Setting, DataAnalysis, Download } from '@element-plus/icons-vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import axios from 'axios'
 import Chart from 'chart.js/auto'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default {
   name: 'ResourceManagement',
@@ -308,7 +325,8 @@ export default {
     Plus,
     Search,
     Setting,
-    DataAnalysis
+    DataAnalysis,
+    Download
   },
   setup() {
     const { success, error } = useSnackbar()
@@ -912,16 +930,31 @@ export default {
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         
         // 예약 데이터 변환 (date, startTime, endTime 추가)
+        const now = new Date()
         this.allReservations = list.map(item => {
           const startDateTime = new Date(item.startDateTime)
           const endDateTime = new Date(item.endDateTime)
+          
+          // 상태 업데이트: 예약 종료 시간이 지난 경우 USED로 처리
+          let status = item.status
+          if (now > endDateTime) {
+            // 종료 시간이 지났으면 USED (사용 완료)로 처리
+            if (status === 'BEFORE' || status === 'IN_USE') {
+              status = 'USED'
+            }
+          } else if (now >= startDateTime && now <= endDateTime) {
+            // 현재 시간이 예약 시간 내에 있으면 IN_USE로 처리
+            if (status === 'BEFORE') {
+              status = 'IN_USE'
+            }
+          }
           
           return {
             id: item.id,
             reservationTypeId: item.reservationTypeId,
             memberId: item.memberId,
             companyId: item.companyId,
-            status: item.status,
+            status: status,
             startDateTime: item.startDateTime,
             endDateTime: item.endDateTime,
             date: startDateTime.toISOString().split('T')[0],
@@ -953,9 +986,39 @@ export default {
       // 총 예약 수
       const totalReservations = reservations.length
       
-      // 이용률 계산 (USED 상태의 예약 비율)
-      const usedReservations = reservations.filter(r => r.status === 'USED').length
+      // 이용률 계산
+      // 종료 시간이 지난 예약 중 취소되지 않은 것들을 이용 완료로 간주
+      // 또는 USED + IN_USE 상태의 예약을 이용 중인 것으로 간주
+      const now = new Date()
+      let usedReservations = 0
+      
+      reservations.forEach(r => {
+        const endDateTime = new Date(r.endDateTime)
+        // 종료 시간이 지난 예약은 USED로 간주
+        if (now > endDateTime) {
+          // 취소되지 않았고 종료 시간이 지났으면 이용 완료
+          if (r.status !== 'CANCELLED' && r.status !== 'CANCEL') {
+            usedReservations++
+          }
+        } else {
+          // 종료 시간이 아직 지나지 않았지만, USED나 IN_USE 상태면 이용 중/완료로 간주
+          if (r.status === 'USED' || r.status === 'IN_USE') {
+            usedReservations++
+          }
+        }
+      })
+      
       const usageRate = totalReservations > 0 ? Math.round((usedReservations / totalReservations) * 100) : 0
+      
+      // 디버깅: 상태별 통계 출력
+      if (process.env.NODE_ENV === 'development') {
+        const statusCounts = {}
+        reservations.forEach(r => {
+          statusCounts[r.status] = (statusCounts[r.status] || 0) + 1
+        })
+        console.log('예약 상태별 통계:', statusCounts)
+        console.log('이용 완료 예약 수:', usedReservations, '/ 전체:', totalReservations)
+      }
       
       // No Show 계산 (BEFORE 상태의 예약 수)
       const noShow = reservations.filter(r => r.status === 'BEFORE').length
@@ -1176,6 +1239,351 @@ export default {
           borderColor: backgroundColor.map(color => color.replace('0.8', '1')),
           borderWidth: 2
         }]
+      }
+    },
+    
+    // PDF 내보내기
+    async exportToPDF() {
+      try {
+        this.success('PDF 생성 중입니다...')
+        
+        // 모달이 열려있지 않거나 차트가 생성되지 않은 경우, 차트 생성
+        if (!this.showStatistics || !this.monthlyChartInstance || !this.resourceChartInstance) {
+          // 차트 데이터가 없으면 로드
+          if (this.allReservations.length === 0) {
+            await this.loadAllReservationsForStatistics()
+            this.calculateStatistics()
+          }
+          
+          // 차트 생성 대기
+          await this.$nextTick()
+          if (!this.monthlyChartInstance && this.$refs.monthlyChart) {
+            this.createMonthlyChart()
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
+          if (!this.resourceChartInstance && this.$refs.resourceChart) {
+            this.createResourceChart()
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
+        }
+        
+        // PDF 생성 (A4 크기: 210mm x 297mm)
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = 210
+        const pdfHeight = 297
+        const margin = 15
+        const contentWidth = pdfWidth - (margin * 2)
+        let yPos = margin
+        
+        // 한글 텍스트를 포함한 HTML 요소 생성
+        const today = new Date()
+        const dateStr = today.toLocaleDateString('ko-KR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+        
+        // 헤더 부분 HTML 생성
+        const headerHtml = `
+          <div style="width: ${contentWidth}mm; padding: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+            <h1 style="font-size: 22px; font-weight: bold; text-align: center; margin: 0 0 8px 0; color: #2c3e50; font-family: inherit;">자원 이용 통계</h1>
+            <p style="font-size: 12px; text-align: center; margin: 0; color: #808080; font-family: inherit;">생성일: ${dateStr}</p>
+          </div>
+        `
+        
+        // HTML 요소 생성 및 캡처
+        const headerElement = document.createElement('div')
+        headerElement.style.position = 'absolute'
+        headerElement.style.left = '-9999px'
+        headerElement.style.width = `${contentWidth}mm`
+        headerElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+        headerElement.innerHTML = headerHtml
+        document.body.appendChild(headerElement)
+        
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        const headerCanvas = await html2canvas(headerElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false,
+          useCORS: true,
+          allowTaint: false,
+          width: headerElement.scrollWidth,
+          height: headerElement.scrollHeight,
+          fontEmbedCSS: true
+        })
+        
+        const headerImgData = headerCanvas.toDataURL('image/png', 1.0)
+        const headerHeight = (headerCanvas.height / headerCanvas.width) * contentWidth
+        pdf.addImage(headerImgData, 'PNG', margin, yPos, contentWidth, headerHeight)
+        yPos += headerHeight + 4
+        
+        document.body.removeChild(headerElement)
+        
+        // PDF용 개선된 통계 요약 HTML 생성 (한 줄에 2개씩, 작은 크기)
+        const statsHtml = `
+          <div style="width: ${contentWidth}mm; padding: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+            <h3 style="font-size: 16px; font-weight: bold; margin: 0 0 12px 0; color: #2c3e50; font-family: inherit; display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 18px;">📊</span>
+              통계 요약
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: 10px; border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">📈</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">이용률</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #409eff; margin-bottom: 4px;">${this.statistics.usageRate}%</div>
+                <div style="font-size: 10px; color: #909399;">실제 이용된 예약 비율</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: 10px; border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">🕐</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">Peak Time</div>
+                </div>
+                <div style="font-size: 18px; font-weight: 700; color: #67c23a; margin-bottom: 4px;">${this.statistics.peakTime || '데이터 없음'}</div>
+                <div style="font-size: 10px; color: #909399;">가장 많이 예약된 시간대</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: 10px; border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">⚠️</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">No Show</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #e6a23c; margin-bottom: 4px;">${this.statistics.noShow}건</div>
+                <div style="font-size: 10px; color: #909399;">예약 후 미사용 건수</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: 10px; border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">📄</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">총 예약</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #909399; margin-bottom: 4px;">${this.statistics.totalReservations}건</div>
+                <div style="font-size: 10px; color: #909399;">전체 예약 건수</div>
+              </div>
+            </div>
+          </div>
+        `
+        
+        const statsElement = document.createElement('div')
+        statsElement.style.position = 'absolute'
+        statsElement.style.left = '-9999px'
+        statsElement.style.width = `${contentWidth}mm`
+        statsElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+        statsElement.innerHTML = statsHtml
+        document.body.appendChild(statsElement)
+        
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        const statsCanvas = await html2canvas(statsElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false,
+          useCORS: true,
+          allowTaint: false,
+          fontEmbedCSS: true
+        })
+        
+        const statsImgData = statsCanvas.toDataURL('image/png', 1.0)
+        const statsHeight = (statsCanvas.height / statsCanvas.width) * contentWidth
+        
+        document.body.removeChild(statsElement)
+        
+        // 페이지 넘김 확인
+        if (yPos + statsHeight > pdfHeight - margin) {
+          pdf.addPage()
+          yPos = margin
+        }
+        
+        pdf.addImage(statsImgData, 'PNG', margin, yPos, contentWidth, statsHeight)
+        yPos += statsHeight + 8
+        
+        // 월별 이용 현황 차트
+        const monthlyChartElement = this.$refs.monthlyChart
+        if (!monthlyChartElement) {
+          console.warn('월별 차트 요소를 찾을 수 없습니다.')
+        } else {
+          try {
+            // 차트가 렌더링될 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // 다음 페이지로 넘어갈 수 있는지 확인
+            if (yPos + 70 > pdfHeight - margin) {
+              pdf.addPage()
+              yPos = margin
+            }
+            
+            // 차트 제목
+            const chartTitleHtml = `
+              <div style="width: ${contentWidth}mm; padding: 8px 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+                <h4 style="font-size: 14px; font-weight: bold; margin: 0; color: #2c3e50; font-family: inherit;">월별 이용 현황</h4>
+              </div>
+            `
+            const titleElement = document.createElement('div')
+            titleElement.style.position = 'absolute'
+            titleElement.style.left = '-9999px'
+            titleElement.style.width = `${contentWidth}mm`
+            titleElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+            titleElement.innerHTML = chartTitleHtml
+            document.body.appendChild(titleElement)
+            
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            const titleCanvas = await html2canvas(titleElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: false,
+              fontEmbedCSS: true
+            })
+            
+            const titleImgData = titleCanvas.toDataURL('image/png', 1.0)
+            const titleHeight = (titleCanvas.height / titleCanvas.width) * contentWidth
+            pdf.addImage(titleImgData, 'PNG', margin, yPos, contentWidth, titleHeight)
+            yPos += titleHeight + 2
+            
+            document.body.removeChild(titleElement)
+            
+            // 차트 캡처
+            const monthlyCanvas = await html2canvas(monthlyChartElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: true,
+              fontEmbedCSS: true
+            })
+            
+            if (!monthlyCanvas || monthlyCanvas.width === 0 || monthlyCanvas.height === 0) {
+              console.warn('월별 차트 캡처 실패: 캔버스가 비어있습니다.')
+            } else {
+              const monthlyImgData = monthlyCanvas.toDataURL('image/png', 1.0)
+              
+              // 차트 크기를 줄여서 한 페이지에 맞춤 (높이 제한)
+              const chartAspectRatio = monthlyCanvas.height / monthlyCanvas.width
+              const maxChartHeight = pdfHeight - yPos - 78
+              const chartWidth = contentWidth
+              let chartHeight = chartWidth * chartAspectRatio
+              
+              // 월별 차트는 최대 70mm로 제한 (크기 증가)
+              const maxMonthlyChartHeight = 70
+              
+              if (chartHeight > maxMonthlyChartHeight) {
+                chartHeight = maxMonthlyChartHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(monthlyImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else if (chartHeight > maxChartHeight) {
+                chartHeight = maxChartHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(monthlyImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else {
+                pdf.addImage(monthlyImgData, 'PNG', margin, yPos, chartWidth, chartHeight)
+              }
+              
+              yPos += chartHeight + 6
+            }
+          } catch (error) {
+            console.error('월별 차트 캡처 오류:', error)
+          }
+        }
+        
+        // 카테고리별 이용률 차트
+        const resourceChartElement = this.$refs.resourceChart
+        if (!resourceChartElement) {
+          console.warn('카테고리별 차트 요소를 찾을 수 없습니다.')
+        } else {
+          try {
+            // 차트가 렌더링될 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // 다음 페이지로 넘어갈 수 있는지 확인
+            if (yPos + 70 > pdfHeight - margin) {
+              pdf.addPage()
+              yPos = margin
+            }
+            
+            // 차트 제목
+            const chartTitle2Html = `
+              <div style="width: ${contentWidth}mm; padding: 8px 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+                <h4 style="font-size: 14px; font-weight: bold; margin: 0; color: #2c3e50; font-family: inherit;">카테고리별 이용률</h4>
+              </div>
+            `
+            const title2Element = document.createElement('div')
+            title2Element.style.position = 'absolute'
+            title2Element.style.left = '-9999px'
+            title2Element.style.width = `${contentWidth}mm`
+            title2Element.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+            title2Element.innerHTML = chartTitle2Html
+            document.body.appendChild(title2Element)
+            
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            const title2Canvas = await html2canvas(title2Element, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: false,
+              fontEmbedCSS: true
+            })
+            
+            const title2ImgData = title2Canvas.toDataURL('image/png', 1.0)
+            const title2Height = (title2Canvas.height / title2Canvas.width) * contentWidth
+            pdf.addImage(title2ImgData, 'PNG', margin, yPos, contentWidth, title2Height)
+            yPos += title2Height + 2
+            
+            document.body.removeChild(title2Element)
+            
+            // 차트 캡처
+            const resourceCanvas = await html2canvas(resourceChartElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: true,
+              fontEmbedCSS: true
+            })
+            
+            if (!resourceCanvas || resourceCanvas.width === 0 || resourceCanvas.height === 0) {
+              console.warn('카테고리별 차트 캡처 실패: 캔버스가 비어있습니다.')
+            } else {
+              const resourceImgData = resourceCanvas.toDataURL('image/png', 1.0)
+              
+              // 차트 크기를 줄여서 한 페이지에 맞춤
+              const chartAspectRatio = resourceCanvas.height / resourceCanvas.width
+              const maxChartHeight = pdfHeight - yPos - margin
+              const maxResourceChartHeight = 60
+              const chartWidth = contentWidth
+              let chartHeight = chartWidth * chartAspectRatio
+              
+              const finalMaxHeight = Math.min(maxChartHeight, maxResourceChartHeight)
+              
+              if (chartHeight > finalMaxHeight) {
+                chartHeight = finalMaxHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(resourceImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else {
+                pdf.addImage(resourceImgData, 'PNG', margin, yPos, chartWidth, chartHeight)
+              }
+            }
+          } catch (error) {
+            console.error('카테고리별 차트 캡처 오류:', error)
+          }
+        }
+        
+        // 파일명 생성 (날짜 포함)
+        const fileName = `자원이용통계_${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}.pdf`
+        
+        // PDF 다운로드
+        pdf.save(fileName)
+        
+        this.success('PDF가 생성되었습니다.')
+      } catch (error) {
+        console.error('PDF 생성 오류:', error)
+        this.error('PDF 생성 중 오류가 발생했습니다.')
       }
     }
   }
@@ -1459,8 +1867,26 @@ export default {
 }
 
 /* 통계 모달 스타일 */
+.statistics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.statistics-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
 .statistics-content {
   padding: 20px 0;
+}
+
+.stats-summary-section {
+  margin-bottom: 30px;
 }
 
 .stats-grid {

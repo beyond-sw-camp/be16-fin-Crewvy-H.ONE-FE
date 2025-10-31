@@ -49,4 +49,16 @@ export default {
       throw error;
     }
   },
+
+  async getMyPermissions() {
+    try {
+      const headers = getAuthHeadersFromToken();
+      if (!headers) throw new Error("Authentication headers not available.");
+      const response = await apiClient.get('/member-service/member/my-permissions', { headers });
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching permissions:", error);
+      throw error;
+    }
+  },
 };

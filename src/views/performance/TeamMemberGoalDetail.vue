@@ -1,95 +1,134 @@
 <template>
   <div class="member-goal-detail-container">
+    <!-- Header Section -->
     <div class="header">
-      <el-page-header @back="goBack"></el-page-header>
-      <h1 class="main-goal-title">{{ goalDetail.title }}</h1>
+      <div class="header-text">
+        <div class="title-row">
+          <h1 class="main-goal-title">{{ goalDetail.title }}</h1>
+          <el-tag :type="getStatusType(goalDetail.status)" effect="dark" class="status-tag">
+            {{ goalDetail.status }}
+          </el-tag>
+        </div>
+        <p class="goal-meta">
+          <el-icon><Calendar /></el-icon>
+          <span>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</span>
+        </p>
+      </div>
+      <div class="header-actions">
+        <el-button @click="goBack" class="back-button" :icon="ArrowLeft">
+          목록으로
+        </el-button>
+      </div>
     </div>
 
-    <div class="goal-details">
-      <el-card>
-        <div class="detail-item description-item">
-          <label>목표 설명</label>
-          <p>{{ goalDetail.contents }}</p>
+    <!-- Goal Details Card -->
+    <el-card class="details-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <el-icon class="section-icon"><Document /></el-icon>
+          <span class="section-title">목표 정보</span>
         </div>
-        <div class="detail-item" v-if="goalDetail.memberName">
-          <label>담당자</label>
-          <p>{{ goalDetail.memberName }} ({{ goalDetail.memberOrganization }} / {{ goalDetail.memberPostion }})</p>
-        </div>
-        <div class="detail-item">
-          <label>기간</label>
-          <p>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</p>
-        </div>
-        <div class="detail-item">
-          <label>상태</label>
-          <p><el-tag :type="getStatusType(goalDetail.status)" effect="dark">{{ goalDetail.status }}</el-tag></p>
-        </div>
-      </el-card>
-    </div>
+      </template>
+      <div class="detail-item description-item">
+        <label><el-icon><Edit /></el-icon> 목표 설명</label>
+        <p>{{ goalDetail.contents }}</p>
+      </div>
+      <div class="detail-item" v-if="goalDetail.memberName">
+        <label><el-icon><User /></el-icon> 담당자</label>
+        <p>{{ goalDetail.memberName }} ({{ goalDetail.memberOrganization }} / {{ goalDetail.memberPostion }})</p>
+      </div>
+      <div class="detail-item">
+        <label><el-icon><Calendar /></el-icon> 기간</label>
+        <p>{{ goalDetail.startDate }} ~ {{ goalDetail.endDate }}</p>
+      </div>
+    </el-card>
 
-    <el-card class="card-section" v-if="goalDetail.gradingSystem && Object.keys(goalDetail.gradingSystem).length">
+    <!-- Scoring Rubric Card -->
+    <el-card class="card-section" shadow="never" v-if="goalDetail.gradingSystem && Object.keys(goalDetail.gradingSystem).length">
         <template #header>
-            <span>점수 체계</span>
+          <div class="card-header">
+            <el-icon class="section-icon"><Medal /></el-icon>
+            <span class="section-title">점수 체계</span>
+          </div>
         </template>
         <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
-            <span class="rubric-grade">{{ item.grade }}</span>
+            <el-tag class="rubric-grade" effect="dark">{{ item.grade }}</el-tag>
             <p class="rubric-description">{{ item.description }}</p>
         </div>
     </el-card>
 
-    <el-divider></el-divider>
+    <!-- Evidence Section -->
+    <el-card class="evidence-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <el-icon class="section-icon"><Folder /></el-icon>
+          <span class="section-title">증적 자료</span>
+        </div>
+      </template>
+      <el-upload
+          class="upload-demo"
+          :file-list="fileList"
+          :on-preview="handleFilePreview"
+          disabled
+      >
+      </el-upload>
+      <div v-if="!fileList || fileList.length === 0" class="empty-evidence">
+        <el-icon class="empty-icon"><FolderOpened /></el-icon>
+        <p>업로드된 증적 자료가 없습니다.</p>
+      </div>
+    </el-card>
 
-    <div class="evidence-section">
-        <el-card>
-            <h3>증적 자료</h3>
-            <el-upload
-                class="upload-demo"
-                :file-list="fileList"
-                :on-preview="handleFilePreview"
-                disabled
-            >
-            </el-upload>
-            <div v-if="!fileList || fileList.length === 0">
-              <p>업로드된 증적 자료가 없습니다.</p>
-            </div>
-        </el-card>
-    </div>
-
-    <el-divider v-if="isReviewMode"></el-divider>
-
+    <!-- Evaluation Result Section -->
     <div class="evaluation-result-section" v-if="isReviewMode">
-      <h2>평가 결과</h2>
-      <el-card class="evaluation-card">
-        <h3>본인 평가</h3>
-        <div class="detail-item">
-          <label>평가 등급</label>
-          <p>{{ goalDetail.selfEvaluation.grade || 'N/A' }}</p>
-        </div>
-        <div class="detail-item">
-          <label>평가 코멘트</label>
-          <p>{{ goalDetail.selfEvaluation.comment || 'N/A' }}</p>
-        </div>
-      </el-card>
+      <div class="section-header">
+        <el-icon class="section-icon"><Checked /></el-icon>
+        <h2 class="section-title">평가 결과</h2>
+      </div>
+      
+      <div class="evaluation-cards-grid">
+        <el-card class="evaluation-card" shadow="never">
+          <template #header>
+            <div class="eval-card-header">
+              <el-icon class="eval-icon self"><User /></el-icon>
+              <span class="eval-title">본인 평가</span>
+            </div>
+          </template>
+          <div class="detail-item">
+            <label>평가 등급</label>
+            <p class="grade-text">{{ goalDetail.selfEvaluation.grade || 'N/A' }}</p>
+          </div>
+          <div class="detail-item">
+            <label>평가 코멘트</label>
+            <p>{{ goalDetail.selfEvaluation.comment || 'N/A' }}</p>
+          </div>
+        </el-card>
 
-      <el-card class="evaluation-card">
-        <h3>관리자 평가</h3>
-        <div class="detail-item">
-          <label>평가 등급</label>
-          <p>{{ goalDetail.managerEvaluation.grade || 'N/A' }}</p>
-        </div>
-        <div class="detail-item">
-          <label>평가 코멘트</label>
-          <p>{{ goalDetail.managerEvaluation.comment || 'N/A' }}</p>
-        </div>
-      </el-card>
+        <el-card class="evaluation-card" shadow="never">
+          <template #header>
+            <div class="eval-card-header">
+              <el-icon class="eval-icon manager"><UserFilled /></el-icon>
+              <span class="eval-title">관리자 평가</span>
+            </div>
+          </template>
+          <div class="detail-item">
+            <label>평가 등급</label>
+            <p class="grade-text">{{ goalDetail.managerEvaluation.grade || 'N/A' }}</p>
+          </div>
+          <div class="detail-item">
+            <label>평가 코멘트</label>
+            <p>{{ goalDetail.managerEvaluation.comment || 'N/A' }}</p>
+          </div>
+        </el-card>
+      </div>
     </div>
 
-    <div class="actions-container">
+    <div class="actions-container" v-if="isReviewMode || (isManagerForGoal && goalDetail.status === '요청')">
       <template v-if="isReviewMode">
         <el-button type="primary" @click="openEvaluateDialog" :disabled="goalDetail.status !== '본인 평가 완료' || goalDetail.managerEvaluation.grade !== ''">관리자 평가</el-button>
       </template>
       <template v-else>
-        <el-button type="success" @click="handleApprove" :disabled="goalDetail.status !== '요청' || !isManagerForGoal">승인</el-button>
-        <el-button type="danger" @click="rejectDialogVisible = true" :disabled="goalDetail.status !== '요청' || !isManagerForGoal">반려</el-button>
+        <el-button type="success" @click="handleApprove">승인</el-button>
+        <el-button type="danger" @click="rejectDialogVisible = true">반려</el-button>
       </template>
     </div>
 
@@ -135,14 +174,35 @@
 
 <script>
 import apiClient from '@/api/http';
-
+import {
+  ArrowLeft,
+  Document,
+  Edit,
+  User,
+  Calendar,
+  Medal,
+  Folder,
+  FolderOpened,
+  Checked,
+  UserFilled
+} from '@element-plus/icons-vue';
 
 export default {
   name: 'TeamMemberGoalDetail',
   components: {
+    Document,
+    Edit,
+    User,
+    Calendar,
+    Medal,
+    Folder,
+    FolderOpened,
+    Checked,
+    UserFilled
   },
   data() {
     return {
+      ArrowLeft,
       goalDetail: { 
         title: '',
         contents: '',
@@ -181,7 +241,8 @@ export default {
   },
   methods: {
     goBack() {
-      this.$router.go(-1);
+      const teamGoalId = this.$route.params.goalId;
+      this.$router.push(`/performance/team-goal/${teamGoalId}`);
     },
     async fetchGoalDetail() {
       const memberGoalId = this.$route.params.memberGoalId;
@@ -247,13 +308,14 @@ export default {
       }
     },
     getStatusType(status) {
-      if (status === '승인') return 'success';
-      if (status === '반려') return 'danger';
-      if (status === '요청') return 'warning';
-      if (status === '취소') return 'info';
-      if (status === '평가 대기') return 'info';
-      if (status === '본인 평가 완료') return 'success';
-      if (status === '최종 평가 완료') return 'success';
+      // 개인 목표 상태 (한국어)
+      if (status === '요청') return 'warning';            // 🟡 요청 - 주황색
+      if (status === '승인') return 'primary';            // 🔵 승인 - 파란색
+      if (status === '반려') return 'danger';             // 🔴 반려 - 빨간색
+      if (status === '취소') return 'info';               // ⚪ 취소 - 회색
+      if (status === '평가 대기') return 'warning';       // 🟡 평가 대기 - 주황색 (요청과 동일)
+      if (status === '본인 평가 완료') return 'success';  // 🟢 본인 평가 완료 - 초록색
+      if (status === '최종 평가 완료') return 'success';  // 🟢 최종 평가 완료 - 초록색 (본인 평가와 동일)
       return '';
     },
     handleFilePreview(file) {
@@ -374,34 +436,107 @@ export default {
   },
   created() {
     this.myMemberPositionId = localStorage.getItem('memberPositionId'); // Added this
-    this.isReviewMode = this.$route.query.mode === 'review'; // Set based on query param
+    this.isReviewMode = this.$route.query.mode === 'review' || this.$route.query.mode === 'complete'; // Set based on query param
     this.fetchGoalDetail();
   },
 };
 </script>
 
 <style scoped>
+/* Container */
 .member-goal-detail-container {
-  padding: 16px;
+  padding: 32px;
+  background: #f5f7fa;
+  min-height: 100vh;
 }
 
+/* Header Section */
 .header {
-  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.header-text {
+  flex: 1;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .main-goal-title {
-  font-size: 28px;
-  font-weight: 600;
-  margin-top: 8px;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0;
+  color: #303133;
 }
 
-.goal-details .el-card,
-.evidence-section .el-card {
+.goal-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: #909399;
+  margin: 0;
+  font-weight: 400;
+}
+
+.goal-meta .el-icon {
+  font-size: 18px;
+  color: #667eea;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-button {
   border-radius: 8px;
+  font-weight: 500;
+}
+
+.status-tag {
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* Card Headers */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.section-icon {
+  font-size: 24px;
+  color: #667eea;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Details Card */
+.details-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: none;
 }
 
 .detail-item {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .detail-item:last-child {
@@ -409,82 +544,200 @@ export default {
 }
 
 .description-item p {
-    min-height: 50px;
+  min-height: 60px;
 }
 
 .detail-item label {
   font-weight: 600;
-  color: #606266;
+  color: #909399;
   font-size: 14px;
-  display: block;
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.detail-item label .el-icon {
+  font-size: 16px;
 }
 
 .detail-item p {
   margin: 0;
   font-size: 16px;
+  color: #606266;
+  line-height: 1.6;
 }
 
-.evidence-section {
-  margin-top: 24px;
-}
-
-.evidence-section h3 {
-  margin-bottom: 16px;
-}
-
-.actions-container {
-    margin-top: 24px;
-    display: flex;
-    justify-content: flex-end;
-}
-
+/* Scoring Rubric */
 .card-section {
-    margin-bottom: 24px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: none;
 }
 
 .rubric-item {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  gap: 16px;
 }
 
 .rubric-item:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .rubric-grade {
-  width: 50px;
+  min-width: 60px;
   text-align: center;
-  font-weight: 600;
-  margin-right: 16px;
-  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 16px;
 }
 
 .rubric-description {
   flex-grow: 1;
   margin: 0;
-  padding: 8px 12px;
-  border: 1px solid #DCDFE6;
-  border-radius: 4px;
-  background-color: #F5F7FA;
-  min-height: 40px;
+  padding: 12px 16px;
+  border: 2px solid #e4e7ed;
+  border-radius: 10px;
+  background-color: #f8f9fc;
+  min-height: 48px;
   display: flex;
   align-items: center;
   word-break: break-word;
+  font-size: 15px;
+  color: #606266;
+}
+
+/* Evidence Card */
+.evidence-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: none;
+}
+
+.empty-evidence {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #dcdfe6;
+  margin-bottom: 12px;
+}
+
+.empty-evidence p {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* Evaluation Section */
+.evaluation-result-section {
+  margin-bottom: 32px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.section-header .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0;
+}
+
+.evaluation-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
 }
 
 .evaluation-card {
-  margin-bottom: 16px;
-}
-.evaluation-card:last-child {
-  margin-bottom: 0;
+  border-radius: 16px;
+  border: none;
 }
 
-.evaluation-card {
-  margin-bottom: 16px;
+.eval-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.evaluation-card:last-child {
-  margin-bottom: 0;
+
+.eval-icon {
+  font-size: 28px;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.eval-icon.self {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.1);
+}
+
+.eval-icon.manager {
+  color: #e6a23c;
+  background: rgba(230, 162, 60, 0.1);
+}
+
+.eval-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.grade-text {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: #667eea !important;
+}
+
+/* Actions Container */
+.actions-container {
+  margin-top: 32px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.actions-container .el-button {
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .member-goal-detail-container {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .evaluation-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-container {
+    flex-direction: column;
+  }
+
+  .actions-container .el-button {
+    width: 100%;
+  }
 }
 </style>
