@@ -1,18 +1,26 @@
 <template>
   <div class="rule-block">
     <el-form-item label="허용 근무지">
+      <div class="select-actions">
+        <el-button size="small" @click="selectAll" :disabled="workLocations.length === 0">전체 선택</el-button>
+        <el-button size="small" @click="clearAll">전체 해제</el-button>
+      </div>
       <el-select
-        v-model="rule.allowedWorkLocationIds"
+        v-model="localSelectedIds"
         multiple
+        collapse-tags
+        collapse-tags-tooltip
+        clearable
         placeholder="근무지를 선택하세요"
         style="width: 100%;"
         :loading="loading"
+        @change="handleSelectionChange"
       >
         <el-option
           v-for="location in workLocations"
-          :key="location.id"
+          :key="location.workLocationId"
           :label="location.name"
-          :value="location.id"
+          :value="location.workLocationId"
         >
           <div class="location-option">
             <span class="location-name">{{ location.name }}</span>
@@ -43,7 +51,7 @@
       <div class="location-cards">
         <el-card
           v-for="location in selectedLocations"
-          :key="location.id"
+          :key="location.workLocationId"
           class="location-card"
           shadow="hover"
         >
@@ -53,7 +61,7 @@
               type="danger"
               size="small"
               text
-              @click="removeLocation(location.id)"
+              @click="removeLocation(location.workLocationId)"
             >
               <el-icon><CloseBold /></el-icon>
             </el-button>
@@ -91,7 +99,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch} from 'vue';
 import { getActiveWorkLocations } from '@/api/attendance';
 import { ElMessage } from 'element-plus';
 import { CloseBold, LocationFilled, Position, Connection } from '@element-plus/icons-vue';
@@ -114,6 +122,7 @@ export default {
   setup(props, { emit }) {
     const loading = ref(false);
     const workLocations = ref([]);
+    const localSelectedIds = ref([]);
 
     const rule = computed({
       get: () => props.modelValue,
@@ -122,11 +131,11 @@ export default {
 
     // 선택된 근무지 정보
     const selectedLocations = computed(() => {
-      if (!rule.value.allowedWorkLocationIds || rule.value.allowedWorkLocationIds.length === 0) {
+      if (!Array.isArray(rule.value.allowedWorkLocationIds) || rule.value.allowedWorkLocationIds.length === 0) {
         return [];
       }
       return workLocations.value.filter(loc =>
-        rule.value.allowedWorkLocationIds.includes(loc.id)
+        rule.value.allowedWorkLocationIds.includes(loc.workLocationId)
       );
     });
 
@@ -143,31 +152,64 @@ export default {
       }
     };
 
+    // 전체 선택
+    const selectAll = () => {
+      const updatedIds = workLocations.value.map(loc => loc.workLocationId);
+      emit('update:modelValue', { ...rule.value, allowedWorkLocationIds: updatedIds });
+      ElMessage.success(`모든 근무지(${workLocations.value.length}곳)가 선택되었습니다.`);
+    };
+
+    // 전체 해제
+    const clearAll = () => {
+      emit('update:modelValue', { ...rule.value, allowedWorkLocationIds: [] });
+      ElMessage.info('모든 근무지 선택이 해제되었습니다.');
+    };
+
     // 근무지 제거
     const removeLocation = (locationId) => {
-      rule.value.allowedWorkLocationIds = rule.value.allowedWorkLocationIds.filter(
-        id => id !== locationId
-      );
+      const updatedIds = rule.value.allowedWorkLocationIds.filter(id => id !== locationId);
+      emit('update:modelValue', { ...rule.value, allowedWorkLocationIds: updatedIds });
+    };
+    // el-select 변경 핸들러
+    const handleSelectionChange = (selectedIds) => {
+      emit('update:modelValue', { ...rule.value, allowedWorkLocationIds: selectedIds });
     };
 
     // 초기화: 기본값 설정
     onMounted(async () => {
+      // 기본값 설정
+      const updates = {};
       if (!rule.value.allowedWorkLocationIds) {
-        rule.value.allowedWorkLocationIds = [];
+        updates.allowedWorkLocationIds = [];
       }
       if (!rule.value.requiredAuthTypes) {
-        rule.value.requiredAuthTypes = ['GPS']; // 기본값: GPS
+        updates.requiredAuthTypes = ['GPS']; // 기본값: GPS
+      }
+      if (Object.keys(updates).length > 0) {
+        emit('update:modelValue', { ...rule.value, ...updates });
       }
 
       await fetchWorkLocations();
     });
+    // props.modelValue 변경 감지하여 localSelectedIds 동기화
+    watch(() => props.modelValue?.allowedWorkLocationIds, (newIds) => {
+      if (Array.isArray(newIds)) {
+        localSelectedIds.value = [...newIds];
+      } else {
+        localSelectedIds.value = [];
+      }
+    }, { immediate: true, deep: true });
 
     return {
       loading,
       workLocations,
       rule,
       selectedLocations,
-      removeLocation
+      selectAll,
+      clearAll,
+      removeLocation,
+      localSelectedIds,
+      handleSelectionChange,
     };
   }
 };
@@ -179,6 +221,12 @@ export default {
   border: 1px solid #e4e7ed;
   border-radius: 4px;
   margin-top: 10px;
+}
+
+.select-actions {
+  margin-bottom: 10px;
+  display: flex;
+  gap: 8px;
 }
 
 .form-help-text {

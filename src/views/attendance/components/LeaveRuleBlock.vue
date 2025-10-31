@@ -17,14 +17,27 @@
         <span class="form-description">법정 최대: 11일</span>
       </el-form-item>
       <el-form-item label="최소 신청 단위">
-        <el-select v-model="rule.minimumRequestUnit" placeholder="선택">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
           <el-option label="일" value="DAY"></el-option>
           <el-option label="반차" value="HALF_DAY"></el-option>
           <el-option label="시간" value="HOUR"></el-option>
         </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+          (예: 반차 선택 시 → 반차, 일 단위 신청 가능)
+        </span>
       </el-form-item>
       <el-form-item label="신청 마감일 (N일 전)">
         <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
       </el-form-item>
     </div>
 
@@ -37,9 +50,28 @@
       <el-form-item label="신청 마감일 (N일 전)">
         <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
       </el-form-item>
+      <el-form-item label="최소 신청 단위">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
+          <el-option label="일" value="DAY"></el-option>
+          <el-option label="반차" value="HALF_DAY"></el-option>
+          <el-option label="시간" value="HOUR"></el-option>
+        </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+        </span>
+      </el-form-item>
       <el-form-item label="최대 분할 횟수">
         <el-input-number v-model="rule.maxSplitCount" :min="1" :max="2" />
         <span class="form-description">출산 전/후 분할 (최대 2회)</span>
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
       </el-form-item>
     </div>
 
@@ -53,9 +85,32 @@
         <el-input-number v-model="rule.maxDaysFromEventDate" :min="0" />
         <span class="form-description">권장: 90일 이내</span>
       </el-form-item>
+      <el-form-item label="신청 마감일 (N일 전)">
+        <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
+        <span class="form-description">휴가 시작일로부터 며칠 전까지 신청해야 하는지</span>
+      </el-form-item>
+      <el-form-item label="최소 신청 단위">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
+          <el-option label="일" value="DAY"></el-option>
+          <el-option label="반차" value="HALF_DAY"></el-option>
+          <el-option label="시간" value="HOUR"></el-option>
+        </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+        </span>
+      </el-form-item>
       <el-form-item label="최대 분할 횟수">
         <el-input-number v-model="rule.maxSplitCount" :min="1" :max="2" />
         <span class="form-description">최대 2회 분할 가능</span>
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
       </el-form-item>
     </div>
 
@@ -72,6 +127,29 @@
         <el-input-number v-model="rule.minConsecutiveDays" :min="1" />
         <span class="form-description">권장: 30일</span>
       </el-form-item>
+      <el-form-item label="신청 마감일 (N일 전)">
+        <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
+        <span class="form-description">휴가 시작일로부터 며칠 전까지 신청해야 하는지 (육아휴직은 장기 휴직이므로 사전 계획 권장)</span>
+      </el-form-item>
+      <el-form-item label="최소 신청 단위">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
+          <el-option label="일" value="DAY"></el-option>
+          <el-option label="반차" value="HALF_DAY"></el-option>
+          <el-option label="시간" value="HOUR"></el-option>
+        </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+        </span>
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
+      </el-form-item>
     </div>
 
     <!-- 5. 가족돌봄휴가 (PTC005) -->
@@ -80,6 +158,38 @@
         <el-input-number v-model="rule.defaultDays" :min="1" :max="10" />
         <span class="form-description">법정: 연간 최대 10일</span>
       </el-form-item>
+      <el-divider content-position="left">사용 제한 설정 (법정 필수)</el-divider>
+      <el-form-item label="사용 제한 주기">
+        <el-input value="연간" disabled />
+        <span class="form-description">가족돌봄휴가는 연간 단위로 제한됩니다</span>
+      </el-form-item>
+      <el-form-item label="연간 최대 사용 일수" required>
+        <el-input-number v-model="rule.maxDaysPerPeriod" :min="1" :max="10" />
+        <span class="form-description">법정: 연간 최대 10일 (부여 일수와 동일하게 설정 권장)</span>
+      </el-form-item>
+      <el-form-item label="신청 마감일 (N일 전)">
+        <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
+        <span class="form-description">휴가 시작일로부터 며칠 전까지 신청해야 하는지</span>
+      </el-form-item>
+      <el-form-item label="최소 신청 단위">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
+          <el-option label="일" value="DAY"></el-option>
+          <el-option label="반차" value="HALF_DAY"></el-option>
+          <el-option label="시간" value="HOUR"></el-option>
+        </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+        </span>
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
+      </el-form-item>
     </div>
 
     <!-- 6. 생리휴가 (PTC006) -->
@@ -87,6 +197,38 @@
       <el-form-item label="월간 부여 일수" required>
         <el-input-number v-model="rule.defaultDays" :min="1" :max="3" />
         <span class="form-description">법정: 월 1일</span>
+      </el-form-item>
+      <el-divider content-position="left">사용 제한 설정 (법정 필수)</el-divider>
+      <el-form-item label="사용 제한 주기">
+        <el-input value="월간" disabled />
+        <span class="form-description">생리휴가는 월 단위로 제한됩니다</span>
+      </el-form-item>
+      <el-form-item label="월간 최대 사용 일수" required>
+        <el-input-number v-model="rule.maxDaysPerPeriod" :min="1" :max="3" />
+        <span class="form-description">법정: 월 1일 (부여 일수와 동일하게 설정 권장)</span>
+      </el-form-item>
+      <el-form-item label="신청 마감일 (N일 전)">
+        <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
+        <span class="form-description">휴가 시작일로부터 며칠 전까지 신청해야 하는지</span>
+      </el-form-item>
+      <el-form-item label="최소 신청 단위">
+        <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
+          <el-option label="일" value="DAY"></el-option>
+          <el-option label="반차" value="HALF_DAY"></el-option>
+          <el-option label="시간" value="HOUR"></el-option>
+        </el-select>
+        <span class="form-description">
+          설정한 최소 단위 이상으로 신청 가능
+        </span>
+      </el-form-item>
+      <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-form-item label="사후 신청 허용">
+        <el-switch v-model="rule.allowRetrospectiveRequest" />
+        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
+      </el-form-item>
+      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
+        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
+        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
       </el-form-item>
     </div>
     
@@ -97,7 +239,7 @@
 </template>
 
 <script>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 
 export default {
   name: 'LeaveRuleBlock',
@@ -112,8 +254,47 @@ export default {
       set: (value) => emit('update:modelValue', value)
     });
 
+    /**
+     * 최소 신청 단위에 따라 allowedRequestUnits 자동 설정
+     * - DAY: 일 단위만
+     * - HALF_DAY: 반차(오전/오후) + 일
+     * - HOUR: 시간 + 반차(오전/오후) + 일 (모두)
+     */
+    const updateAllowedRequestUnits = () => {
+      const minUnit = rule.value.minimumRequestUnit;
+
+      if (minUnit === 'DAY') {
+        rule.value.allowedRequestUnits = ['DAY'];
+      } else if (minUnit === 'HALF_DAY') {
+        rule.value.allowedRequestUnits = ['HALF_DAY_AM', 'HALF_DAY_PM', 'DAY'];
+      } else if (minUnit === 'HOUR') {
+        rule.value.allowedRequestUnits = ['TIME_OFF', 'HALF_DAY_AM', 'HALF_DAY_PM', 'DAY'];
+      } else {
+        // 선택 안 됨 또는 기타
+        rule.value.allowedRequestUnits = null;
+      }
+    };
+
+    /**
+     * 정책 타입에 따라 limitPeriod 자동 설정 (법정 필수)
+     * - PTC005 (가족돌봄휴가): YEARLY
+     * - PTC006 (생리휴가): MONTHLY
+     */
+    watch(
+      () => props.policyTypeCode,
+      (newTypeCode) => {
+        if (newTypeCode === 'PTC005') {
+          rule.value.limitPeriod = 'YEARLY';
+        } else if (newTypeCode === 'PTC006') {
+          rule.value.limitPeriod = 'MONTHLY';
+        }
+      },
+      { immediate: true }
+    );
+
     return {
-      rule
+      rule,
+      updateAllowedRequestUnits
     };
   }
 };
