@@ -14,6 +14,9 @@
               <el-radio-group v-model="requestType" @change="handleRequestTypeChange">
                 <el-radio-button label="leave">휴가</el-radio-button>
                 <el-radio-button label="trip">출장</el-radio-button>
+                <el-radio-button label="overtime">연장근무</el-radio-button>
+                <el-radio-button label="night">야간근무</el-radio-button>
+                <el-radio-button label="holiday">휴일근무</el-radio-button>
               </el-radio-group>
             </el-form-item>
 
@@ -28,14 +31,34 @@
                 <el-option v-for="policy in tripPolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
               </el-select>
             </el-form-item>
+            <el-form-item v-if="requestType === 'overtime'" label="연장근무 정책" prop="policyId" :rules="{ required: true, message: '연장근무 정책을 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="연장근무 정책을 선택하세요">
+                <el-option v-for="policy in overtimePolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item v-if="requestType === 'night'" label="야간근무 정책" prop="policyId" :rules="{ required: true, message: '야간근무 정책을 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="야간근무 정책을 선택하세요">
+                <el-option v-for="policy in nightWorkPolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item v-if="requestType === 'holiday'" label="휴일근무 정책" prop="policyId" :rules="{ required: true, message: '휴일근무 정책을 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="휴일근무 정책을 선택하세요">
+                <el-option v-for="policy in holidayWorkPolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+            </el-form-item>
 
             <el-form-item v-if="requestType === 'leave'" label="신청 단위" prop="requestUnit">
               <el-radio-group v-model="form.requestUnit">
-                <el-radio-button label="DAY">종일</el-radio-button>
-                <el-radio-button label="HALF_DAY_AM">오전 반차</el-radio-button>
-                <el-radio-button label="HALF_DAY_PM">오후 반차</el-radio-button>
-                <el-radio-button label="TIME_OFF">시간 단위</el-radio-button>
+                <el-radio-button label="DAY" :disabled="!isRequestUnitAllowed('DAY')">종일</el-radio-button>
+                <el-radio-button label="HALF_DAY_AM" :disabled="!isRequestUnitAllowed('HALF_DAY_AM')">오전 반차</el-radio-button>
+                <el-radio-button label="HALF_DAY_PM" :disabled="!isRequestUnitAllowed('HALF_DAY_PM')">오후 반차</el-radio-button>
+                <el-radio-button label="TIME_OFF" :disabled="!isRequestUnitAllowed('TIME_OFF')">시간 단위</el-radio-button>
               </el-radio-group>
+              <span v-if="selectedPolicy && selectedPolicy.allowedRequestUnits" class="form-description">
+                * 이 정책은 {{ formatAllowedUnits(selectedPolicy.allowedRequestUnits) }} 신청만 가능합니다.
+              </span>
             </el-form-item>
 
             <el-form-item v-if="form.requestUnit !== 'TIME_OFF'" label="기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
@@ -66,6 +89,17 @@
               <el-select v-model="form.workLocation" placeholder="출장지를 선택하세요">
                 <el-option v-for="loc in workLocations" :key="loc.workLocationId" :label="loc.name" :value="loc.name" />
               </el-select>
+            </el-form-item>
+            <el-form-item v-if="requestType === 'overtime' || requestType === 'night' || requestType === 'holiday'" label="근무 시간" prop="dateTimeRange" :rules="{ required: true, message: '근무 시간을 선택하세요', trigger: 'change' }">
+              <el-date-picker
+                v-model="form.dateTimeRange"
+                type="datetimerange"
+                range-separator="-"
+                start-placeholder="시작 시각"
+                end-placeholder="종료 시각"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+              />
             </el-form-item>
 
             <el-form-item label="사유" prop="reason" :rules="{ required: true, message: '사유를 입력하세요', trigger: 'blur' }">
@@ -124,7 +158,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { createLeaveRequest, getPolicies, getActiveWorkLocations, getMyLeaveRequests } from '@/api/attendance';
+import { createLeaveRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests } from '@/api/attendance';
 import { Refresh } from '@element-plus/icons-vue';
 
 export default {
@@ -154,25 +188,73 @@ export default {
     const pagination = ref({ page: 1, size: 10, total: 0 });
     const tableLoading = ref(false);
 
-    const leavePolicies = computed(() => 
-      allPolicies.value.filter(p => p && p.typeCode && (p.typeCode.includes('LEAVE') || p.typeCode.includes('PTC00')))
+    const leavePolicies = computed(() =>
+      allPolicies.value.filter(p => p && p.typeCode && (p.typeCode.includes('LEAVE') || p.typeCode.startsWith('PTC00')))
     );
-    const tripPolicies = computed(() => 
+    const tripPolicies = computed(() =>
       allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC102')
     );
+    const overtimePolicies = computed(() =>
+      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC103')
+    );
+    const nightWorkPolicies = computed(() =>
+      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC104')
+    );
+    const holidayWorkPolicies = computed(() =>
+      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC105')
+    );
+
+    // 선택된 정책 정보
+    const selectedPolicy = computed(() => {
+      if (!form.value.policyId) return null;
+      return allPolicies.value.find(p => p.policyId === form.value.policyId);
+    });
+
+    // 신청 단위 허용 여부 확인
+    const isRequestUnitAllowed = (unit) => {
+      if (!selectedPolicy.value) return true; // 정책 미선택 시 모두 허용
+      if (!selectedPolicy.value.allowedRequestUnits || selectedPolicy.value.allowedRequestUnits.length === 0) {
+        return true; // allowedRequestUnits가 없으면 모두 허용
+      }
+      return selectedPolicy.value.allowedRequestUnits.includes(unit);
+    };
+
+    // 허용된 단위 포맷팅
+    const formatAllowedUnits = (units) => {
+      const unitMap = {
+        'DAY': '종일',
+        'HALF_DAY_AM': '오전 반차',
+        'HALF_DAY_PM': '오후 반차',
+        'TIME_OFF': '시간 단위'
+      };
+      return units.map(u => unitMap[u] || u).join(', ');
+    };
 
     watch(requestType, (newType) => {
       if (newType === 'trip') {
         form.value.requestUnit = 'DAY';
+      } else if (newType === 'overtime' || newType === 'night' || newType === 'holiday') {
+        form.value.requestUnit = 'TIME_OFF';
+      }
+    });
+
+    // 정책 선택 시 신청 단위 자동 조정
+    watch(() => form.value.policyId, (newPolicyId) => {
+      if (newPolicyId && selectedPolicy.value && selectedPolicy.value.allowedRequestUnits) {
+        // 현재 선택된 신청 단위가 허용되지 않으면 첫 번째 허용된 단위로 변경
+        if (!isRequestUnitAllowed(form.value.requestUnit)) {
+          form.value.requestUnit = selectedPolicy.value.allowedRequestUnits[0] || 'DAY';
+        }
       }
     });
 
     const fetchInitialData = async () => {
       try {
-        const policyResponse = await getPolicies({ page: 0, size: 100 });
-        console.log('Fetched Policies:', policyResponse.content); // 데이터 확인용 콘솔 로그
-        allPolicies.value = policyResponse.content || [];
-        
+        // 내게 할당된 정책만 가져오기
+        const assignedPolicies = await getMyAssignedPolicies();
+        console.log('Fetched Assigned Policies:', assignedPolicies); // 데이터 확인용 콘솔 로그
+        allPolicies.value = assignedPolicies || [];
+
         workLocations.value = await getActiveWorkLocations();
       } catch (err) {
         error(err.message || '필요한 데이터를 불러오는 데 실패했습니다.');
@@ -219,10 +301,16 @@ export default {
               payload.endAt = form.value.dateRange[1];
             }
 
-            await createLeaveRequest(payload);
-            success('신청이 성공적으로 제출되었습니다.');
+            const response = await createLeaveRequest(payload);
+
+            // 자동 승인 여부에 따라 다른 메시지 표시
+            if (response.autoApproved && response.status === 'APPROVED') {
+              success('자동승인처리되었습니다.');
+            } else {
+              success('신청이 성공적으로 제출되었습니다.');
+            }
             fetchMyRequests(); // 신청 성공 후 목록 새로고침
-            router.push({ name: 'AttendancePage' });
+            router.push({ name: 'AttendanceManagement' });
           } catch (err) {
             error(err.message || '신청 제출에 실패했습니다.');
           } finally {
@@ -240,8 +328,12 @@ export default {
     };
     
     const handleRequestTypeChange = () => {
+      // 신청 종류 변경 시 모든 필드 초기화
       form.value.policyId = null;
-      resetForm();
+      form.value.dateRange = [];
+      form.value.dateTimeRange = [];
+      form.value.workLocation = null;
+      form.value.reason = '';
     };
 
     const handleSizeChange = (newSize) => {
@@ -277,6 +369,9 @@ export default {
       requestType,
       leavePolicies,
       tripPolicies,
+      overtimePolicies,
+      nightWorkPolicies,
+      holidayWorkPolicies,
       workLocations,
       submitForm,
       resetForm,
@@ -293,6 +388,9 @@ export default {
       formatDate,
       formatPeriod,
       Refresh,
+      selectedPolicy,
+      isRequestUnitAllowed,
+      formatAllowedUnits,
     };
   },
 };
@@ -311,5 +409,12 @@ export default {
 .pagination {
   justify-content: center;
   margin-top: 20px;
+}
+.form-description {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 10px;
+  display: block;
+  margin-top: 5px;
 }
 </style>

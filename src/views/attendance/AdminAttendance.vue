@@ -32,7 +32,7 @@
       <!-- 근태 현황 목록 -->
       <div class="content-card table-card">
         <div class="card-header">
-          <h3>근태 현황 목록</h3>
+          <h3>근태 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
           <el-button type="primary" @click="exportToExcel">
             <el-icon><Download /></el-icon>
             <span style="margin-left: 8px;">엑셀로 내보내기</span>
@@ -42,9 +42,10 @@
           <el-date-picker
             v-model="selectedDate"
             type="date"
-            placeholder="날짜 선택"
+            placeholder="오늘 날짜"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            disabled
           />
           <el-input
             v-model="searchQuery"
@@ -56,9 +57,13 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
+          <el-button @click="fetchAttendanceData" :loading="isLoading">
+            <el-icon><Refresh /></el-icon>
+            <span style="margin-left: 8px;">새로고침</span>
+          </el-button>
         </div>
         <div class="attendance-table">
-          <el-table :data="filteredAttendanceData" style="width: 100%">
+          <el-table :data="filteredAttendanceData" v-loading="isLoading" style="width: 100%">
             <el-table-column prop="employeeName" label="이름" width="120" />
             <el-table-column prop="department" label="부서" width="150" />
             <el-table-column prop="date" label="날짜" width="150" />
@@ -106,11 +111,15 @@
         </el-form-item>
         <el-form-item label="상태">
           <el-select v-model="editingRecord.status" placeholder="상태 선택">
-            <el-option label="출근" value="출근" />
+            <el-option label="정상 근무" value="정상 근무" />
             <el-option label="지각" value="지각" />
-            <el-option label="휴가" value="휴가" />
-            <el-option label="결근" value="결근" />
+            <el-option label="휴가 (연차)" value="휴가 (연차)" />
+            <el-option label="휴가 (오전 반차)" value="휴가 (오전 반차)" />
+            <el-option label="휴가 (오후 반차)" value="휴가 (오후 반차)" />
+            <el-option label="휴가 (병가)" value="휴가 (병가)" />
             <el-option label="재택" value="재택" />
+            <el-option label="출장" value="출장" />
+            <el-option label="결근" value="결근" />
           </el-select>
         </el-form-item>
         <el-form-item label="출근 시간">
@@ -131,17 +140,19 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
 import { Bar } from 'vue-chartjs';
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import { useSnackbar } from '@/composables/useSnackbar';
+import { getTeamAttendanceStatus } from '@/api/attendance';
+import { Download, Search, Refresh } from '@element-plus/icons-vue';
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
 export default {
   name: 'AdminAttendance',
-  components: { Bar },
+  components: { Bar, Download, Search, Refresh },
   setup() {
     const { success, info, error } = useSnackbar();
 
@@ -149,23 +160,16 @@ export default {
     const searchQuery = ref('');
     const editDialogVisible = ref(false);
     const editingRecord = ref(null);
+    const isLoading = ref(false);
 
-    const attendanceData = ref([
-      { id: 1, employeeName: '김철수', department: '개발팀', date: '2025-09-24', status: '출근', clockIn: '09:01', clockOut: '18:05', workHours: '8시간 4분' },
-      { id: 2, employeeName: '이영희', department: '디자인팀', date: '2025-09-24', status: '휴가', clockIn: '-', clockOut: '-', workHours: '-' },
-      { id: 3, employeeName: '박민준', department: '개발팀', date: '2025-09-24', status: '지각', clockIn: '09:32', clockOut: '18:30', workHours: '7시간 58분' },
-      { id: 4, employeeName: '최지우', department: '마케팅팀', date: '2025-09-24', status: '재택', clockIn: '08:55', clockOut: '17:58', workHours: '8시간 3분' },
-      { id: 5, employeeName: '정다솜', department: '개발팀', date: '2025-09-24', status: '출근', clockIn: '08:58', clockOut: '18:02', workHours: '8시간 4분' },
-      { id: 6, employeeName: '홍길동', department: '영업팀', date: '2025-09-24', status: '결근', clockIn: '-', clockOut: '-', workHours: '-' },
-    ]);
+    const attendanceData = ref([]);
 
     const filteredAttendanceData = computed(() => {
       return attendanceData.value.filter(item => {
-        const matchesDate = !selectedDate.value || item.date === selectedDate.value;
-        const matchesSearch = !searchQuery.value || 
+        const matchesSearch = !searchQuery.value ||
                               item.employeeName.includes(searchQuery.value) ||
                               item.department.includes(searchQuery.value);
-        return matchesDate && matchesSearch;
+        return matchesSearch;
       });
     });
 
@@ -173,23 +177,25 @@ export default {
         const data = filteredAttendanceData.value;
         return {
             total: data.length,
-            onTime: data.filter(item => item.status === '출근').length,
+            onTime: data.filter(item => item.status === '정상 근무').length,
             late: data.filter(item => item.status === '지각').length,
-            leave: data.filter(item => item.status === '휴가' || item.status === '재택').length,
+            leave: data.filter(item => item.status.includes('휴가') || item.status === '재택').length,
         };
     });
 
     const chartData = computed(() => ({
-      labels: ['출근', '지각', '휴가', '재택', '결근'],
+      labels: ['정상 근무', '지각', '휴가', '재택', '출장', '결근', '미출근'],
       datasets: [{
         label: '직원 수',
-        backgroundColor: ['#67C23A', '#E6A23C', '#909399', '#409EFF', '#F56C6C'],
+        backgroundColor: ['#67C23A', '#E6A23C', '#909399', '#409EFF', '#17A2B8', '#F56C6C', '#6C757D'],
         data: [
-          attendanceData.value.filter(item => item.status === '출근').length,
+          attendanceData.value.filter(item => item.status === '정상 근무').length,
           attendanceData.value.filter(item => item.status === '지각').length,
-          attendanceData.value.filter(item => item.status === '휴가').length,
+          attendanceData.value.filter(item => item.status.includes('휴가')).length,
           attendanceData.value.filter(item => item.status === '재택').length,
+          attendanceData.value.filter(item => item.status === '출장').length,
           attendanceData.value.filter(item => item.status === '결근').length,
+          attendanceData.value.filter(item => item.status === '미출근').length,
         ]
       }]
     }));
@@ -205,14 +211,14 @@ export default {
     });
 
     const getStatusTagType = (status) => {
-      switch (status) {
-        case '출근': return 'success';
-        case '지각': return 'warning';
-        case '휴가': return 'info';
-        case '결근': return 'danger';
-        case '재택': return 'primary';
-        default: return '';
-      }
+      if (status === '정상 근무') return 'success';
+      if (status === '지각') return 'warning';
+      if (status.includes('휴가')) return 'info';
+      if (status === '재택') return 'primary';
+      if (status === '출장') return '';
+      if (status === '결근') return 'danger';
+      if (status === '미출근') return '';
+      return '';
     };
 
     const handleEdit = (row) => {
@@ -233,7 +239,61 @@ export default {
         editingRecord.value = null;
       }
     };
-    
+
+    // 상태 코드를 한글로 매핑
+    const mapStatusToKorean = (statusCode, isLate) => {
+      // 지각인 경우 우선 처리
+      if (isLate) {
+        return '지각';
+      }
+
+      // statusCode가 없으면 미출근
+      if (!statusCode) {
+        return '미출근';
+      }
+
+      // 영문 코드 -> 한글 매핑
+      const statusMap = {
+        'NORMAL_WORK': '정상 근무',
+        'ANNUAL_LEAVE': '휴가 (연차)',
+        'HALF_DAY_AM': '휴가 (오전 반차)',
+        'HALF_DAY_PM': '휴가 (오후 반차)',
+        'SICK_LEAVE': '휴가 (병가)',
+        'REMOTE_WORK': '재택',
+        'BUSINESS_TRIP': '출장',
+        'ABSENT': '결근',
+      };
+
+      return statusMap[statusCode] || statusCode;
+    };
+
+    // 백엔드 API로부터 근태 데이터 조회 (권한 기반 자동 범위 결정)
+    const fetchAttendanceData = async () => {
+      isLoading.value = true;
+      try {
+        const response = await getTeamAttendanceStatus();
+
+        // 백엔드 응답을 프론트엔드 형식으로 변환 (한글 매핑은 프론트에서 처리)
+        attendanceData.value = response.map((item) => ({
+          id: item.memberId,
+          employeeName: item.name || '-',
+          department: item.department || '-',
+          date: item.date,
+          status: mapStatusToKorean(item.statusCode, item.isLate),
+          clockIn: item.clockInTime || '-',
+          clockOut: item.clockOutTime || '-',
+          workHours: item.workHours || '-',
+        }));
+
+        success(`근태 현황을 조회했습니다. (${response.length}명)`);
+      } catch (err) {
+        error(err.message || '근태 데이터를 불러오는 데 실패했습니다.');
+        attendanceData.value = [];
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
     const exportToExcel = () => {
       info('근태 현황을 엑셀로 내보냅니다.');
       const worksheet = XLSX.utils.json_to_sheet(filteredAttendanceData.value);
@@ -242,6 +302,11 @@ export default {
       XLSX.writeFile(workbook, '근태_현황.xlsx');
       success('엑셀 내보내기가 완료되었습니다.');
     };
+
+    // 컴포넌트 마운트 시 데이터 조회
+    onMounted(() => {
+      fetchAttendanceData();
+    });
 
     return {
       selectedDate,
@@ -252,6 +317,7 @@ export default {
       summaryStats,
       chartData,
       chartOptions,
+      isLoading,
       getStatusTagType,
       handleEdit,
       handleSave,

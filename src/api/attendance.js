@@ -105,6 +105,49 @@ export const recordAttendanceEvent = (data) => workforceClient.post('/attendance
 export const getMyTodayAttendance = () => workforceClient.get('/attendance/my/today');
 export const getMyBalance = () => workforceClient.get('/attendance/my/balance');
 
+/**
+ * 내 모든 휴가 정책 잔액 조회 (연차, 병가, 육아휴직 등)
+ * @returns {Promise<Array<object>>}
+ */
+export const getMyAllBalances = () => workforceClient.get('/attendance/my/balances');
+
+/**
+ * 내게 할당된 모든 정책 조회 (휴가 신청 시 사용)
+ * @returns {Promise<Array<object>>}
+ */
+export const getMyAssignedPolicies = () => workforceClient.get('/attendance/my/assigned-policies');
+
+/**
+ * 팀원 근태 현황 조회 (오늘 날짜 기준)
+ * @returns {Promise<Array<object>>}
+ */
+export const getTeamAttendanceStatus = () => workforceClient.get('/attendance/team/status');
+
+/**
+ * 연차 현황 조회 (권한에 따라 조회 범위 자동 결정)
+ * - COMPANY 권한: 전사 직원 연차 현황
+ * - TEAM 권한: 본인 조직 및 하위 조직 직원 연차 현황
+ * @param {object} params - { year?: number }
+ * @returns {Promise<Array<object>>}
+ */
+export const getLeaveBalanceStatus = (params) => workforceClient.get('/attendance/leave-balance/status', { params });
+
+// --- 급여 정산용 조회 (Admin/COMPANY Level) ---
+
+/**
+ * 기간별 전체 직원 일일 근태 조회 (COMPANY 레벨 권한 필요)
+ * @param {object} params - { startDate: 'yyyy-MM-dd', endDate: 'yyyy-MM-dd' }
+ * @returns {Promise<Array<object>>}
+ */
+export const getDailyAttendanceSummary = (params) => workforceClient.get('/attendance/summary/daily', { params });
+
+/**
+ * 연도별 전체 직원 잔여 일수 조회 (COMPANY 레벨 권한 필요)
+ * @param {object} params - { year: number }
+ * @returns {Promise<Array<object>>}
+ */
+export const getMemberBalanceSummary = (params) => workforceClient.get('/attendance/summary/balance', { params });
+
 // --- 디바이스 관리 (Device Management) ---
 
 export const registerDevice = (data) => workforceClient.post('/requests/devices/register', data);

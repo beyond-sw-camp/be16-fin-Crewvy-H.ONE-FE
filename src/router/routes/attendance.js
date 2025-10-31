@@ -1,6 +1,5 @@
 import PolicyEditor from '@/views/attendance/PolicyEditor.vue';
 import PolicyAssignment from '@/views/attendance/PolicyAssignment.vue';
-import TeamAttendanceStatus from '../../views/attendance/TeamAttendanceStatus.vue';
 
 const attendanceRoutes = [
   {
@@ -14,6 +13,24 @@ const attendanceRoutes = [
     name: 'LeaveRequest',
     component: () => import('@/views/attendance/LeaveRequest.vue'),
     meta: { requiresAuth: true, title: '휴가/출장 신청' }
+  },
+  {
+    path: '/shared-calendar',
+    name: 'SharedCalendar',
+    component: () => import('@/views/SharedCalendar.vue'),
+    meta: { requiresAuth: true, title: '공유 캘린더' }
+  },
+  {
+    path: '/admin/attendance',
+    name: 'AdminAttendance',
+    component: () => import('@/views/attendance/AdminAttendance.vue'),
+    meta: { requiresAuth: true, title: '근태 현황' }
+  },
+  {
+    path: '/admin/leave-management',
+    name: 'AdminLeaveManagement',
+    component: () => import('@/views/attendance/LeaveManagement.vue'),
+    meta: { requiresAuth: true, title: '연차 현황' }
   },
   {
     path: '/admin/policy-management', // 경로 수정
@@ -41,9 +58,8 @@ const attendanceRoutes = [
   },
   {
     path: '/team-attendance-status',
-    name: 'TeamAttendanceStatus',
-    component: TeamAttendanceStatus,
-    meta: { requiresAuth: true, title: '팀원 근태 현황' }
+    redirect: '/admin/attendance',
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/work-location-management',
@@ -56,6 +72,12 @@ const attendanceRoutes = [
     name: 'DeviceApprovalManagement',
     component: () => import('@/views/admin/DeviceApprovalManagement.vue'),
     meta: { requiresAuth: true, title: '디바이스 승인 관리' }
+  },
+  {
+    path: '/admin/audit-log',
+    name: 'AuditLog',
+    component: () => import('@/views/AuditLog.vue'),
+    meta: { requiresAuth: true, title: '감사 로그' }
   }
 ];
 
