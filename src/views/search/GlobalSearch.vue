@@ -10,7 +10,7 @@
     <div class="search-section">
       <el-input
         v-model="searchQuery"
-        placeholder="직원, 부서, 문서, 공지 등 무엇이든 검색해보세요..."
+        placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요."
         prefix-icon="Search"
         clearable
         @keyup.enter="performSearch"
@@ -32,16 +32,66 @@
             <el-empty :description="'\'' + searchQuery + '\'에 대한 검색 결과가 없습니다.'"></el-empty>
           </div>
           <div v-else>
-            <div v-for="result in results" :key="result.id" class="result-item">
-              <div class="result-header">
-                <span class="result-type">{{ result.type }}</span>
-                <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
-              </div>
-              <p class="result-snippet" v-html="result.snippet"></p>
+            <div v-for="(group, category) in groupedResults" :key="category" class="result-group">
+              <h2 class="group-title">{{ category }}</h2>
+              <template v-if="category === '직원'">
+                <div class="employee-list-header">
+                  <div class="employee-list-cell">이름</div>
+                  <div class="employee-list-cell">부서</div>
+                  <div class="employee-list-cell">직책</div>
+                  <div class="employee-list-cell">연락처</div>
+                  <div class="employee-list-cell">상태</div>
+                </div>
+                <div v-for="result in group.slice(0, 5)" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
+                  <div class="employee-list-cell">{{ result.title }}</div>
+                  <div class="employee-list-cell">{{ result.department }}</div>
+                  <div class="employee-list-cell">{{ result.position }}</div>
+                  <div class="employee-list-cell">{{ result.contact }}</div>
+                  <div class="employee-list-cell">{{ result.status }}</div>
+                </div>
+                <div v-if="group.length > 5" class="view-more-container">
+                  <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{ group.length - 5 }}개)</el-button>
+                </div>
+              </template>
+              <template v-else>
+                <div v-for="result in group.slice(0, 5)" :key="result.id" class="result-item">
+                  <div class="result-header">
+                    <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
+                  </div>
+                  <p class="result-snippet" v-html="result.snippet"></p>
+                </div>
+                <div v-if="group.length > 5" class="view-more-container">
+                  <el-button type="text" @click="activeTab = categories.find(c => c.label === category).name">{{ category }} 더보기 ({{ group.length - 5 }}개)</el-button>
+                </div>
+              </template>
             </div>
           </div>
         </el-tab-pane>
-        <el-tab-pane v-for="category in categories" :key="category.name" :label="category.label" :name="category.name">
+        <el-tab-pane label="직원" name="employee">
+          <div v-if="!searched">
+            <el-empty description="검색어를 입력해주세요."></el-empty>
+          </div>
+          <div v-else-if="getResultsByCategory('employee').length === 0">
+            <el-empty :description="'\'' + searchQuery + '\'에 대한 직원 검색 결과가 없습니다.'"></el-empty>
+          </div>
+          <div v-else>
+            <div class="employee-list-header">
+              <div class="employee-list-cell">이름</div>
+              <div class="employee-list-cell">부서</div>
+              <div class="employee-list-cell">직책</div>
+              <div class="employee-list-cell">연락처</div>
+              <div class="employee-list-cell">상태</div>
+            </div>
+            <div v-for="result in getResultsByCategory('employee')" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
+              <div class="employee-list-cell">{{ result.title }}</div>
+              <div class="employee-list-cell">{{ result.department }}</div>
+              <div class="employee-list-cell">{{ result.position }}</div>
+              <div class="employee-list-cell">{{ result.contact }}</div>
+              <div class="employee-list-cell">{{ result.status }}</div>
+            </div>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane v-for="category in categories.filter(c => c.name !== 'employee')" :key="category.name" :label="category.label" :name="category.name">
             <div v-if="!searched">
               <el-empty description="검색어를 입력해주세요."></el-empty>
             </div>
@@ -63,7 +113,8 @@
 </template>
 
 <script>
-import employeeService from '@/api/employeeService';
+import searchService from '@/api/searchService';
+
 export default {
   name: 'GlobalSearch',
   data() {
@@ -73,14 +124,25 @@ export default {
       searched: false,
       categories: [
         { name: 'employee', label: '직원' },
-        { name: 'organization', label: '조직' },
-        { name: 'board', label: '게시판' },
-        { name: 'approval', label: '결재' },
+        { name: 'approval', label: '결재문서' },
+        { name: 'meeting', label: '회의록' },
       ],
       results: [],
     };
   },
+  created() {
+  },
   computed: {
+    groupedResults() {
+      return this.results.reduce((groups, result) => {
+        const category = result.type;
+        if (!groups[category]) {
+          groups[category] = [];
+        }
+        groups[category].push(result);
+        return groups;
+      }, {});
+    }
   },
   methods: {
     async performSearch() {
@@ -91,22 +153,33 @@ export default {
       }
 
       try {
-        const response = await employeeService.searchEmployees(this.searchQuery);
-        this.results = response.data.data.map(emp => ({
-          id: emp.memberId,
-          type: '직원',
-          title: emp.name,
-                    snippet: `${emp.organizationName.join(', ')} - ${emp.titleName.join(', ')}`,          category: 'employee',
-          path: `/member/detail/${emp.memberId}`
-        }));
+        const response = await searchService.searchGlobal(this.searchQuery);
+        this.results = response.data.data.map(res => {
+          if (res.category === 'employee') {
+            return {
+              id: res.id,
+              type: '직원',
+              title: res.title,
+              department: res.department,
+              position: res.position,
+              contact: res.contact,
+              status: res.status,
+              snippet: `${res.department} / ${res.position} / ${res.contact} / ${res.status}`,
+              category: 'employee',
+              path: `/member/detail/${res.id}`
+            };
+          } 
+          return null;
+        }).filter(Boolean);
+
       } catch (error) {
-        console.error('Error searching employees:', error);
-        // You can add user-facing error handling here, like a snackbar notification.
+        console.error('Error searching:', error);
       }
     },
     getResultsByCategory(category) {
       return this.results.filter(result => result.category === category);
     },
+
     navigateTo(result) {
       this.$router.push(result.path);
     }
@@ -190,4 +263,76 @@ export default {
   color: #606266;
   line-height: 1.6;
 }
-</style>
+
+.result-group {
+  margin-bottom: 24px;
+}
+
+.group-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 16px;
+}
+
+.employee-list-header,
+.employee-list-row {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.employee-list-header {
+  font-weight: 600;
+  background-color: #f5f7fa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.employee-list-row:hover {
+  background-color: #f9f9f9;
+  cursor: pointer;
+}
+
+.employee-list-cell {
+  flex: 1;
+  text-align: center;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.organization-list-header,
+.organization-list-row {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.organization-list-header {
+  font-weight: 600;
+  background-color: #f5f7fa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.organization-list-row:hover {
+  background-color: #f9f9f9;
+  cursor: pointer;
+}
+
+.organization-list-cell {
+  flex: 1;
+  text-align: center;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-more-container {
+  text-align: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}</style>
