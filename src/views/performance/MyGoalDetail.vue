@@ -273,7 +273,12 @@ export default {
       document.body.removeChild(link);
     },
     goBack() {
-      this.$router.go(-1);
+      // 평가 쪽에서 들어온 경우(from=review) 평가 목록으로, 그렇지 않으면 내 목표 관리로
+      if (this.$route.query.from === 'review') {
+        this.$router.push('/performance/review');
+      } else {
+        this.$router.push('/performance/my-goal');
+      }
     },
     async saveChanges() {
       try {

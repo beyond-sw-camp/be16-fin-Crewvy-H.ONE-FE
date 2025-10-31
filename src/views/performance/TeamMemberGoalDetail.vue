@@ -241,7 +241,8 @@ export default {
   },
   methods: {
     goBack() {
-      this.$router.go(-1);
+      const teamGoalId = this.$route.params.goalId;
+      this.$router.push(`/performance/team-goal/${teamGoalId}`);
     },
     async fetchGoalDetail() {
       const memberGoalId = this.$route.params.memberGoalId;
