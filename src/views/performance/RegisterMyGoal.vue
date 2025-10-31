@@ -1,31 +1,43 @@
 <template>
   <div class="register-my-goal-container">
+    <!-- Header Section -->
     <div class="header">
-      <el-page-header @back="goBack" content="내 목표 등록"></el-page-header>
+      <div class="header-text">
+        <h1 class="title">내 목표 등록</h1>
+        <p class="subtitle">팀 목표를 기반으로 나의 개인 목표를 설정하세요</p>
+      </div>
+      <el-button @click="goBack" class="back-button" :icon="ArrowLeft">
+        목록으로
+      </el-button>
     </div>
 
-    <el-card class="team-goal-card">
+    <!-- Team Goal Info Card -->
+    <el-card class="team-goal-card" shadow="never">
         <template #header>
             <div class="card-header">
-                <span>팀 목표 정보</span>
+                <el-icon class="section-icon"><Link /></el-icon>
+                <span class="section-title">연결된 팀 목표</span>
             </div>
         </template>
-        <h2>{{ teamGoal.title }}</h2>
-        <p>{{ teamGoal.contents }}</p>
-        <div class="meta">
+        <h3 class="team-goal-title">{{ teamGoal.title }}</h3>
+        <p class="team-goal-contents">{{ teamGoal.contents }}</p>
+        <div class="goal-period">
+            <el-icon><Calendar /></el-icon>
             <span>{{ teamGoal.startDate }} ~ {{ teamGoal.endDate }}</span>
         </div>
     </el-card>
 
-    <el-card class="my-goal-card">
+    <!-- My Goal Setting Card -->
+    <el-card class="my-goal-card" shadow="never">
         <template #header>
             <div class="card-header">
-                <span>내 목표 설정</span>
+                <el-icon class="section-icon"><Document /></el-icon>
+                <span class="section-title">내 목표 설정</span>
             </div>
         </template>
-        <el-form :model="myGoalForm" label-position="top">
+        <el-form :model="myGoalForm" label-position="top" class="goal-form">
             <el-form-item label="목표 제목">
-                <el-input v-model="myGoalForm.title" placeholder="팀 목표 달성을 위한 내 목표 제목을 입력하세요."></el-input>
+                <el-input v-model="myGoalForm.title" placeholder="팀 목표 달성을 위한 내 목표 제목을 입력하세요." size="large"></el-input>
             </el-form-item>
             <el-form-item label="목표 상세 내용">
                 <el-input v-model="myGoalForm.contents" type="textarea" :rows="5" placeholder="목표에 대한 상세 내용을 입력하세요."></el-input>
@@ -39,39 +51,69 @@
                     end-placeholder="종료일"
                     value-format="YYYY-MM-DD"
                     :disabled-date="disabledDate"
+                    size="large"
+                    style="width: 100%"
                 />
-            </el-form-item>
-
-            <el-form-item label="점수 체계">
-                <div class="rubric-container">
-                    <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
-                        <span class="rubric-grade">{{ item.grade }}</span>
-                        <el-input
-                            v-model="item.description"
-                            type="textarea"
-                            :rows="2"
-                            :placeholder="item.grade + ' 등급에 대한 달성 기준을 입력하세요.'"
-                        ></el-input>
-                    </div>
-                </div>
             </el-form-item>
         </el-form>
     </el-card>
 
+    <!-- Scoring Rubric Card -->
+    <el-card class="scoring-card" shadow="never">
+        <template #header>
+            <div class="card-header">
+                <el-icon class="section-icon"><Medal /></el-icon>
+                <span class="section-title">점수 체계</span>
+            </div>
+        </template>
+        <div class="rubric-container">
+            <div v-for="item in scoringRubric" :key="item.grade" class="rubric-item">
+                <el-tag class="rubric-grade" effect="dark">{{ item.grade }}</el-tag>
+                <el-input
+                    v-model="item.description"
+                    type="textarea"
+                    :rows="2"
+                    class="rubric-input"
+                    :placeholder="item.grade + ' 등급에 대한 달성 기준을 입력하세요.'"
+                ></el-input>
+            </div>
+        </div>
+    </el-card>
+
+    <!-- Actions Container -->
     <div class="actions-container">
-        <el-button @click="goBack">취소</el-button>
-        <el-button type="primary" @click="registerGoal">등록</el-button>
+        <el-button @click="goBack" class="cancel-button">취소</el-button>
+        <el-button type="primary" @click="registerGoal" class="register-button">
+            <el-icon><Select /></el-icon>
+            <span>등록</span>
+        </el-button>
     </div>
   </div>
 </template>
 
 <script>
 import apiClient from '@/api/http';
+import { 
+  ArrowLeft, 
+  Link, 
+  Calendar, 
+  Document, 
+  Medal, 
+  Select 
+} from '@element-plus/icons-vue';
 
 export default {
   name: 'RegisterMyGoal',
+  components: {
+    Link,
+    Calendar,
+    Document,
+    Medal,
+    Select
+  },
   data() {
     return {
+      ArrowLeft,
       teamGoal: {}, // API로부터 팀 목표 정보를 받아올 객체
       myGoalForm: {
         title: '',
@@ -171,49 +213,202 @@ export default {
 </script>
 
 <style scoped>
+/* Container */
 .register-my-goal-container {
-  padding: 24px;
-}
-.header {
-    margin-bottom: 24px;
-}
-.team-goal-card, .my-goal-card {
-    margin-bottom: 24px;
-}
-.actions-container {
-    display: flex;
-    justify-content: flex-end;
-}
-.el-date-picker {
-    width: 100%;
+  padding: 32px;
+  background: #f5f7fa;
+  min-height: 100vh;
 }
 
+/* Header Section */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.back-button {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.header-text {
+  flex: 1;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #303133;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #909399;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Cards */
+.team-goal-card, 
+.my-goal-card, 
+.scoring-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: none;
+}
+
+/* Card Headers */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.section-icon {
+  font-size: 24px;
+  color: #667eea;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Team Goal Info */
+.team-goal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0 0 12px 0;
+}
+
+.team-goal-contents {
+  font-size: 15px;
+  color: #606266;
+  line-height: 1.8;
+  margin: 0 0 16px 0;
+  white-space: pre-wrap;
+}
+
+.goal-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #909399;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.goal-period .el-icon {
+  font-size: 16px;
+  color: #667eea;
+}
+
+/* Form */
+.goal-form {
+  margin-top: 0;
+}
+
+/* Scoring Rubric */
 .rubric-container {
-    width: 100%;
+  width: 100%;
 }
 
 .rubric-item {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  gap: 16px;
 }
 
 .rubric-item:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .rubric-grade {
-  width: 50px;
+  min-width: 60px;
   text-align: center;
-  font-weight: 600;
-  margin-right: 16px;
+  font-weight: 700;
+  font-size: 16px;
   flex-shrink: 0;
 }
-.meta {
+
+.rubric-input {
+  flex-grow: 1;
+}
+
+/* Actions Container */
+.actions-container {
   display: flex;
-  justify-content: flex-start;
-  color: #909399;
-  font-size: 14px;
-  margin-top: 8px;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.cancel-button,
+.register-button {
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.register-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+}
+
+.register-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 16px rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.register-button:active {
+  transform: translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .register-my-goal-container {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .actions-container {
+    flex-direction: column;
+  }
+
+  .actions-container .el-button {
+    width: 100%;
+  }
+
+  .rubric-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rubric-grade {
+    margin-bottom: 8px;
+  }
 }
 </style>

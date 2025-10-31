@@ -1,59 +1,54 @@
 <template>
   <div class="performance-review">
-    <div class="page-header">
-      <div class="header-content">
-        <h1>성과 평가</h1>
-        <p>구성원의 성과를 공정하게 평가하고 피드백을 제공하세요.</p>
-      </div>
-      <div class="header-actions">
+    <!-- Header Section -->
+    <div class="header">
+      <div class="header-text">
+        <h1 class="title">성과 평가</h1>
+        <p class="subtitle">구성원의 성과를 공정하게 평가하고 피드백을 제공하세요</p>
       </div>
     </div>
 
-    <!-- 평가 현황 카드 -->
-    <div class="review-cards">
-      <div class="review-card">
-        <div class="card-icon">
-          <el-icon><Clock /></el-icon>
+    <!-- Statistics Section -->
+    <div class="statistics-section">
+      <el-card class="stat-card" shadow="never">
+        <div class="stat-content">
+          <el-icon class="stat-icon my-goal"><Clock /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ inProgressReviews }}</div>
+            <div class="stat-label">내 목표 평가</div>
+          </div>
         </div>
-        <div class="card-content">
-          <div class="card-title">진행중인 평가</div>
-          <div class="card-value">{{ inProgressReviews }}</div>
-          <div class="card-subtitle">내가 할 평가</div>
-        </div>
-      </div>
+      </el-card>
       
-      <div class="review-card">
-        <div class="card-icon">
-          <el-icon><Document /></el-icon>
+      <el-card class="stat-card" shadow="never">
+        <div class="stat-content">
+          <el-icon class="stat-icon team-goal"><Document /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ myReviewsCount }}</div>
+            <div class="stat-label">팀 목표 평가</div>
+          </div>
         </div>
-        <div class="card-content">
-          <div class="card-title">내 평가</div>
-          <div class="card-value">{{ myReviewsCount }}</div>
-          <div class="card-subtitle">피평가</div>
-        </div>
-      </div>
+      </el-card>
       
-      <div class="review-card">
-        <div class="card-icon">
-          <el-icon><Check /></el-icon>
+      <el-card class="stat-card" shadow="never">
+        <div class="stat-content">
+          <el-icon class="stat-icon completed-my"><Check /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ completedReviews }}</div>
+            <div class="stat-label">완료된 개인 목표</div>
+          </div>
         </div>
-        <div class="card-content">
-          <div class="card-title">완료된 평가</div>
-          <div class="card-value">{{ completedReviews }}</div>
-          <div class="card-subtitle">이번 분기</div>
-        </div>
-      </div>
+      </el-card>
       
-      <div class="review-card">
-        <div class="card-icon">
-          <el-icon><User /></el-icon>
+      <el-card class="stat-card" shadow="never">
+        <div class="stat-content">
+          <el-icon class="stat-icon completed-team"><User /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ teamAverageScore }}</div>
+            <div class="stat-label">완료된 팀 목표</div>
+          </div>
         </div>
-        <div class="card-content">
-          <div class="card-title">팀 평균</div>
-          <div class="card-value">{{ teamAverageScore }}</div>
-          <div class="card-subtitle"></div>
-        </div>
-      </div>
+      </el-card>
     </div>
 
     <!-- 탭 메뉴 -->
@@ -61,110 +56,160 @@
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="내 목표 평가" name="my-goal-reviews">
           <div class="my-reviews">
-            <div class="section-header">
-              <h3>내 목표 평가</h3>
-            </div>
             <div class="review-list">
-              <div class="review-item" v-for="review in myReviews" :key="review.goalId">
+              <el-card class="review-item" v-for="review in myReviews" :key="review.goalId" shadow="hover">
                 <div class="review-info">
                   <div class="review-header">
-                    <div class="review-title">{{ review.title }}</div>
+                    <h4 class="review-title">{{ review.title }}</h4>
                   </div>
                   <div class="review-details">
-                    <span class="review-period"><strong>목표 진행 기간:</strong> {{ review.startDate }} ~ {{ review.endDate }}</span>
+                    <span class="review-period">
+                      <el-icon><Clock /></el-icon>
+                      {{ review.startDate }} ~ {{ review.endDate }}
+                    </span>
                   </div>
                 </div>
                 <div class="review-actions">
-                  <el-button size="small" @click="viewReviewDetails(review)">
+                  <el-button type="primary" @click="viewReviewDetails(review)">
                     <el-icon><View /></el-icon>
-                    상세
+                    <span>상세보기</span>
                   </el-button>
                 </div>
+              </el-card>
+              <div v-if="myReviews.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><Document /></el-icon>
+                <p class="empty-text">평가 대상이 없습니다</p>
               </div>
+            </div>
+            <div v-if="myReviewsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="myReviewsTotalPages * 10"
+                v-model:current-page="myReviewsCurrentPage"
+                @current-change="handleMyReviewsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
         
         <el-tab-pane label="팀 목표 평가" name="team-goal-reviews">
           <div class="team-reviews">
-            <div class="section-header">
-              <h3>팀 목표 평가</h3>
-            </div>
             <div class="review-list">
-              <div class="review-item" v-for="review in teamReviews" :key="review.goalId">
+              <el-card class="review-item" v-for="review in teamReviews" :key="review.goalId" shadow="hover">
                 <div class="review-info">
                   <div class="review-header">
-                    <div class="review-title">{{ review.title }}</div>
+                    <h4 class="review-title">{{ review.title }}</h4>
                   </div>
                   <div class="review-details">
-                    <span class="reviewee"><strong>피평가자:</strong> {{ review.memberName }} ({{ review.memberPosition }})</span>
-                    <span class="review-status"><strong>상태:</strong> {{ review.status }}</span>
+                    <span class="reviewee">
+                      <el-icon><User /></el-icon>
+                      {{ review.memberName }} ({{ review.memberPosition }})
+                    </span>
                   </div>
                 </div>
                 <div class="review-actions">
-                  <el-button size="small" @click="viewReviewDetails(review)">
+                  <el-button type="primary" @click="viewReviewDetails(review)">
                     <el-icon><View /></el-icon>
-                    상세
+                    <span>상세보기</span>
                   </el-button>
                 </div>
+              </el-card>
+              <div v-if="teamReviews.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><Document /></el-icon>
+                <p class="empty-text">평가 대상이 없습니다</p>
               </div>
+            </div>
+            <div v-if="teamReviewsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="teamReviewsTotalPages * 10"
+                v-model:current-page="teamReviewsCurrentPage"
+                @current-change="handleTeamReviewsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
 
         <el-tab-pane label="완료된 개인 목표" name="completed-my-goals">
           <div class="completed-reviews">
-            <div class="section-header">
-              <h3>완료된 개인 목표</h3>
-            </div>
             <div class="review-list">
-              <div class="review-item" v-for="goal in completedMyGoals" :key="goal.goalId">
+              <el-card class="review-item" v-for="goal in completedMyGoals" :key="goal.goalId" shadow="hover">
                 <div class="review-info">
                   <div class="review-header">
-                    <div class="review-title">{{ goal.title }}</div>
+                    <h4 class="review-title">{{ goal.title }}</h4>
                   </div>
                   <div class="review-details">
-                    <span class="review-period"><strong>기간:</strong> {{ goal.startDate }} ~ {{ goal.endDate }}</span>
-                    <span class="review-status"><strong>상태:</strong> {{ goal.status }}</span>
+                    <span class="review-period">
+                      <el-icon><Clock /></el-icon>
+                      {{ goal.startDate }} ~ {{ goal.endDate }}
+                    </span>
                   </div>
                 </div>
                 <div class="review-actions">
-                  <el-button size="small" @click="viewCompletedMyGoalDetails(goal)">
+                  <el-button type="primary" @click="viewCompletedMyGoalDetails(goal)">
                     <el-icon><View /></el-icon>
-                    상세
+                    <span>상세보기</span>
                   </el-button>
                 </div>
+              </el-card>
+              <div v-if="completedMyGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><Check /></el-icon>
+                <p class="empty-text">완료된 개인 목표 평가가 없습니다</p>
               </div>
-              <p v-if="completedMyGoals.length === 0">완료된 개인 목표 평가가 없습니다.</p>
+            </div>
+            <div v-if="completedMyGoalsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="completedMyGoalsTotalPages * 10"
+                v-model:current-page="completedMyGoalsCurrentPage"
+                @current-change="handleCompletedMyGoalsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
 
         <el-tab-pane label="완료된 팀 목표" name="completed-team-goals">
           <div class="completed-reviews">
-            <div class="section-header">
-              <h3>완료된 팀 목표</h3>
-            </div>
             <div class="review-list">
-              <div class="review-item" v-for="goal in completedTeamGoals" :key="goal.goalId">
+              <el-card class="review-item" v-for="goal in completedTeamGoals" :key="goal.goalId" shadow="hover">
                 <div class="review-info">
                   <div class="review-header">
-                    <div class="review-title">{{ goal.title }}</div>
+                    <h4 class="review-title">{{ goal.title }}</h4>
                   </div>
                   <div class="review-details">
-                    <span class="reviewee"><strong>팀원:</strong> {{ goal.memberName }} ({{ goal.memberPosition }})</span>
-                    <span class="review-period"><strong>기간:</strong> {{ goal.startDate }} ~ {{ goal.endDate }}</span>
-                    <span class="review-status"><strong>상태:</strong> {{ goal.status }}</span>
+                    <span class="reviewee">
+                      <el-icon><User /></el-icon>
+                      {{ goal.memberName }} ({{ goal.memberPosition }})
+                    </span>
+                    <span class="review-period">
+                      <el-icon><Clock /></el-icon>
+                      {{ goal.startDate }} ~ {{ goal.endDate }}
+                    </span>
                   </div>
                 </div>
                 <div class="review-actions">
-                  <el-button size="small" @click="viewCompletedTeamGoalDetails(goal)">
+                  <el-button type="primary" @click="viewCompletedTeamGoalDetails(goal)">
                     <el-icon><View /></el-icon>
-                    상세
+                    <span>상세보기</span>
                   </el-button>
                 </div>
+              </el-card>
+              <div v-if="completedTeamGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><Check /></el-icon>
+                <p class="empty-text">완료된 팀 목표 평가가 없습니다</p>
               </div>
-              <p v-if="completedTeamGoals.length === 0">완료된 팀 목표 평가가 없습니다.</p>
+            </div>
+            <div v-if="completedTeamGoalsTotalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="completedTeamGoalsTotalPages * 10"
+                v-model:current-page="completedTeamGoalsCurrentPage"
+                @current-change="handleCompletedTeamGoalsPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -194,42 +239,72 @@ export default {
     const completedReviews = ref(0);
     const teamAverageScore = ref('-');
 
+    const fetchEvaluationStats = async () => {
+      try {
+        const response = await apiClient.get('/workforce-service/performance/get-stat');
+        const stats = response.data.data;
+        inProgressReviews.value = stats.myGoalCount; // Assuming myGoalCount is for '내 목표 평가'
+        myReviewsCount.value = stats.teamGoalCount; // Assuming teamGoalCount is for '팀 목표 평가'
+        completedReviews.value = stats.myGoalCompleteCount; // Assuming myGoalCompleteCount is for '완료된 개인 목표'
+        teamAverageScore.value = stats.teamGoalCompleteCount; // Assuming teamGoalCompleteCount is for '완료된 팀 목표'
+      } catch (error) {
+        console.error('Error fetching evaluation stats:', error);
+      }
+    };
+
     const myReviews = ref([]);
     const teamReviews = ref([]);
     const completedMyGoals = ref([]); // New ref
     const completedTeamGoals = ref([]); // New ref
 
-    const fetchMyGoalReviews = async () => {
+    const myReviewsTotalPages = ref(0);
+    const myReviewsCurrentPage = ref(1);
+    const teamReviewsTotalPages = ref(0);
+    const teamReviewsCurrentPage = ref(1);
+    const completedMyGoalsTotalPages = ref(0);
+    const completedMyGoalsCurrentPage = ref(1);
+    const completedTeamGoalsTotalPages = ref(0);
+    const completedTeamGoalsCurrentPage = ref(1);
+
+    const fetchMyGoalReviews = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-goal-evaluation');
-        myReviews.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-goal-evaluation?page=${page}`);
+        myReviews.value = response.data.data.content;
+        myReviewsTotalPages.value = response.data.data.totalPages;
+        myReviewsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching my goal reviews:', error);
       }
     };
 
-    const fetchTeamGoalReviews = async () => {
+    const fetchTeamGoalReviews = async (page = 0) => {
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-teamgoal-evaluation');
-        teamReviews.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-teamgoal-evaluation?page=${page}`);
+        teamReviews.value = response.data.data.content;
+        teamReviewsTotalPages.value = response.data.data.totalPages;
+        teamReviewsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching team goal reviews:', error);
       }
     };
 
-    const fetchCompletedMyGoals = async () => { // New function
+    const fetchCompletedMyGoals = async (page = 0) => { // New function
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-complete-goal');
-        completedMyGoals.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-complete-goal?page=${page}`);
+        completedMyGoals.value = response.data.data.content;
+        completedMyGoalsTotalPages.value = response.data.data.totalPages;
+        completedMyGoalsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching completed my goals:', error);
       }
     };
 
-    const fetchCompletedTeamGoals = async () => { // New function
+    const fetchCompletedTeamGoals = async (page = 0) => { // New function
       try {
-        const response = await apiClient.get('/workforce-service/performance/find-complete-teamgoal');
-        completedTeamGoals.value = response.data.data;
+        const response = await apiClient.get(`/workforce-service/performance/find-complete-teamgoal?page=${page}`);
+        completedTeamGoals.value = response.data.data.content;
+        completedTeamGoalsTotalPages.value = response.data.data.totalPages;
+        completedTeamGoalsCurrentPage.value = response.data.data.number + 1;
       } catch (error) {
         console.error('Error fetching completed team goals:', error);
       }
@@ -238,14 +313,30 @@ export default {
     const handleTabChange = (tabName) => {
       activeTab.value = tabName;
       if (tabName === 'my-goal-reviews') {
-        fetchMyGoalReviews();
+        fetchMyGoalReviews(0);
       } else if (tabName === 'team-goal-reviews') {
-        fetchTeamGoalReviews();
+        fetchTeamGoalReviews(0);
       } else if (tabName === 'completed-my-goals') {
-        fetchCompletedMyGoals();
+        fetchCompletedMyGoals(0);
       } else if (tabName === 'completed-team-goals') {
-        fetchCompletedTeamGoals();
+        fetchCompletedTeamGoals(0);
       }
+    };
+
+    const handleMyReviewsPageChange = (page) => {
+      fetchMyGoalReviews(page - 1);
+    };
+
+    const handleTeamReviewsPageChange = (page) => {
+      fetchTeamGoalReviews(page - 1);
+    };
+
+    const handleCompletedMyGoalsPageChange = (page) => {
+      fetchCompletedMyGoals(page - 1);
+    };
+
+    const handleCompletedTeamGoalsPageChange = (page) => {
+      fetchCompletedTeamGoals(page - 1);
     };
 
     const viewCompletedMyGoalDetails = (goal) => {
@@ -253,22 +344,23 @@ export default {
     };
 
     const viewCompletedTeamGoalDetails = (goal) => {
-      router.push(`/performance/team-goal-review/${goal.teamGoalId}?mode=review`);
+      router.push(`/performance/team-goal-review/${goal.teamGoalId}?mode=complete`);
     };
 
     const viewReviewDetails = (review) => {
       if (activeTab.value === 'my-goal-reviews') {
         router.push(`/performance/my-goal/${review.goalId}?from=review`);
-      } else {
-        router.push(`/performance/team-goal-review/${review.teamGoalId}`);
+      } else { // This 'else' block is for 'team-goal-reviews'
+        router.push(`/performance/team-goal-review/${review.teamGoalId}?mode=review`);
       }
     };
 
     onMounted(() => {
-      fetchMyGoalReviews();
-      fetchTeamGoalReviews();
-      fetchCompletedMyGoals();
-      fetchCompletedTeamGoals();
+      fetchMyGoalReviews(0);
+      fetchTeamGoalReviews(0);
+      fetchCompletedMyGoals(0);
+      fetchCompletedTeamGoals(0);
+      fetchEvaluationStats(); // Call the new stats function
     });
 
     return {
@@ -285,6 +377,10 @@ export default {
       viewReviewDetails,
       viewCompletedMyGoalDetails, // New method
       viewCompletedTeamGoalDetails, // New method
+      handleMyReviewsPageChange,
+      handleTeamReviewsPageChange,
+      handleCompletedMyGoalsPageChange,
+      handleCompletedTeamGoalsPageChange,
     };
   },
 }
@@ -292,119 +388,145 @@ export default {
 
 <style scoped>
 .performance-review {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.header-content h1 {
-  font-size: 32px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 8px;
-}
-
-.header-content p {
-  font-size: 16px;
-  color: #606266;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-}
-
-.review-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.review-card {
-  background: white;
   padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Section */
+.header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  transition: transform 0.3s ease;
+  justify-content: space-between;
+  margin-bottom: 32px;
 }
 
-.review-card:hover {
-  transform: translateY(-2px);
-}
-
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  color: white;
-  background: #4f46e5;
-}
-
-.card-content {
+.header-text {
   flex: 1;
 }
 
-.card-title {
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #303133;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #909399;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Statistics Section */
+.statistics-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  border-radius: 12px;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px;
+}
+
+.stat-icon {
+  font-size: 56px;
+  padding: 16px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.stat-icon.my-goal {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.1);
+}
+
+.stat-icon.team-goal {
+  color: #e6a23c;
+  background: rgba(230, 162, 60, 0.1);
+}
+
+.stat-icon.completed-my {
+  color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+}
+
+.stat-icon.completed-team {
+  color: #909399;
+  background: rgba(144, 147, 153, 0.1);
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #303133;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.stat-label {
   font-size: 14px;
   color: #606266;
-  margin-bottom: 4px;
+  font-weight: 500;
 }
 
-.card-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 4px;
-}
-
-.card-subtitle {
-  font-size: 12px;
-  color: #909399;
-}
-
+/* Tabs Section */
 .review-tabs {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
-.review-tabs :deep(.el-tabs__nav) {
-  padding-left: 20px;
+.review-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 24px;
+  background: #f5f7fa;
+}
+
+.review-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background-color: #e4e7ed;
+}
+
+.review-tabs :deep(.el-tabs__item) {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 24px;
+  height: 56px;
+  line-height: 56px;
+}
+
+.review-tabs :deep(.el-tabs__item.is-active) {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.review-tabs :deep(.el-tabs__active-bar) {
+  background-color: #667eea;
+  height: 3px;
 }
 
 .my-reviews, .team-reviews, .completed-reviews {
-  padding: 24px;
+  padding: 32px;
 }
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.section-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-}
-
+/* Review List */
 .review-list {
   display: flex;
   flex-direction: column;
@@ -412,19 +534,23 @@ export default {
 }
 
 .review-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  background: white;
   border-radius: 12px;
-  border: 1px solid #e9ecef;
+  border: 1px solid #e4e7ed;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .review-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.review-item :deep(.el-card__body) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
 }
 
 .review-info {
@@ -432,24 +558,72 @@ export default {
 }
 
 .review-header {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .review-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: #303133;
+  margin: 0;
 }
 
 .review-details {
   display: flex;
-  gap: 16px;
+  gap: 24px;
   font-size: 14px;
   color: #606266;
+  align-items: center;
+}
+
+.review-details span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-details .el-icon {
+  font-size: 16px;
+  color: #909399;
 }
 
 .review-actions {
   display: flex;
   gap: 8px;
+  margin-left: 24px;
 }
-</style>
+
+.review-actions .el-button {
+  padding: 10px 20px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #dcdfe6;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: #909399;
+  margin: 0;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.pagination-container :deep(.el-pagination) {
+  font-weight: 500;
+}</style>
