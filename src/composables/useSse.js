@@ -32,14 +32,46 @@ export function useSse() {
         store.dispatch('notification/addNotification', newNotification);
       });
 
-      eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
-        eventSource.close();
+      eventSource.onerror = (event) => {
+        // SSE 연결 에러 처리
+        // readyState 확인:
+        // 0 = CONNECTING (연결 중)
+        // 1 = OPEN (연결됨)
+        // 2 = CLOSED (연결 종료)
+        
+        // 연결이 이미 종료된 상태면 조용히 처리
+        if (eventSource.readyState === EventSourcePolyfill.CLOSED) {
+          // 백엔드 연결이 끊겼을 때 발생하는 정상적인 상황
+          // 사용자에게 노출하지 않고 조용히 처리
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('SSE connection closed (handled silently)');
+          }
+          return;
+        }
+        
+        // 연결 중 에러가 발생한 경우
+        if (eventSource.readyState === EventSourcePolyfill.CONNECTING) {
+          // 개발 환경에서만 콘솔 로그 출력
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('SSE connection error while connecting (handled silently):', event);
+          }
+          // 네트워크 에러는 조용히 처리 (사용자에게 노출 안 함)
+          return;
+        }
+        
+        // 기타 에러는 개발 환경에서만 로그
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('SSE error (handled silently):', event);
+        }
       };
 
       sse.value = eventSource;
     } catch (error) {
-      console.error('Failed to connect to SSE:', error);
+      // SSE 연결 실패 시 조용히 처리 (사용자에게 노출 안 함)
+      // 네트워크 에러는 백엔드 연결이 끊겼을 때 발생할 수 있는 정상적인 상황
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Failed to connect to SSE (handled silently):', error);
+      }
     }
   };
 
