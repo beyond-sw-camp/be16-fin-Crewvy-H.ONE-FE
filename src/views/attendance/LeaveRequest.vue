@@ -13,6 +13,7 @@
             <el-form-item label="신청 종류" prop="requestType">
               <el-radio-group v-model="requestType" @change="handleRequestTypeChange">
                 <el-radio-button label="leave">휴가</el-radio-button>
+                <el-radio-button label="childcare">휴직</el-radio-button>
                 <el-radio-button label="trip">출장</el-radio-button>
                 <el-radio-button label="overtime">연장근무</el-radio-button>
                 <el-radio-button label="night">야간근무</el-radio-button>
@@ -24,6 +25,30 @@
               <el-select v-model="form.policyId" placeholder="휴가 종류를 선택하세요">
                 <el-option v-for="policy in leavePolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
               </el-select>
+              <el-alert
+                v-if="splitUsageWarning && requestType === 'leave'"
+                :type="splitUsageWarning.type"
+                :closable="false"
+                style="margin-top: 8px;"
+                :title="splitUsageWarning.title"
+              >
+                {{ splitUsageWarning.message }}
+              </el-alert>
+            </el-form-item>
+
+            <el-form-item v-if="requestType === 'childcare'" label="휴직 종류" prop="policyId" :rules="{ required: true, message: '휴직 종류를 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="휴직 종류를 선택하세요">
+                <el-option v-for="policy in childcarePolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
+              </el-select>
+              <el-alert
+                v-if="splitUsageWarning && requestType === 'childcare'"
+                :type="splitUsageWarning.type"
+                :closable="false"
+                style="margin-top: 8px;"
+                :title="splitUsageWarning.title"
+              >
+                {{ splitUsageWarning.message }}
+              </el-alert>
             </el-form-item>
 
             <el-form-item v-if="requestType === 'trip'" label="출장 종류" prop="policyId" :rules="{ required: true, message: '출장 종류를 선택하세요', trigger: 'change' }">
@@ -61,6 +86,14 @@
               </span>
             </el-form-item>
 
+            <!-- 문서 선택 (모든 신청 타입에 표시) -->
+            <el-form-item label="결재 문서" prop="documentId">
+              <el-select v-model="form.documentId" placeholder="결재 문서를 선택하세요 (선택사항)" clearable>
+                <el-option v-for="doc in documents" :key="doc.id" :label="doc.documentName" :value="doc.id" />
+              </el-select>
+              <span class="form-description">* 결재가 필요한 경우 문서를 선택하세요.</span>
+            </el-form-item>
+
             <el-form-item v-if="form.requestUnit !== 'TIME_OFF'" label="기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
               <el-date-picker
                 v-model="form.dateRange"
@@ -73,7 +106,7 @@
               />
             </el-form-item>
 
-            <el-form-item v-if="form.requestUnit === 'TIME_OFF'" label="시간" prop="dateTimeRange" :rules="{ required: true, message: '시간을 선택하세요', trigger: 'change' }">
+            <el-form-item v-if="requestType === 'leave' && form.requestUnit === 'TIME_OFF'" label="시간" prop="dateTimeRange" :rules="{ required: true, message: '시간을 선택하세요', trigger: 'change' }">
               <el-date-picker
                 v-model="form.dateTimeRange"
                 type="datetimerange"
@@ -84,13 +117,11 @@
                 value-format="YYYY-MM-DDTHH:mm:ss"
               />
             </el-form-item>
-            
-            <el-form-item v-if="requestType === 'trip'" label="출장지" prop="workLocation">
-              <el-select v-model="form.workLocation" placeholder="출장지를 선택하세요">
-                <el-option v-for="loc in workLocations" :key="loc.workLocationId" :label="loc.name" :value="loc.name" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="requestType === 'overtime' || requestType === 'night' || requestType === 'holiday'" label="근무 시간" prop="dateTimeRange" :rules="{ required: true, message: '근무 시간을 선택하세요', trigger: 'change' }">
+
+            <el-form-item v-if="requestType === 'overtime' || requestType === 'night' || requestType === 'holiday'"
+                           label="근무 시간"
+                           prop="dateTimeRange"
+                           :rules="{ required: true, message: '근무 시간을 선택하세요', trigger: 'change' }">
               <el-date-picker
                 v-model="form.dateTimeRange"
                 type="datetimerange"
@@ -100,6 +131,15 @@
                 format="YYYY-MM-DD HH:mm"
                 value-format="YYYY-MM-DDTHH:mm:ss"
               />
+              <el-alert
+                v-if="weeklyOvertimeWarning"
+                :type="weeklyOvertimeWarning.type"
+                :closable="false"
+                style="margin-top: 8px;"
+                :title="weeklyOvertimeWarning.title"
+              >
+                {{ weeklyOvertimeWarning.message }}
+              </el-alert>
             </el-form-item>
 
             <el-form-item label="사유" prop="reason" :rules="{ required: true, message: '사유를 입력하세요', trigger: 'blur' }">
@@ -158,7 +198,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { createLeaveRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests } from '@/api/attendance';
+import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getDocumentList, getMyAllBalances } from '@/api/attendance';
 import { Refresh } from '@element-plus/icons-vue';
 
 export default {
@@ -172,7 +212,9 @@ export default {
     const requestType = ref('leave');
 
     const allPolicies = ref([]);
+    const allBalances = ref([]);
     const workLocations = ref([]);
+    const documents = ref([]);
 
     const form = ref({
       policyId: null,
@@ -180,7 +222,9 @@ export default {
       dateRange: [],
       dateTimeRange: [],
       reason: '',
+      requesterComment: '',
       workLocation: null,
+      documentId: null,
     });
 
     // --- 신청 현황 테이블용 상태 변수 ---
@@ -191,6 +235,12 @@ export default {
     const leavePolicies = computed(() =>
       allPolicies.value.filter(p => p && p.typeCode && (p.typeCode.includes('LEAVE') || p.typeCode.startsWith('PTC00')))
     );
+    const childcarePolicies = computed(() => {
+      return allPolicies.value.filter(p =>
+        p.typeCode === 'PTC004' ||  // 육아휴직
+        p.typeCode === 'PTC005'     // 가족돌봄휴가
+      );
+    });
     const tripPolicies = computed(() =>
       allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC102')
     );
@@ -230,8 +280,96 @@ export default {
       return units.map(u => unitMap[u] || u).join(', ');
     };
 
+    const weeklyOvertimeWarning = computed(() => {
+      if (requestType.value !== 'overtime') return null;
+      if (!form.value.dateTimeRange?.length) return null;
+
+      const start = new Date(form.value.dateTimeRange[0]);
+      const end = new Date(form.value.dateTimeRange[1]);
+      const requestMin = (end - start) / 60000;
+
+      // 이번 주 월요일~일요일 범위
+      const day = start.getDay();
+      const monday = new Date(start);
+      monday.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+      monday.setHours(0, 0, 0, 0);
+
+      // 기존 연장근무 합산 (PTC103/104/105, PENDING/APPROVED)
+      let existingMin = 0;
+      myRequests.value.forEach(r => {
+        if (!['PTC103', 'PTC104', 'PTC105'].includes(r.typeCode)) return;
+        if (!['PENDING', 'APPROVED'].includes(r.status)) return;
+        const rStart = new Date(r.startDateTime);
+        if (rStart >= monday) {
+          const rEnd = new Date(r.endDateTime);
+          existingMin += (rEnd - rStart) / 60000;
+        }
+      });
+
+      const total = existingMin + requestMin;
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+
+      if (total > 720) {
+        return { type: 'error', title: '⚠️ 주간 한도 초과',
+                 message: `${h}h ${m}m / 12h (근로기준법 제53조 위반)` };
+      } else if (total > 600) {
+        return { type: 'warning', title: '주간 한도 임박',
+                 message: `${h}h ${m}m / 12h` };
+      } else if (total > 0) {
+        return { type: 'info', title: '주간 연장근무',
+                 message: `${h}h ${m}m / 12h` };
+      }
+      return null;
+    });
+
+    // 분할 사용 경고 (마지막 분할 시 경고)
+    const splitUsageWarning = computed(() => {
+      if (!selectedPolicy.value || !form.value.policyId) return null;
+
+      // 선택된 정책의 잔액 정보 찾기
+      const balance = allBalances.value.find(b =>
+        b.balanceTypeCode?.codeValue === selectedPolicy.value.typeCode
+      );
+
+      if (!balance || balance.maxSplitCount == null) return null;
+
+      const currentCount = balance.currentSplitCount || 0;
+      const maxCount = balance.maxSplitCount;
+
+      // 마지막 분할 사용 중인 경우
+      if (currentCount === maxCount - 1) {
+        const remainingDays = balance.remaining || 0;
+        return {
+          type: 'warning',
+          title: '⚠️ 마지막 분할 사용',
+          message: `이번이 마지막 분할 신청입니다. (${currentCount + 1}/${maxCount}회) 잔여 ${remainingDays}일을 모두 사용하세요.`
+        };
+      }
+
+      // 이미 모든 분할을 사용한 경우 (백엔드에서 막히겠지만 UI에서도 표시)
+      if (currentCount >= maxCount) {
+        return {
+          type: 'error',
+          title: '❌ 분할 횟수 초과',
+          message: `최대 분할 횟수(${maxCount}회)를 모두 사용했습니다. 더 이상 신청할 수 없습니다.`
+        };
+      }
+
+      // 일반 정보
+      if (currentCount > 0) {
+        return {
+          type: 'info',
+          title: '분할 사용 현황',
+          message: `현재 ${currentCount}/${maxCount}회 사용 중 (잔여: ${balance.remaining || 0}일)`
+        };
+      }
+
+      return null;
+    });
+
     watch(requestType, (newType) => {
-      if (newType === 'trip') {
+      if (newType === 'trip' || newType === 'childcare') {
         form.value.requestUnit = 'DAY';
       } else if (newType === 'overtime' || newType === 'night' || newType === 'holiday') {
         form.value.requestUnit = 'TIME_OFF';
@@ -255,9 +393,21 @@ export default {
         console.log('Fetched Assigned Policies:', assignedPolicies); // 데이터 확인용 콘솔 로그
         allPolicies.value = assignedPolicies || [];
 
+        // 잔액 정보 가져오기 (분할 사용 현황 포함)
+        const balances = await getMyAllBalances();
+        allBalances.value = balances || [];
+
         workLocations.value = await getActiveWorkLocations();
       } catch (err) {
         error(err.message || '필요한 데이터를 불러오는 데 실패했습니다.');
+      }
+    };
+
+    const fetchDocuments = async () => {
+      try {
+        documents.value = await getDocumentList();
+      } catch (err) {
+        console.error('문서 목록 조회 실패:', err);
       }
     };
 
@@ -277,6 +427,7 @@ export default {
 
     onMounted(() => {
       fetchInitialData();
+      fetchDocuments();
       fetchMyRequests(); // onMounted에 추가
     });
 
@@ -286,31 +437,69 @@ export default {
         if (valid) {
           isSubmitting.value = true;
           try {
-            const payload = {
-              policyId: form.value.policyId,
-              requestUnit: form.value.requestUnit,
-              reason: form.value.reason,
-              workLocation: requestType.value === 'trip' ? form.value.workLocation : null,
-            };
+            let response;
 
-            if (form.value.requestUnit === 'TIME_OFF') {
-              payload.startDateTime = form.value.dateTimeRange[0];
-              payload.endDateTime = form.value.dateTimeRange[1];
-            } else {
-              payload.startAt = form.value.dateRange[0];
-              payload.endAt = form.value.dateRange[1];
+            // 출장 신청
+            if (requestType.value === 'trip') {
+              const tripPayload = {
+                policyId: form.value.policyId,
+                startAt: form.value.dateRange[0],
+                endAt: form.value.dateRange[1],
+                workLocation: form.value.workLocation,
+                reason: form.value.reason,
+                requesterComment: form.value.requesterComment || null,
+                documentId: form.value.documentId || null,
+              };
+              response = await createTripRequest(tripPayload);
+            }
+            // 휴가/휴직/연장근무 신청
+            else {
+              const payload = {
+                policyId: form.value.policyId,
+                requestUnit: form.value.requestUnit,
+                reason: form.value.reason,
+                requesterComment: form.value.requesterComment || null,
+                documentId: form.value.documentId || null,
+              };
+
+              // 시간 단위 신청
+              if (form.value.requestUnit === 'TIME_OFF' ||
+                  requestType.value === 'overtime' ||
+                  requestType.value === 'night' ||
+                  requestType.value === 'holiday') {
+                payload.startDateTime = form.value.dateTimeRange[0];
+                payload.endDateTime = form.value.dateTimeRange[1];
+              }
+              // 일자 단위 신청
+              else {
+                payload.startAt = form.value.dateRange[0];
+                payload.endAt = form.value.dateRange[1];
+              }
+
+              response = await createLeaveRequest(payload);
             }
 
-            const response = await createLeaveRequest(payload);
-
-            // 자동 승인 여부에 따라 다른 메시지 표시
+            // 성공 메시지
             if (response.autoApproved && response.status === 'APPROVED') {
               success('자동승인처리되었습니다.');
             } else {
               success('신청이 성공적으로 제출되었습니다.');
             }
-            fetchMyRequests(); // 신청 성공 후 목록 새로고침
-            router.push({ name: 'AttendanceManagement' });
+
+            fetchMyRequests();
+
+            // documentId가 있으면 결재 화면으로 이동
+            if (form.value.documentId) {
+              router.push({
+                name: 'ApprovalCreate',
+                query: {
+                  requestId: response.id,
+                  documentId: form.value.documentId
+                }
+              });
+            } else {
+              router.push({ name: 'AttendanceManagement' });
+            }
           } catch (err) {
             error(err.message || '신청 제출에 실패했습니다.');
           } finally {
@@ -391,6 +580,10 @@ export default {
       selectedPolicy,
       isRequestUnitAllowed,
       formatAllowedUnits,
+      weeklyOvertimeWarning,
+      splitUsageWarning,
+      childcarePolicies,
+      documents,
     };
   },
 };

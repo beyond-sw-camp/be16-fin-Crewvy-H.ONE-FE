@@ -68,10 +68,14 @@ export const reactivateAssignments = (assignmentIds) => workforceClient.patch('/
 // --- 휴가/근태 신청 (Request) ---
 
 export const createLeaveRequest = (data) => workforceClient.post('/requests/leave', data);
+export const createTripRequest = (data) => workforceClient.post('/requests/trip', data);
 export const getMyRequests = (params) => workforceClient.get('/requests/my', { params });
 export const getMyLeaveRequests = (params) => workforceClient.get('/requests/my-leaves', { params });
 export const getRequestById = (requestId) => workforceClient.get(`/requests/${requestId}`);
 export const cancelRequest = (requestId) => workforceClient.delete(`/requests/${requestId}/cancel`);
+
+// 문서 목록 조회 API 추가 (결재 문서 연동용)
+export const getDocumentList = () => workforceClient.get('/approval/get-document-list');
 
 // --- 근무지 관리 (Work Location) ---
 
@@ -155,3 +159,5 @@ export const getMyDevices = (params) => workforceClient.get('/requests/devices/m
 export const getPendingDevices = (params) => workforceClient.get('/requests/devices/pending', { params });
 export const approveDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/approve`);
 export const rejectDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/reject`);
+
+export const runAnnualLeaveAccrualBatch = () => workforceClient.post('/batch/attendance/annual-leave-accrual');
