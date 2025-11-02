@@ -65,13 +65,12 @@
         <span class="form-description">출산 전/후 분할 (최대 2회)</span>
       </el-form-item>
       <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-alert type="warning" :closable="false" style="margin-bottom: 15px;">
+        장기 휴가는 계획적으로 사전 신청해야 하므로 사후 신청이 불가능합니다.
+      </el-alert>
       <el-form-item label="사후 신청 허용">
-        <el-switch v-model="rule.allowRetrospectiveRequest" />
-        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
-      </el-form-item>
-      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
-        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
-        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
+        <el-switch v-model="rule.allowRetrospectiveRequest" disabled />
+        <span class="form-description">장기 휴가는 사후 신청 불가 (자동 비활성화)</span>
       </el-form-item>
     </div>
 
@@ -142,13 +141,12 @@
         </span>
       </el-form-item>
       <el-divider content-position="left">사후 신청 설정</el-divider>
+      <el-alert type="warning" :closable="false" style="margin-bottom: 15px;">
+        장기 휴직은 계획적으로 사전 신청해야 하므로 사후 신청이 불가능합니다.
+      </el-alert>
       <el-form-item label="사후 신청 허용">
-        <el-switch v-model="rule.allowRetrospectiveRequest" />
-        <span class="form-description">급한 개인 사정으로 사전 신청이 어려운 경우 허용</span>
-      </el-form-item>
-      <el-form-item v-if="rule.allowRetrospectiveRequest" label="사후 신청 가능 기간 (일)">
-        <el-input-number v-model="rule.retrospectiveRequestDays" :min="1" :max="30" />
-        <span class="form-description">휴가 시작일로부터 최대 며칠 이내 신청 가능</span>
+        <el-switch v-model="rule.allowRetrospectiveRequest" disabled />
+        <span class="form-description">장기 휴직은 사후 신청 불가 (자동 비활성화)</span>
       </el-form-item>
     </div>
 
@@ -287,6 +285,24 @@ export default {
           rule.value.limitPeriod = 'YEARLY';
         } else if (newTypeCode === 'PTC006') {
           rule.value.limitPeriod = 'MONTHLY';
+        }
+      },
+      { immediate: true }
+    );
+
+    /**
+     * 장기 휴가/휴직 타입은 사후 신청 자동 비활성화
+     * - PTC002 (출산전후휴가): 90-150일
+     * - PTC004 (육아휴직): 최대 365일
+     */
+    watch(
+      () => props.policyTypeCode,
+      (newTypeCode) => {
+        const longTermLeaveTypes = ['PTC002', 'PTC004'];
+        if (longTermLeaveTypes.includes(newTypeCode)) {
+          rule.value.allowRetrospectiveRequest = false;
+          // retrospectiveRequestDays도 초기화
+          rule.value.retrospectiveRequestDays = null;
         }
       },
       { immediate: true }

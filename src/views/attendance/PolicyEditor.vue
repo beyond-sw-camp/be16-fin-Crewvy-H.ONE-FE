@@ -118,7 +118,7 @@
           <h4>휴게 규칙<el-tag v-if="isMandatory('breakRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
           <el-button v-if="!isMandatory('breakRule')" type="danger" @click="removeBlock('breakRule')" text circle><el-icon><CloseBold /></el-icon></el-button>
         </div>
-        <BreakRuleBlock v-model="policy.ruleDetails.breakRule" />
+        <BreakRuleBlock v-model="policy.ruleDetails.breakRule" :work-time-rule="policy.ruleDetails.workTimeRule" />
       </div>
       <div v-if="policy.ruleDetails.expenseRule" class="rule-block-container">
         <div class="block-header">
@@ -243,7 +243,12 @@ export default {
         if (blockName === 'leaveRule' && !policy.value.ruleDetails.leaveRule) {
             policy.value.ruleDetails.leaveRule = { defaultDays: 0 };
         } else if (blockName === 'workTimeRule' && !policy.value.ruleDetails.workTimeRule) {
-            policy.value.ruleDetails.workTimeRule = { type: 'FIXED', fixedWorkMinutes: 480 };
+            policy.value.ruleDetails.workTimeRule = {
+                type: 'FIXED',
+                fixedWorkMinutes: 480,
+                workStartTime: '09:00',
+                workEndTime: '18:00'
+            };
         } else if (blockName === 'authRule' && !policy.value.ruleDetails.authRule) {
             policy.value.ruleDetails.authRule = { allowedWorkLocationIds: [], requiredAuthTypes: ['GPS'] };
         } else if (blockName === 'breakRule' && !policy.value.ruleDetails.breakRule) {
@@ -380,6 +385,34 @@ export default {
         ruleDetails: policy.value.ruleDetails,
         autoApprove: policy.value.autoApprove,
       };
+
+      // workTimeRule 타입에 따라 불필요한 속성 제거
+      if (requestData.ruleDetails.workTimeRule) {
+        const workTimeRule = requestData.ruleDetails.workTimeRule;
+        if (workTimeRule.type === 'FIXED') {
+          // FIXED 타입: 코어타임 필드 제거
+          delete workTimeRule.coreTimeStart;
+          delete workTimeRule.coreTimeEnd;
+        } else if (workTimeRule.type === 'FLEXIBLE') {
+          // FLEXIBLE 타입: 삭제할 필드 없음 (모든 필드 필요)
+          // fixedWorkMinutes, workStartTime, workEndTime, coreTimeStart, coreTimeEnd 모두 필요
+        }
+      }
+
+      // breakRule 타입에 따라 불필요한 속성 제거
+      if (requestData.ruleDetails.breakRule) {
+        const breakRule = requestData.ruleDetails.breakRule;
+        if (breakRule.type === 'FIXED') {
+          delete breakRule.defaultBreakMinutesFor8Hours;
+          delete breakRule.mandatoryBreakMinutes;
+        } else if (breakRule.type === 'AUTO' || breakRule.type === 'MANUAL') {
+          delete breakRule.fixedBreakStart;
+          delete breakRule.fixedBreakEnd;
+        }
+      }
+
+      console.log('API 요청 데이터:', JSON.stringify(requestData, null, 2));
+
       try {
         if (isEditMode.value) {
           await updatePolicy(policyId.value, requestData);
@@ -388,7 +421,7 @@ export default {
           await createPolicy(requestData);
           success("정책이 성공적으로 생성되었습니다.");
         }
-        router.push('/policies');
+        router.push('/admin/policy-management');
       } catch (err) {
         error(err.message || "정책 저장에 실패했습니다.");
       } finally {
