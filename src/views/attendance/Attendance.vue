@@ -6,14 +6,40 @@
         <p>출퇴근 기록과 휴가 신청을 관리하세요.</p>
       </div>
       <div class="header-actions">
-        <el-button type="success" @click="recordEvent('CLOCK_IN')" :disabled="workStatus !== 'BEFORE_WORK'">
-          <el-icon><VideoPlay /></el-icon>
-          <span style="margin-left: 8px;">출근</span>
-        </el-button>
-        <el-button type="danger" @click="recordEvent('CLOCK_OUT')" :disabled="workStatus === 'BEFORE_WORK' || workStatus === 'CLOCKED_OUT'">
-          <el-icon><VideoPause /></el-icon>
-          <span style="margin-left: 8px;">퇴근</span>
-        </el-button>
+        <div class="action-buttons">
+          <el-button
+            type="success"
+            @click="recordEvent('CLOCK_IN')"
+            :disabled="workStatus !== 'BEFORE_WORK' || !isWithinWorkTimeRange"
+          >
+            <el-icon><VideoPlay /></el-icon>
+            <span style="margin-left: 8px;">출근</span>
+          </el-button>
+          <el-button
+            type="danger"
+            @click="recordEvent('CLOCK_OUT')"
+            :disabled="workStatus === 'BEFORE_WORK' || workStatus === 'CLOCKED_OUT' || !isWithinWorkTimeRange"
+          >
+            <el-icon><VideoPause /></el-icon>
+            <span style="margin-left: 8px;">퇴근</span>
+          </el-button>
+        </div>
+        <div v-if="!isWithinWorkTimeRange && effectivePolicy" class="time-warning">
+          <el-icon><Warning /></el-icon>
+          <span>출퇴근 가능 시간: {{ effectivePolicy.ruleDetails?.workTimeRule?.workStartTime }} ~ {{ effectivePolicy.ruleDetails?.workTimeRule?.workEndTime }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 출퇴근 시간 표시 -->
+    <div class="work-time-display">
+      <div class="time-item">
+        <span class="time-label">출근 시간</span>
+        <span class="time-value">{{ clockInTime || '--:--:--' }}</span>
+      </div>
+      <div class="time-item">
+        <span class="time-label">퇴근 시간</span>
+        <span class="time-value">{{ clockOutTime || '--:--:--' }}</span>
       </div>
     </div>
 
@@ -37,7 +63,7 @@
         <div class="card-content">
           <div class="card-title">이번 달 근무일</div>
           <div class="card-value">{{ monthlyWorkDays }}일</div>
-          <div class="card-subtitle">출근 {{ clockInTime || '--:--' }}</div>
+          <div class="card-subtitle">총 {{ totalMonthlyWorkHours }}시간</div>
         </div>
       </div>
 
@@ -59,49 +85,83 @@
         <div class="card-content">
           <div class="card-title">사용 휴가</div>
           <div class="card-value">{{ balanceInfo.totalUsed }}일</div>
-          <div class="card-subtitle">퇴근 {{ clockOutTime || '--:--' }}</div>
+          <div class="card-subtitle">전체 사용 내역</div>
         </div>
       </div>
     </div>
 
     <!-- 추가 작업 버튼 -->
     <div class="quick-actions">
-      <el-button @click="recordEvent('BREAK_START')" :disabled="workStatus !== 'WORKING'">
+      <el-button @click="recordEvent('BREAK_START')" :disabled="!isBreakManualMode || workStatus !== 'WORKING'">
         <el-icon><CoffeeCup /></el-icon>
         휴게 시작
       </el-button>
-      <el-button @click="recordEvent('BREAK_END')" :disabled="workStatus !== 'ON_BREAK'">
+      <el-button @click="recordEvent('BREAK_END')" :disabled="!isBreakManualMode || workStatus !== 'ON_BREAK'">
         <el-icon><Check /></el-icon>
         휴게 종료
       </el-button>
-      <el-button type="info" plain @click="registerCurrentDevice">
-        <el-icon><Monitor /></el-icon>
-        현재 기기 등록
+      <el-button @click="recordEvent('GO_OUT')" :disabled="workStatus !== 'WORKING'">
+        <el-icon><VideoPlay /></el-icon>
+        외출
+      </el-button>
+      <el-button @click="recordEvent('COME_BACK')" :disabled="workStatus !== 'AWAY'">
+        <el-icon><VideoPause /></el-icon>
+        복귀
       </el-button>
     </div>
 
     <!-- 탭 메뉴 -->
     <div class="attendance-tabs">
       <el-tabs v-model="activeTab">
-        <el-tab-pane label="월별 현황" name="monthly">
+        <el-tab-pane label="근태 현황" name="monthly">
           <div class="records-section">
-            <div class="section-header">
-              <h3>월별 근태 현황</h3>
-              <div class="filter-options">
-                <el-button :icon="ArrowLeft" @click="prevMonth" circle />
-                <h2>{{ currentMonthYear }}</h2>
-                <el-button :icon="ArrowRight" @click="nextMonth" circle />
+            <div class="calendar-controls-top">
+              <el-radio-group v-model="calendarView" size="small">
+                <el-radio-button label="month">월</el-radio-button>
+                <el-radio-button label="week">주</el-radio-button>
+              </el-radio-group>
+              <div class="date-navigator">
+                <el-button-group>
+                  <el-button :icon="ArrowLeft" @click="navigateCalendar(-1)"></el-button>
+                  <el-button @click="goToToday">오늘</el-button>
+                  <el-button :icon="ArrowRight" @click="navigateCalendar(1)"></el-button>
+                </el-button-group>
+                <span class="current-date-display">{{ currentCalendarDisplay }}</span>
               </div>
             </div>
 
-            <el-calendar v-model="calendarDate">
-              <template #date-cell="{ data }">
-                <p>{{ data.day.split('-').slice(2).join('-') }}</p>
-                <span class="status-text" :class="getWorkStatusClass(data.day)">
-                  {{ getWorkStatusForDate(data.day) }}
-                </span>
-              </template>
-            </el-calendar>
+            <div class="calendar-grid-container">
+              <div class="calendar-weekdays">
+                <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
+              </div>
+              <div class="calendar-days">
+                <div
+                  v-for="day in calendarDays"
+                  :key="day.date"
+                  class="calendar-day"
+                  :class="{
+                    'other-month': !day.currentMonth,
+                    'today': day.isToday,
+                    'has-events': day.events.length > 0
+                  }"
+                >
+                  <div class="day-number">{{ day.day }}</div>
+                  <div class="day-events">
+                    <div
+                      v-for="(event, idx) in day.events.slice(0, 2)"
+                      :key="`${event.date}-${idx}`"
+                      class="event-item"
+                      :class="event.type"
+                    >
+                      {{ event.title }}
+                    </div>
+                    <div v-if="day.events.length > 2" class="more-events">
+                      +{{ day.events.length - 2 }}개 더
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </el-tab-pane>
 
@@ -113,12 +173,17 @@
             </div>
 
             <div class="balance-cards" v-if="allBalances.length > 0">
-              <div class="balance-card" v-for="balance in allBalances" :key="balance.id">
+              <div class="balance-card" v-for="balance in allBalances" :key="balance.balanceTypeCode?.codeValue">
                 <div class="balance-header">
                   <h4>{{ balance.balanceTypeCode?.codeName || '알 수 없음' }}</h4>
-                  <el-tag :type="balance.isPaid ? 'success' : 'info'" size="small">
-                    {{ balance.isPaid ? '유급' : '무급' }}
-                  </el-tag>
+                  <div class="balance-tags">
+                    <el-tag :type="balance.isPaid ? 'success' : 'info'" size="small">
+                      {{ balance.isPaid ? '유급' : '무급' }}
+                    </el-tag>
+                    <el-tag v-if="!balance.balanceTypeCode?.isBalanceDeductible" type="warning" size="small">
+                      승인 필요
+                    </el-tag>
+                  </div>
                 </div>
                 <div class="balance-stats">
                   <div class="stat-item">
@@ -133,14 +198,23 @@
                     <span class="stat-label">잔여</span>
                     <span class="stat-value remaining">{{ balance.remaining || 0 }}일</span>
                   </div>
+                  <!-- 분할 사용 현황 (maxSplitCount가 설정된 경우만) -->
+                  <div v-if="balance.maxSplitCount != null" class="stat-item split-usage">
+                    <span class="stat-label">분할 사용</span>
+                    <span class="stat-value split-count" :class="{ 'split-warning': balance.currentSplitCount >= balance.maxSplitCount }">
+                      {{ balance.currentSplitCount || 0 }}/{{ balance.maxSplitCount }}회
+                    </span>
+                  </div>
                 </div>
                 <div class="balance-footer">
                   <span class="expiry-info">{{ balance.year }}년 유효</span>
                   <el-progress
-                    :percentage="balance.totalGranted > 0 ? Math.round((balance.totalUsed / balance.totalGranted) * 100) : 0"
+                    v-if="balance.totalGranted > 0"
+                    :percentage="Math.round((balance.totalUsed / balance.totalGranted) * 100)"
                     :stroke-width="6"
                     :color="getProgressColor(balance)"
                   />
+                  <span v-else class="no-balance-info">부여 내역 없음</span>
                 </div>
               </div>
             </div>
@@ -231,10 +305,9 @@
 <script>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft, ArrowRight, Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check, Monitor } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check, Warning } from '@element-plus/icons-vue';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { getMyMonthlyAttendance, getMyLeaveRequests, recordAttendanceEvent, getMyTodayAttendance, registerDevice, getMyAllBalances } from '@/api/attendance';
-import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { getMyMonthlyAttendance, getMyLeaveRequests, recordAttendanceEvent, getMyTodayAttendance, getMyAllBalances, getMyEffectivePolicy } from '@/api/attendance';
 
 export default {
   name: 'AttendancePage',
@@ -253,17 +326,138 @@ export default {
 
     const calendarDate = ref(new Date());
     const monthlyAttendances = ref([]);
-    const leaveRequests = ref([]);
+    const leaveRequests = ref([]); // 리스트용 (페이징)
+    const allLeaveRequests = ref([]); // 캘린더용 (전체)
     const leavePagination = ref({ page: 0, size: 10, totalElements: 0 });
     const balanceInfo = ref({
       remaining: 0,
       totalGranted: 0,
       totalUsed: 0
     });
-    const allBalances = ref([]); // 모든 휴가 정책 잔액
+    const allBalances = ref([]);
+    const effectivePolicy = ref(null);
 
+    const calendarView = ref('month'); // 'month' or 'week'
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+
+    const formatLocalDate = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const allEvents = computed(() => {
+      const events = [];
+
+      // 1. 근태 기록 (정상출근, 지각 등)
+      monthlyAttendances.value.forEach(att => {
+        if (att.statusName) {
+          events.push({
+            date: att.attendanceDate,
+            title: att.statusName,
+            type: getAttendanceEventType(att.statusName)
+          });
+        }
+      });
+
+      // 2. 승인된 휴가/출장 (APPROVED만) - 캘린더용 전체 데이터 사용
+      allLeaveRequests.value
+        .filter(leave => leave.status === 'APPROVED')
+        .forEach(leave => {
+          const startDate = new Date(leave.startDateTime);
+          const endDate = new Date(leave.endDateTime);
+
+          // 시작일부터 종료일까지 각 날짜에 이벤트 추가
+          for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateStr = formatLocalDate(d);
+            events.push({
+              date: dateStr,
+              title: leave.policyTypeName || '휴가',
+              type: leave.policyTypeCode === 'PTC007' ? 'businessTrip' : 'vacation'
+            });
+          }
+        });
+
+      return events;
+    });
+
+    const getAttendanceEventType = (statusName) => {
+      const typeMap = {
+        '정상': 'normal',
+        '지각': 'late',
+        '조퇴': 'earlyLeave',
+        '결근': 'absent'
+      };
+      return typeMap[statusName] || 'normal';
+    };
+
+    const calendarDays = computed(() => {
+      const year = calendarDate.value.getFullYear();
+      const month = calendarDate.value.getMonth();
+      const today = new Date();
+
+      let startDate;
+      if (calendarView.value === 'month') {
+        const firstDayOfMonth = new Date(year, month, 1);
+        startDate = new Date(firstDayOfMonth);
+        startDate.setDate(startDate.getDate() - firstDayOfMonth.getDay());
+      } else { // week view
+        startDate = new Date(calendarDate.value);
+        startDate.setDate(startDate.getDate() - calendarDate.value.getDay());
+      }
+
+      const days = [];
+      const numDays = calendarView.value === 'month' ? 42 : 7;
+
+      for (let i = 0; i < numDays; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        
+        const dateStr = formatLocalDate(date);
+        const dayEvents = allEvents.value.filter(event => event.date === dateStr);
+        
+        days.push({
+          date: dateStr,
+          day: date.getDate(),
+          currentMonth: calendarView.value === 'month' ? date.getMonth() === month : true,
+          isToday: date.toDateString() === today.toDateString(),
+          events: dayEvents
+        });
+      }
+      return days;
+    });
+
+    const currentCalendarDisplay = computed(() => {
+      const year = calendarDate.value.getFullYear();
+      const month = calendarDate.value.getMonth();
+      if (calendarView.value === 'month') {
+        return `${year}년 ${month + 1}월`;
+      } else {
+        const startOfWeek = new Date(calendarDate.value);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(endOfWeek.getDate() + 6);
+        return `${startOfWeek.getMonth() + 1}월 ${startOfWeek.getDate()}일 - ${endOfWeek.getMonth() + 1}월 ${endOfWeek.getDate()}일`;
+      }
+    });
+
+    const navigateCalendar = (direction) => {
+      if (calendarView.value === 'month') {
+        calendarDate.value = new Date(calendarDate.value.getFullYear(), calendarDate.value.getMonth() + direction, 1);
+      } else { // week view
+        calendarDate.value = new Date(calendarDate.value.getFullYear(), calendarDate.value.getMonth(), calendarDate.value.getDate() + (direction * 7));
+      }
+    };
+
+    const goToToday = () => {
+      calendarDate.value = new Date();
+    };
     const fetchMonthlyData = async () => {
       try {
+        // FullCalendar는 자체적으로 날짜를 관리하므로, API 호출 시 필요한 날짜 정보를 가져와야 함
+        // 이 부분은 FullCalendar의 viewDidMount나 datesSet 콜백에서 처리하는 것이 더 정확함
+        // 우선 기존 로직을 유지하되, 향후 개선 예정
         const year = calendarDate.value.getFullYear();
         const month = calendarDate.value.getMonth() + 1;
         monthlyAttendances.value = await getMyMonthlyAttendance({ year, month });
@@ -274,12 +468,24 @@ export default {
 
     const fetchLeaveData = async () => {
       try {
+        // 리스트용 페이징 데이터
         const params = { page: leavePagination.value.page, size: leavePagination.value.size };
         const response = await getMyLeaveRequests(params);
         leaveRequests.value = response.content || [];
         leavePagination.value.totalElements = response.totalElements || 0;
       } catch (err) {
         error(err.message || '휴가 내역을 불러오는 데 실패했습니다.');
+      }
+    };
+
+    const fetchAllLeaveData = async () => {
+      try {
+        // 캘린더 표시용 전체 데이터 (100개)
+        const params = { page: 0, size: 100 };
+        const response = await getMyLeaveRequests(params);
+        allLeaveRequests.value = response.content || [];
+      } catch (err) {
+        console.error('전체 휴가 내역을 불러오는 데 실패했습니다.');
       }
     };
 
@@ -350,11 +556,22 @@ export default {
       }
     };
 
+    const fetchEffectivePolicy = async () => {
+      try {
+        const policy = await getMyEffectivePolicy();
+        effectivePolicy.value = policy;
+      } catch (err) {
+        console.error('적용된 정책을 불러오는 데 실패했습니다.');
+      }
+    };
+
     onMounted(() => {
       timer.value = setInterval(() => { currentTime.value = new Date().toLocaleTimeString(); }, 1000);
       fetchTodayData();
       fetchMonthlyData();
       fetchLeaveData();
+      fetchAllLeaveData(); // 캘린더용 전체 휴가 데이터
+      fetchEffectivePolicy();
       fetchBalance();
     });
 
@@ -362,7 +579,10 @@ export default {
       clearInterval(timer.value);
     });
 
-    watch(calendarDate, fetchMonthlyData);
+    watch(calendarDate, () => {
+      fetchMonthlyData();
+      fetchAllLeaveData(); // 월이 바뀔 때 휴가 데이터도 새로 로드
+    });
 
     const workStatusText = computed(() => {
       switch(workStatus.value) {
@@ -387,6 +607,43 @@ export default {
 
     const currentMonthYear = computed(() => {
       return calendarDate.value.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+    });
+
+    // 휴게 규칙 타입이 MANUAL인 경우에만 휴게 버튼 활성화
+    const isBreakManualMode = computed(() => {
+      return effectivePolicy.value?.ruleDetails?.breakRule?.type === 'MANUAL';
+    });
+
+    // 현재 시간이 출퇴근 가능 시간 범위 내인지 확인
+    const isWithinWorkTimeRange = computed(() => {
+      if (!effectivePolicy.value?.ruleDetails?.workTimeRule) {
+        return true; // 정책이 없으면 항상 허용
+      }
+
+      const workTimeRule = effectivePolicy.value.ruleDetails.workTimeRule;
+      const { workStartTime, workEndTime } = workTimeRule;
+
+      if (!workStartTime || !workEndTime) {
+        return true; // 시간 설정이 없으면 항상 허용
+      }
+
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes(); // 현재 시각을 분 단위로 변환
+
+      // workStartTime, workEndTime을 분 단위로 변환 (HH:mm 형식)
+      const [startHour, startMin] = workStartTime.split(':').map(Number);
+      const [endHour, endMin] = workEndTime.split(':').map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      // 자정을 넘어가는 경우 처리 (예: 18:00 ~ 02:00)
+      if (endMinutes < startMinutes) {
+        // 자정 이전 또는 자정 이후 허용
+        return currentTime >= startMinutes || currentTime <= endMinutes;
+      } else {
+        // 정상적인 시간 범위 (예: 07:00 ~ 19:00)
+        return currentTime >= startMinutes && currentTime <= endMinutes;
+      }
     });
 
     // 디바이스 타입 감지 함수
@@ -427,15 +684,16 @@ export default {
 
     const recordEvent = async (eventType) => {
       try {
-        const fp = await FingerprintJS.load();
-        const result = await fp.get();
-        const deviceId = result.visitorId;
+        // deviceId는 근태 인증에 불필요 (로그인으로 사용자 판별)
+        // const fp = await FingerprintJS.load();
+        // const result = await fp.get();
+        // const deviceId = result.visitorId;
         const deviceType = detectDeviceType();
         const gpsLocation = await getGpsLocation();
 
         await recordAttendanceEvent({
           eventType: eventType,
-          deviceId: deviceId,
+          // deviceId: deviceId,
           deviceType: deviceType,
           latitude: gpsLocation.latitude,
           longitude: gpsLocation.longitude,
@@ -444,56 +702,6 @@ export default {
         await fetchTodayData();
       } catch (err) {
         error(err.message || '근태 기록에 실패했습니다.');
-      }
-    };
-
-    const registerCurrentDevice = async () => {
-      try {
-        const deviceType = detectDeviceType();
-        const deviceTypeText = deviceType === 'MOBILE' ? '모바일 기기' : '노트북/데스크톱';
-
-        const deviceName = prompt(`이 기기의 이름을 입력하세요 (감지된 타입: ${deviceTypeText}):`);
-        if (!deviceName) {
-          error('기기 이름이 입력되지 않아 취소되었습니다.');
-          return;
-        }
-
-        const fp = await FingerprintJS.load();
-        const result = await fp.get();
-        const deviceId = result.visitorId;
-
-        await registerDevice({
-          deviceId: deviceId,
-          deviceName: deviceName,
-          deviceType: deviceType,
-        });
-        success(`기기 등록 요청이 완료되었습니다. (타입: ${deviceTypeText})`);
-      } catch (err) {
-        error(err.message || '기기 등록에 실패했습니다.');
-      }
-    };
-
-    const prevMonth = () => {
-      calendarDate.value = new Date(calendarDate.value.setMonth(calendarDate.value.getMonth() - 1));
-    };
-    const nextMonth = () => {
-      calendarDate.value = new Date(calendarDate.value.setMonth(calendarDate.value.getMonth() + 1));
-    };
-
-    const getWorkStatusForDate = (day) => {
-      const record = monthlyAttendances.value.find(d => d.attendanceDate === day);
-      return record ? record.statusName : '';
-    };
-
-    const getWorkStatusClass = (day) => {
-      const record = monthlyAttendances.value.find(d => d.attendanceDate === day);
-      if (!record) return '';
-      switch(record.statusName) {
-        case '정상': return 'status-normal';
-        case '지각': return 'status-late';
-        case '조퇴': return 'status-early';
-        case '연차': return 'status-leave';
-        default: return '';
       }
     };
 
@@ -531,11 +739,14 @@ export default {
     return {
       activeTab, currentTime, workStatus, clockInTime, clockOutTime,
       totalWorkTime, workStatusText, recordEvent, calendarDate,
-      currentMonthYear, prevMonth, nextMonth, getWorkStatusForDate, getWorkStatusClass,
+      currentMonthYear,
       leaveRequests, leavePagination, handleLeavePageChange, goToLeaveRequest,
-      ArrowLeft, ArrowRight, Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check, Monitor,
-      registerCurrentDevice, monthlyWorkDays, balanceInfo, totalMonthlyWorkHours,
+      ArrowLeft, ArrowRight, Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check,
+      monthlyWorkDays, balanceInfo, totalMonthlyWorkHours,
       formatDate, getVacationStatusType, allBalances, getProgressColor,
+      isBreakManualMode, isWithinWorkTimeRange, effectivePolicy,
+      calendarView, weekdays, calendarDays, currentCalendarDisplay, navigateCalendar, goToToday,
+      allEvents, Warning
     };
   },
 };
@@ -570,7 +781,30 @@ export default {
 
 .header-actions {
   display: flex;
+  flex-direction: column;
   gap: 12px;
+  align-items: flex-end;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.time-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 14px;
+}
+
+.time-warning .el-icon {
+  font-size: 16px;
 }
 
 .attendance-cards {
@@ -629,12 +863,6 @@ export default {
   color: #909399;
 }
 
-.card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
 .quick-actions {
   display: flex;
   gap: 12px;
@@ -657,52 +885,178 @@ export default {
   padding: 24px;
 }
 
-.section-header {
+.calendar-controls-top {
+  padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.section-header h3 {
-  font-size: 18px;
+.date-navigator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.current-date-display {
+  font-size: 16px;
   font-weight: 600;
   color: #2c3e50;
-  margin: 0;
+  min-width: 120px;
+  text-align: center;
 }
 
-.filter-options {
+.calendar-grid-container {
+  padding: 24px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  margin-bottom: 8px;
+}
+
+.weekday {
+  padding: 12px;
+  text-align: center;
+  font-weight: 600;
+  color: #606266;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.calendar-day {
+  min-height: 100px;
+  padding: 8px;
+  background: white;
+  border-right: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e4e7ed;
+  transition: all 0.3s ease;
+}
+
+.calendar-day:nth-child(7n) {
+  border-right: none;
+}
+
+.calendar-day:nth-last-child(-n + 7) {
+  border-bottom: none;
+}
+
+.calendar-day.other-month {
+  background: #f8f9fa;
+  color: #909399;
+}
+
+.calendar-day.today {
+  background: #f0f9ff;
+  border: 2px solid #4f46e5;
+}
+
+.day-number {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #2c3e50;
+}
+
+.day-events {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.event-item {
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 근태 상태 */
+.event-item.normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.event-item.late {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.event-item.earlyLeave {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.event-item.absent {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* 휴가/출장 */
+.event-item.vacation {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.event-item.businessTrip {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.more-events {
+  font-size: 10px;
+  color: #606266;
+  font-style: italic;
+}
+
+.work-time-display {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.time-item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.filter-options h2 {
-  margin: 0;
-  font-size: 18px;
+.time-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
 }
 
-.status-text {
-  font-size: 12px;
+/* ... 기존 스타일 ... */
+.time-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: #4f46e5;
 }
 
-.status-late {
-  color: #e6a23c;
-}
-
-.status-early {
-  color: #f56c6c;
-}
-
-.status-leave {
-  color: #409eff;
-}
-
-.status-normal {
-  color: #67c23a;
-}
-
+/* 휴가 관리 탭 스타일 */
 .balance-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -736,6 +1090,11 @@ export default {
   font-weight: 600;
   color: #2c3e50;
   margin: 0;
+}
+
+.balance-tags {
+  display: flex;
+  gap: 8px;
 }
 
 .balance-stats {
@@ -773,6 +1132,20 @@ export default {
   color: #4f46e5;
 }
 
+.balance-stats .stat-value.split-count {
+  color: #67c23a;
+}
+
+.balance-stats .stat-value.split-count.split-warning {
+  color: #f56c6c;
+  font-weight: 700;
+}
+
+.balance-stats .stat-item.split-usage {
+  border-left: 1px solid #f0f0f0;
+  padding-left: 12px;
+}
+
 .balance-footer {
   display: flex;
   flex-direction: column;
@@ -782,6 +1155,14 @@ export default {
 .balance-footer .expiry-info {
   font-size: 12px;
   color: #909399;
+}
+
+.no-balance-info {
+  font-size: 13px;
+  color: #e6a23c;
+  font-weight: 500;
+  text-align: center;
+  padding: 8px;
 }
 
 .empty-balance {
@@ -865,6 +1246,7 @@ export default {
   margin-top: 20px;
 }
 
+/* 근태 통계 탭 스타일 */
 .statistics-section {
   padding: 24px;
 }
