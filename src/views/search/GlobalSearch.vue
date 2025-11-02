@@ -29,50 +29,53 @@
             <el-empty description="검색어를 입력해주세요."></el-empty>
           </div>
           <div v-else-if="results.length === 0">
-            <el-empty :description="'\'' + searchQuery + '\'에 대한 검색 결과가 없습니다.'"></el-empty>
+            <el-empty :description="`'${searchQuery}'에 대한 검색 결과가 없습니다.`"></el-empty>
           </div>
           <div v-else>
-            <div v-for="(group, category) in groupedResults" :key="category" class="result-group">
-              <h2 class="group-title">{{ category }}</h2>
-              <template v-if="category === '직원'">
-                <div class="employee-list-header">
-                  <div class="employee-list-cell">이름</div>
-                  <div class="employee-list-cell">부서</div>
-                  <div class="employee-list-cell">직책</div>
-                  <div class="employee-list-cell">연락처</div>
-                  <div class="employee-list-cell">상태</div>
+            <!-- Employee Results in All Tab -->
+            <div v-if="getResultsByCategory('employee').length > 0" class="result-group">
+              <h2 class="group-title">직원</h2>
+              <div class="employee-list-header">
+                <div class="employee-list-cell">이름</div>
+                <div class="employee-list-cell">부서</div>
+                <div class="employee-list-cell">직책</div>
+                <div class="employee-list-cell">연락처</div>
+                <div class="employee-list-cell">상태</div>
+              </div>
+              <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
+                <div class="employee-list-cell">{{ result.title }}</div>
+                <div class="employee-list-cell">{{ result.department }}</div>
+                <div class="employee-list-cell">{{ result.position }}</div>
+                <div class="employee-list-cell">{{ result.contact }}</div>
+                <div class="employee-list-cell">{{ result.status }}</div>
+              </div>
+              <div v-if="getResultsByCategory('employee').length > 5" class="view-more-container">
+                <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{ getResultsByCategory('employee').length - 5 }}개)</el-button>
+              </div>
+            </div>
+
+            <!-- Approval Results in All Tab -->
+            <div v-if="getResultsByCategory('approval').length > 0" class="result-group">
+              <h2 class="group-title">결재문서</h2>
+              <div v-for="result in getResultsByCategory('approval').slice(0, 5)" :key="result.id" class="result-item">
+                <div class="result-header">
+                  <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
                 </div>
-                <div v-for="result in group.slice(0, 5)" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
-                  <div class="employee-list-cell">{{ result.title }}</div>
-                  <div class="employee-list-cell">{{ result.department }}</div>
-                  <div class="employee-list-cell">{{ result.position }}</div>
-                  <div class="employee-list-cell">{{ result.contact }}</div>
-                  <div class="employee-list-cell">{{ result.status }}</div>
-                </div>
-                <div v-if="group.length > 5" class="view-more-container">
-                  <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{ group.length - 5 }}개)</el-button>
-                </div>
-              </template>
-              <template v-else>
-                <div v-for="result in group.slice(0, 5)" :key="result.id" class="result-item">
-                  <div class="result-header">
-                    <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
-                  </div>
-                  <p class="result-snippet" v-html="result.snippet"></p>
-                </div>
-                <div v-if="group.length > 5" class="view-more-container">
-                  <el-button type="text" @click="activeTab = categories.find(c => c.label === category).name">{{ category }} 더보기 ({{ group.length - 5 }}개)</el-button>
-                </div>
-              </template>
+              </div>
+              <div v-if="getResultsByCategory('approval').length > 5" class="view-more-container">
+                <el-button type="text" @click="activeTab = 'approval'">결재문서 더보기 ({{ getResultsByCategory('approval').length - 5 }}개)</el-button>
+              </div>
             </div>
           </div>
         </el-tab-pane>
+
+        <!-- Employee Tab -->
         <el-tab-pane label="직원" name="employee">
           <div v-if="!searched">
             <el-empty description="검색어를 입력해주세요."></el-empty>
           </div>
           <div v-else-if="getResultsByCategory('employee').length === 0">
-            <el-empty :description="'\'' + searchQuery + '\'에 대한 직원 검색 결과가 없습니다.'"></el-empty>
+            <el-empty :description="`'${searchQuery}'에 대한 직원 검색 결과가 없습니다.`"></el-empty>
           </div>
           <div v-else>
             <div class="employee-list-header">
@@ -91,21 +94,36 @@
             </div>
           </div>
         </el-tab-pane>
-        <el-tab-pane v-for="category in categories.filter(c => c.name !== 'employee')" :key="category.name" :label="category.label" :name="category.name">
+
+        <!-- Approval Tab -->
+        <el-tab-pane label="결재문서" name="approval">
             <div v-if="!searched">
               <el-empty description="검색어를 입력해주세요."></el-empty>
             </div>
-            <div v-else-if="getResultsByCategory(category.name).length === 0">
-              <el-empty :description="'\'' + searchQuery + '\'에 대한 ' + category.label + ' 검색 결과가 없습니다.'"></el-empty>
+            <div v-else-if="approvalResults.length === 0">
+              <el-empty :description="`'${searchQuery}'에 대한 결재문서 검색 결과가 없습니다.`"></el-empty>
             </div>
             <div v-else>
-              <div v-for="result in getResultsByCategory(category.name)" :key="result.id" class="result-item">
+              <div v-for="result in approvalResults" :key="result.id" class="result-item">
                 <div class="result-header">
                   <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
                 </div>
-                <p class="result-snippet" v-html="result.snippet"></p>
               </div>
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="approvalTotalItems"
+                :page-size="approvalsPerPage"
+                v-model:current-page="approvalCurrentPage"
+                @current-change="handleApprovalPageChange"
+                class="pagination-container"
+              />
             </div>
+        </el-tab-pane>
+
+        <!-- Other tabs will be dynamically created here, but won't have content yet -->
+        <el-tab-pane v-for="category in categories.filter(c => c.name !== 'employee' && c.name !== 'approval')" :key="category.name" :label="category.label" :name="category.name">
+            <el-empty :description="`'${category.label}'에 대한 검색 기능은 아직 준비중입니다.`"></el-empty>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -127,32 +145,43 @@ export default {
         { name: 'approval', label: '결재문서' },
         { name: 'meeting', label: '회의록' },
       ],
-      results: [],
+      results: [], // For global search results
+      approvalResults: [], // For paginated approval results
+      approvalCurrentPage: 1,
+      approvalTotalItems: 0,
+      approvalsPerPage: 10,
     };
   },
-  created() {
+  watch: {
+    activeTab(newTab) {
+      if (newTab === 'approval' && this.searched && this.approvalResults.length === 0) {
+        this.fetchApprovalResults();
+      }
+    }
   },
   computed: {
     groupedResults() {
-      return this.results.reduce((groups, result) => {
-        const category = result.type;
-        if (!groups[category]) {
-          groups[category] = [];
-        }
-        groups[category].push(result);
-        return groups;
-      }, {});
+      const groups = {
+        '직원': this.getResultsByCategory('employee'),
+        '결재문서': this.getResultsByCategory('approval'),
+      };
+      return Object.fromEntries(Object.entries(groups).filter(([, value]) => value.length > 0));
     }
   },
   methods: {
     async performSearch() {
       this.searched = true;
       this.results = [];
+      this.approvalResults = [];
+      this.approvalCurrentPage = 1;
+      this.approvalTotalItems = 0;
+
       if (!this.searchQuery) {
         return;
       }
 
       try {
+        // Fetch global results for "All" tab
         const response = await searchService.searchGlobal(this.searchQuery);
         this.results = response.data.data.map(res => {
           if (res.category === 'employee') {
@@ -164,22 +193,56 @@ export default {
               position: res.position,
               contact: res.contact,
               status: res.status,
-              snippet: `${res.department} / ${res.position} / ${res.contact} / ${res.status}`,
               category: 'employee',
               path: `/member/detail/${res.id}`
             };
-          } 
+          } else if (res.category === 'approval') {
+            return {
+              id: res.id,
+              type: '결재문서',
+              title: res.title,
+              category: 'approval',
+              path: `/approval/detail/${res.id}`
+            };
+          }
           return null;
         }).filter(Boolean);
+
+        // Fetch first page for "Approval" tab
+        this.fetchApprovalResults();
 
       } catch (error) {
         console.error('Error searching:', error);
       }
     },
+    async fetchApprovalResults() {
+      if (!this.searchQuery) return;
+      try {
+        const response = await searchService.searchApprovals(
+          this.searchQuery,
+          this.approvalCurrentPage - 1,
+          this.approvalsPerPage
+        );
+        const pageData = response.data.data;
+        this.approvalResults = pageData.content.map(doc => ({
+          id: doc.approvalId,
+          type: '결재문서',
+          title: doc.title,
+          category: 'approval',
+          path: `/approval/detail/${doc.approvalId}`
+        }));
+        this.approvalTotalItems = pageData.totalElements;
+      } catch (error) {
+        console.error('Error fetching approval results:', error);
+      }
+    },
+    handleApprovalPageChange(newPage) {
+      this.approvalCurrentPage = newPage;
+      this.fetchApprovalResults();
+    },
     getResultsByCategory(category) {
       return this.results.filter(result => result.category === category);
     },
-
     navigateTo(result) {
       this.$router.push(result.path);
     }

@@ -38,6 +38,18 @@ class SearchService {
       },
     });
   }
+
+  searchApprovals(query, page, size) {
+    const accessToken = localStorage.getItem('accessToken');
+    const companyId = localStorage.getItem('companyId');
+    return axios.get(`${API_URL}/search/approvals`, {
+      params: { query, page, size },
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-User-CompanyId': companyId,
+      },
+    });
+  }
 }
 
 export default new SearchService();
