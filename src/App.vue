@@ -10,6 +10,7 @@
 <script>
 import AppLayout from './layouts/AppLayout.vue';
 import BlankLayout from './layouts/BlankLayout.vue';
+import MobileLayout from './layouts/MobileLayout.vue';
 import SnackbarContainer from './components/SnackbarContainer.vue';
 
 export default {
@@ -17,17 +18,26 @@ export default {
   components: {
     AppLayout,
     BlankLayout,
+    MobileLayout,
     SnackbarContainer
   },
   data() {
     return {
-      isLoading: true, // Initially true, to prevent rendering until user data is loaded
+      isLoading: true,
     };
   },
   computed: {
     layout() {
-      // Use a default layout if the route doesn't specify one
-      return this.$route.meta.layout || 'AppLayout';
+      // 모바일 디바이스 감지
+      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase());
+
+      // 라우트에 명시적으로 레이아웃이 지정된 경우 (예: 로그인 페이지)
+      if (this.$route.meta.layout) {
+        return this.$route.meta.layout;
+      }
+
+      // 모바일이면 MobileLayout, PC면 AppLayout
+      return isMobile ? 'MobileLayout' : 'AppLayout';
     }
   },
   async created() {
@@ -43,9 +53,9 @@ export default {
         memberPositionId
       };
       
-      await this.$store.dispatch('setUser', user); // Wait for the action to complete
+      await this.$store.dispatch('setUser', user);
     }
-    this.isLoading = false; // Set to false after user data is loaded or not found
+    this.isLoading = false;
   }
 }
 </script>

@@ -68,12 +68,6 @@ const attendanceRoutes = [
     meta: { requiresAuth: true, title: '근무지 관리' }
   },
   {
-    path: '/admin/device-approval-management',
-    name: 'DeviceApprovalManagement',
-    component: () => import('@/views/admin/DeviceApprovalManagement.vue'),
-    meta: { requiresAuth: true, title: '디바이스 승인 관리' }
-  },
-  {
     path: '/admin/audit-log',
     name: 'AuditLog',
     component: () => import('@/views/AuditLog.vue'),
