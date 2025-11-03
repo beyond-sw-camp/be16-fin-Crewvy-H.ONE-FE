@@ -15,8 +15,12 @@
     <div class="content">
       <!-- 비디오 영역 -->
       <div class="stage">
-        <div class="videos">
-          <div v-for="track in videoTracks" :key="track.sid" class="video-item">
+        <div class="main-video" v-if="mainVideoTrack">
+          <video :ref="el => { if (el) mainVideoTrack.attach(el) }" autoplay playsinline :muted="mainVideoTrack.isLocal"></video>
+          <div class="participant-name">{{ mainVideoTrack.isLocal ? '나' : (mainVideoTrack.participant ? mainVideoTrack.participant.identity : '') }}</div>
+        </div>
+        <div class="thumbnail-videos">
+          <div v-for="track in thumbnailVideoTracks" :key="track.sid" class="video-item" @click="setMainVideoTrack(track)">
             <video :ref="el => { if (el) track.attach(el) }" autoplay playsinline :muted="track.isLocal"></video>
             <div class="participant-name">{{ track.isLocal ? '나' : (track.participant ? track.participant.identity : '') }}</div>
           </div>
@@ -93,6 +97,8 @@ export default {
       screenShareActive: false,
       isChatOpen: true,
       messages: [],
+      mainVideoTrack: null,
+      participantCount: 0,
       videoTracks: [],
       chatText: '',
       Track,
@@ -104,8 +110,11 @@ export default {
     }
   },
   computed: {
-    participantCount() {
-      return this.room && this.room.participants ? this.room.participants.size : 0
+    // participantCount() {
+    //   return this.remoteParticipants.length + 1
+    // },
+    thumbnailVideoTracks() {
+      return this.videoTracks.filter(track => track !== this.mainVideoTrack)
     }
   },
   mounted() {
@@ -120,14 +129,19 @@ export default {
     this.leaveSession()
   },
   methods: {
+    setMainVideoTrack(track) {
+      this.mainVideoTrack = track
+    },
     async join(videoConferenceId, token) {
       this.room = new Room()
 
       this.room.on(RoomEvent.ParticipantConnected, (participant) => {
         this.remoteParticipants.push(participant)
+        this.participantCount = this.room.remoteParticipants.size+1;
       })
       this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.remoteParticipants = this.remoteParticipants.filter(p => p.sid !== participant.sid)
+        this.participantCount = this.room.remoteParticipants.size+1;
       })
 
       this.room.on(RoomEvent.TrackSubscribed, (track) => {
@@ -161,7 +175,7 @@ export default {
       try {
         await this.room.connect(process.env.VUE_APP_LIVEKIT_URL, token)
         this.localParticipant = this.room.localParticipant
-
+        this.participantCount = this.room.remoteParticipants.size+1;
         // Publish local tracks
         this.localAudioTrack = await createLocalAudioTrack()
         await this.localParticipant.publishTrack(this.localAudioTrack)
@@ -169,6 +183,7 @@ export default {
         this.localVideoTrack = await createLocalVideoTrack()
         await this.localParticipant.publishTrack(this.localVideoTrack)
         this.videoTracks.push(this.localVideoTrack)
+        this.setMainVideoTrack(this.localVideoTrack) // 내 비디오를 메인으로 설정
 
         if (this.videoConferenceId) {
           getChatMessages(this.videoConferenceId)
@@ -208,12 +223,20 @@ export default {
     toggleAudio() {
       if (!this.localAudioTrack) return
       this.audioEnabled = !this.audioEnabled
-      this.localAudioTrack.mute(!this.audioEnabled)
+      if (this.audioEnabled) {
+        this.localAudioTrack.unmute()
+      } else {
+        this.localAudioTrack.mute()
+      }
     },
     toggleVideo() {
       if (!this.localVideoTrack) return
       this.videoEnabled = !this.videoEnabled
-      this.localVideoTrack.mute(!this.videoEnabled)
+      if (this.videoEnabled) {
+        this.localVideoTrack.unmute()
+      } else {
+        this.localVideoTrack.mute()
+      }
     },
     async toggleScreenShare() {
       if (!this.room || !this.localParticipant) return
@@ -328,21 +351,52 @@ export default {
 .stage {
   position: relative;
   background: #0d0d0e;
+  display: flex;
+  flex-direction: column;
 }
-.videos {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 10px;
+.main-video {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 10px;
 }
-.videos video {
+.main-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* contain으로 변경하여 전체 비디오가 보이도록 함 */
+  background: #000;
+  border-radius: 8px;
+}
+.thumbnail-videos {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+.video-item {
+  position: relative;
+  width: 240px; /* 썸네일 너비 고정 */
+  height: 135px; /* 16:9 비율 */
+  flex-shrink: 0;
+}
+.video-item video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   background: #000;
   border-radius: 8px;
+}
+.participant-name {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 .controls {
   position: absolute;
