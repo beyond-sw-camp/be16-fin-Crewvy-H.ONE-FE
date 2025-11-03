@@ -76,25 +76,37 @@
             <div class="section-header">
               <h3>진행 중인 회의</h3>
             </div>
-            <div class="meeting-item" v-for="meeting in activeMeetingsList" :key="meeting.id">
-              <div class="meeting-info">
-                <div class="meeting-title">{{ meeting.title }}</div>
-                <div class="meeting-details">
-                  <span class="meeting-host">주최: {{ meeting.host }}</span>
-                  <span class="meeting-participants">{{ meeting.participants }}명 참여</span>
-                  <span class="meeting-duration">{{ meeting.duration }}</span>
+            <div class="meeting-list">
+              <div class="meeting-item" v-for="meeting in activeMeetingsList" :key="meeting.id">
+                <div class="meeting-info">
+                  <div class="meeting-title">{{ meeting.title }}</div>
+                  <div class="meeting-details">
+                    <span class="meeting-host">주최: {{ meeting.host }}</span>
+                    <span class="meeting-participants">{{ meeting.participants }}명 참여</span>
+                    <span class="meeting-duration">{{ meeting.duration }}</span>
+                  </div>
+                </div>
+                <div class="meeting-actions">
+                  <el-button type="primary" @click="joinActiveMeeting(meeting)">
+                    <el-icon><Connection /></el-icon>
+                    참여
+                  </el-button>
+                  <!-- <el-button @click="endMeeting">
+                    <el-icon><Close /></el-icon>
+                    종료
+                  </el-button> -->
                 </div>
               </div>
-              <div class="meeting-actions">
-                <el-button type="primary" @click="joinActiveMeeting(meeting)">
-                  <el-icon><Connection /></el-icon>
-                  참여
-                </el-button>
-                <!-- <el-button @click="endMeeting">
-                  <el-icon><Close /></el-icon>
-                  종료
-                </el-button> -->
-              </div>
+            </div>
+            <div class="pagination-container" v-if="activeMeetingsList.length > 0">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="activeTotalPages * activePageSize"
+                :page-size="activePageSize"
+                v-model:current-page="activeCurrentPage"
+                @current-change="handleActivePageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -132,6 +144,16 @@
                 </div>
               </div>
             </div>
+            <div class="pagination-container" v-if="scheduledMeetings.length > 0">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="scheduledTotalPages * scheduledPageSize"
+                :page-size="scheduledPageSize"
+                v-model:current-page="scheduledCurrentPage"
+                @current-change="handleScheduledPageChange"
+              />
+            </div>
           </div>
         </el-tab-pane>
         
@@ -167,11 +189,11 @@
                     <span class="meeting-duration">{{ meeting.duration }}</span>
                     <span class="meeting-participants">{{ meeting.participants }}명 참여</span>
                   </div>
-                  <div class="meeting-status">
+                  <!-- <div class="meeting-status">
                     <el-tag :type="meeting.status === '완료' ? 'success' : 'warning'" size="small">
                       {{ meeting.status }}
                     </el-tag>
-                  </div>
+                  </div> -->
                 </div>
                 <div class="meeting-actions">
                   <el-button type="text" @click="viewRecording(meeting)" v-if="meeting.url">
@@ -184,6 +206,16 @@
                   </el-button>
                 </div>
               </div>
+            </div>
+            <div class="pagination-container" v-if="meetingHistory.length > 0">
+              <el-pagination
+                background
+                layout="prev, pager, next"
+                :total="historyTotalPages * historyPageSize"
+                :page-size="historyPageSize"
+                                v-model:current-page="historyCurrentPage"
+                @current-change="handleHistoryPageChange"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -368,6 +400,15 @@ export default {
       activeMeetingsList: [],
       scheduledMeetings: [],
       meetingHistory: [],
+      historyCurrentPage: 1,
+      historyPageSize: 5,
+      historyTotalPages: 1,
+      scheduledCurrentPage: 1,
+      scheduledPageSize: 5,
+      scheduledTotalPages: 1,
+      activeCurrentPage: 1,
+      activePageSize: 5,
+      activeTotalPages: 1,
       employees: [
         { id: 'ed723fc3-4ac9-4510-810a-4e71a7b7d6c9', name: '김민준' },
         { id: '577bf0f7-447a-49a2-9530-dff78dc4c2a7', name: '이서준' },
@@ -450,39 +491,54 @@ export default {
     async handleTabChange(tab) {
       this.activeTab = tab
       if(tab === 'active') {
-        const inProgress = await getMyVideoConferences('IN_PROGRESS')
-        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
-        this.activeMeetings = this.activeMeetingsList.length
+        this.loadActiveMeetings();
       } else if(tab === 'scheduled') {
-        const waiting = await getMyVideoConferences('WAITING')
-        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
-        const localDate = this.getLocalDate();
-        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
+        this.loadScheduledMeetings();
       } else if(tab === 'history') {
-        const ended = await getMyVideoConferences('ENDED')
-        this.meetingHistory = this.parseMeetingHistory(ended)
+        this.loadMeetingHistory();
+      }
+    },
+    async loadActiveMeetings() {
+      try {
+        const inProgress = await getMyVideoConferences('IN_PROGRESS', this.activeCurrentPage - 1, this.activePageSize);
+        this.activeMeetingsList = this.parseActiveMeetings(inProgress);
+        this.activeTotalPages = inProgress.totalPages || 1;
+        this.activeMeetings = inProgress.totalElements || 0;
+        this.totalParticipants = this.activeMeetingsList.reduce((acc, cur) => acc + (cur.participants || 0), 0);
+      } catch (e) {
+        this.error('진행 중인 회의 목록을 불러오지 못했습니다.');
+      }
+    },
+    async loadScheduledMeetings() {
+      try {
+        const waiting = await getMyVideoConferences('WAITING', this.scheduledCurrentPage - 1, this.scheduledPageSize);
+        this.scheduledMeetings = this.parseScheduledMeetings(waiting);
+        this.scheduledTotalPages = waiting.totalPages || 1;
+      } catch (e) {
+        this.error('예정된 회의 목록을 불러오지 못했습니다.');
+      }
+    },
+    async loadMeetingHistory() {
+      try {
+        const ended = await getMyVideoConferences('ENDED', this.historyCurrentPage - 1, this.historyPageSize);
+        this.meetingHistory = this.parseMeetingHistory(ended);
+        this.historyTotalPages = ended.totalPages || 1;
+      } catch (e) {
+        this.error('회의 기록을 불러오지 못했습니다.');
       }
     },
     async loadMeetingLists() {
       try {
-        const [inProgress, waiting, ended] = await Promise.all([
-          getMyVideoConferences('IN_PROGRESS'),
-          getMyVideoConferences('WAITING'),
-          getMyVideoConferences('ENDED')
-        ])
+        this.loadActiveMeetings();
+        this.loadScheduledMeetings();
+        this.loadMeetingHistory();
 
-        this.activeMeetingsList = this.parseActiveMeetings(inProgress)
-        this.activeMeetings = this.activeMeetingsList.length
-
-        this.scheduledMeetings = this.parseScheduledMeetings(waiting)
+        const allWaiting = await getMyVideoConferences('WAITING', 0, 2000); // Assuming 2000 is enough
+        const allScheduledMeetings = this.parseScheduledMeetings(allWaiting);
         const localDate = this.getLocalDate();
-        this.todayMeetings = this.scheduledMeetings.filter(({ date }) => date === localDate).length
-
-        this.meetingHistory = this.parseMeetingHistory(ended)
-
-        this.totalParticipants = this.activeMeetingsList.reduce((acc, cur) => acc + (cur.participants || 0), 0)
+        this.todayMeetings = allScheduledMeetings.filter(({ date }) => date === localDate).length;
       } catch (e) {
-        this.error('회의 목록을 불러오지 못했습니다.')
+        this.error('회의 목록을 불러오지 못했습니다.');
       }
     },
     async joinActiveMeeting(meeting) {
@@ -695,6 +751,18 @@ export default {
     viewMinute(meeting) {
       this.$router.push("/meeting/minutes/" + meeting.id);
       // this.success(`${meeting.title} 회의록을 확인합니다.`)
+    },
+    handleHistoryPageChange(page) {
+      this.historyCurrentPage = page;
+      this.loadMeetingHistory();
+    },
+    handleScheduledPageChange(page) {
+      this.scheduledCurrentPage = page;
+      this.loadScheduledMeetings();
+    },
+    handleActivePageChange(page) {
+      this.activeCurrentPage = page;
+      this.loadActiveMeetings();
     }
   }
 }
@@ -889,5 +957,11 @@ export default {
   font-size: 12px;
   color: #909399;
   margin-left: 8px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>

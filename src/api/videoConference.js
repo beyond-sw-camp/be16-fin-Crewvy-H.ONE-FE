@@ -33,10 +33,11 @@ export const startVideoConference = async (videoConferenceId) => {
   return data.data
 }
 
-export const getMyVideoConferences = async (status) => {
-  const { data } = await api.get(`${VC_BASE}`, { params: { status } })
-  return data.data
-}
+export const getMyVideoConferences = async (status, page = 0, size = 10) => {
+  const params = { status, page, size };
+  const { data } = await api.get(`${VC_BASE}`, { params });
+  return data.data;
+};
 
 export const updateVideoConference = async (videoConferenceId, update) => {
   const { data } = await api.put(`${VC_BASE}/${videoConferenceId}`, update)
