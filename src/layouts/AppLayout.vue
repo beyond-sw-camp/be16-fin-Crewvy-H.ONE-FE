@@ -372,8 +372,8 @@
           </div>
           <div class="calendar-actions">
             <el-button type="primary" @click="addEvent">
-              <el-icon>
-                <Plus />
+              <el-icon style="margin-right: 6px;">
+                <CirclePlus />
               </el-icon>
               일정 추가
             </el-button>
@@ -433,21 +433,51 @@
     </el-dialog>
 
     <!-- 일정 전체 보기 다이얼로그 -->
-    <el-dialog v-model="showAllEventsDialog" :title="selectedDayTitle" width="600px">
+    <el-dialog 
+      v-model="showAllEventsDialog" 
+      width="680px"
+      class="all-events-dialog"
+      :show-close="false"
+    >
+      <template #header>
+        <div class="custom-dialog-header">
+          <h3 class="header-title">{{ selectedDayTitle }}</h3>
+        </div>
+      </template>
       <div class="all-events-list">
         <div v-if="selectedDayEvents.length === 0" class="no-events">
-          <p>일정이 없습니다.</p>
-        </div>
-        <div v-for="event in selectedDayEvents" :key="event.id" class="full-event-item" :class="event.type">
-          <div class="event-header">
-            <span class="event-title">{{ event.title }}</span>
-            <span class="event-time">{{ event.time }}</span>
+          <div class="empty-state">
+            <el-icon class="empty-icon"><Calendar /></el-icon>
+            <h3 class="empty-title">일정이 없습니다</h3>
+            <p class="empty-description">이 날짜에는 등록된 일정이 없습니다.</p>
           </div>
-          <div class="event-type-badge" :class="event.type">{{ getEventTypeName(event.type) }}</div>
+        </div>
+        <div v-else class="events-container">
+          <div v-for="event in selectedDayEvents" :key="event.id" class="full-event-item" :class="event.type" @click="viewEvent(event)">
+            <div class="event-indicator"></div>
+            <div class="event-content">
+              <div class="event-top">
+                <span class="event-type-badge" :class="event.type">
+                  <span class="badge-dot"></span>
+                  {{ getEventTypeName(event.type) }}
+                </span>
+                <div class="event-time-wrapper">
+                  <el-icon class="time-icon"><Clock /></el-icon>
+                  <span class="event-time">{{ event.time }}</span>
+                </div>
+              </div>
+              <h4 class="event-title">{{ event.title }}</h4>
+            </div>
+            <el-icon class="arrow-icon"><ArrowRight /></el-icon>
+          </div>
         </div>
       </div>
       <template #footer>
-        <el-button @click="showAllEventsDialog = false">닫기</el-button>
+        <div class="dialog-footer-custom">
+          <el-button @click="showAllEventsDialog = false" size="large" class="close-btn">
+            닫기
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -455,8 +485,9 @@
     <el-dialog 
       v-model="showEventDetailDialog" 
       :title="eventDetailTitle" 
-      width="580px"
+      width="520px"
       class="event-dialog"
+      :append-to-body="true"
     >
       <div v-if="!isEditingEvent" class="event-detail-view">
         <div class="detail-section" v-if="selectedEvent.typeName">
@@ -513,24 +544,46 @@
           />
         </el-form-item>
         <el-form-item label="시작 날짜" required>
-          <el-date-picker 
-            v-model="editEventForm.startDate" 
-            type="datetime" 
-            placeholder="시작 날짜 및 시간 선택" 
-            format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%;" 
-          />
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="editEventForm.startDate" 
+              type="date" 
+              placeholder="시작 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="editEventForm.startTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
         </el-form-item>
         <el-form-item label="종료 날짜" required>
-          <el-date-picker 
-            v-model="editEventForm.endDate" 
-            type="datetime" 
-            placeholder="종료 날짜 및 시간 선택" 
-            format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%;" 
-          />
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="editEventForm.endDate" 
+              type="date" 
+              placeholder="종료 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="editEventForm.endTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -564,9 +617,10 @@
     <el-dialog 
       v-model="showEventDialog" 
       title="일정 추가" 
-      width="560px" 
+      width="520px" 
       :before-close="handleEventDialogClose"
       class="event-dialog"
+      :append-to-body="true"
     >
       <el-form label-width="100px" class="event-form">
         <el-form-item label="제목" required>
@@ -587,24 +641,46 @@
           />
         </el-form-item>
         <el-form-item label="시작 날짜" required>
-          <el-date-picker 
-            v-model="eventForm.startDate" 
-            type="datetime" 
-            placeholder="시작 날짜 및 시간 선택" 
-            format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%;"
-          />
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="eventForm.startDate" 
+              type="date" 
+              placeholder="시작 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="eventForm.startTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
         </el-form-item>
         <el-form-item label="종료 날짜" required>
-          <el-date-picker 
-            v-model="eventForm.endDate" 
-            type="datetime" 
-            placeholder="종료 날짜 및 시간 선택" 
-            format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%;"
-          />
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="eventForm.endDate" 
+              type="date" 
+              placeholder="종료 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="eventForm.endTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -640,7 +716,7 @@ import axios from 'axios';
 import apiClient from '@/api/http';
 import NotificationBell from '@/components/NotificationBell.vue';
 import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
-import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook, Document, Tickets, Clock } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook, Document, Tickets, Clock, Calendar } from '@element-plus/icons-vue';
 
 export default {
   name: 'MainLayout',
@@ -655,7 +731,8 @@ export default {
     Notebook,
     Document,
     Tickets,
-    Clock
+    Clock,
+    Calendar
   },
   setup() {
     const { success, error, warning, info } = useSnackbar();
@@ -858,7 +935,9 @@ export default {
         title: '',
         contents: '',
         startDate: '',
-        endDate: ''
+        startTime: '',
+        endDate: '',
+        endTime: ''
       },
       showEventDetailDialog: false,
       isEditingEvent: false,
@@ -868,7 +947,9 @@ export default {
         title: '',
         contents: '',
         startDate: '',
-        endDate: ''
+        startTime: '',
+        endDate: '',
+        endTime: ''
       }
     }
   },
@@ -955,13 +1036,29 @@ export default {
 
         const dateStr = this.formatLocalDate(date)
         const dayEvents = this.events.filter(event => event.date === dateStr)
+        
+        // 시간 순서대로 정렬
+        const sortedEvents = dayEvents.sort((a, b) => {
+          // 시간 문자열이 있는 경우 시간으로 비교
+          if (a.time && b.time) {
+            const timeA = a.time.split(':').map(Number)
+            const timeB = b.time.split(':').map(Number)
+            const timeValueA = timeA[0] * 60 + timeA[1]
+            const timeValueB = timeB[0] * 60 + timeB[1]
+            return timeValueA - timeValueB
+          }
+          // 시간이 없으면 startDate로 비교
+          const dateA = new Date(a.startDate).getTime()
+          const dateB = new Date(b.startDate).getTime()
+          return dateA - dateB
+        })
 
         days.push({
           date: dateStr,
           day: date.getDate(),
           currentMonth: date.getMonth() === month,
           isToday: date.toDateString() === today.toDateString(),
-          events: dayEvents
+          events: sortedEvents
         })
       }
 
@@ -1322,8 +1419,23 @@ export default {
       done()
     },
     showAllEvents(day) {
-      this.selectedDayEvents = day.events;
-      this.selectedDayTitle = `${day.date} 일정 (${day.events.length}개)`;
+      // 시간 순서대로 정렬
+      const sortedEvents = [...day.events].sort((a, b) => {
+        // 시간 문자열이 있는 경우 시간으로 비교
+        if (a.time && b.time) {
+          const timeA = a.time.split(':').map(Number)
+          const timeB = b.time.split(':').map(Number)
+          const timeValueA = timeA[0] * 60 + timeA[1]
+          const timeValueB = timeB[0] * 60 + timeB[1]
+          return timeValueA - timeValueB
+        }
+        // 시간이 없으면 startDate로 비교
+        const dateA = new Date(a.startDate).getTime()
+        const dateB = new Date(b.startDate).getTime()
+        return dateA - dateB
+      })
+      this.selectedDayEvents = sortedEvents;
+      this.selectedDayTitle = `${day.date} 일정`;
       this.showAllEventsDialog = true;
     },
     getEventTypeName(type) {
@@ -1359,8 +1471,10 @@ export default {
       
       // 기본 날짜가 넘어오면 시작일로 세팅 (달력 날짜 더블클릭 진입)
       if (defaultDate) {
-        this.eventForm.startDate = `${defaultDate}T09:00:00`
-        this.eventForm.endDate = `${defaultDate}T10:00:00`
+        this.eventForm.startDate = defaultDate
+        this.eventForm.startTime = '09:00'
+        this.eventForm.endDate = defaultDate
+        this.eventForm.endTime = '10:00'
       } else {
         // 모달 상단 버튼 클릭 진입 시 현재 날짜 및 시간 기본값
         const now = new Date()
@@ -1370,13 +1484,15 @@ export default {
         const hh = String(now.getHours()).padStart(2, '0')
         const min = String(now.getMinutes()).padStart(2, '0')
         
-        this.eventForm.startDate = `${yyyy}-${mm}-${dd}T${hh}:${min}:00`
+        this.eventForm.startDate = `${yyyy}-${mm}-${dd}`
+        this.eventForm.startTime = `${hh}:${min}`
         
         // 종료 시간은 시작 시간 + 1시간
         const endTime = new Date(now.getTime() + 60 * 60 * 1000)
         const endHH = String(endTime.getHours()).padStart(2, '0')
         const endMin = String(endTime.getMinutes()).padStart(2, '0')
-        this.eventForm.endDate = `${yyyy}-${mm}-${dd}T${endHH}:${endMin}:00`
+        this.eventForm.endDate = `${yyyy}-${mm}-${dd}`
+        this.eventForm.endTime = `${endHH}:${endMin}`
       }
       this.showEventDialog = true
     },
@@ -1386,21 +1502,27 @@ export default {
         title: '',
         contents: '',
         startDate: '',
-        endDate: ''
+        startTime: '',
+        endDate: '',
+        endTime: ''
       }
       if (done && typeof done === 'function') {
         done()
       }
     },
     async saveEvent() {
-      const { title, contents, startDate, endDate } = this.eventForm
-      if (!title || !startDate || !endDate) {
+      const { title, contents, startDate, startTime, endDate, endTime } = this.eventForm
+      if (!title || !startDate || !startTime || !endDate || !endTime) {
         this.warning('필수 항목을 입력해주세요.')
         return
       }
       
+      // 날짜와 시간을 합쳐서 LocalDateTime 형식으로 변환
+      const startDateTime = `${startDate}T${startTime}:00`
+      const endDateTime = `${endDate}T${endTime}:00`
+      
       // 시작일이 종료일보다 나중이면 경고
-      if (new Date(startDate) > new Date(endDate)) {
+      if (new Date(startDateTime) > new Date(endDateTime)) {
         this.warning('종료 날짜는 시작 날짜보다 이후여야 합니다.')
         return
       }
@@ -1410,8 +1532,8 @@ export default {
         await apiClient.post('/workspace-service/calendar/post-my-schedule', {
           title: title,
           contents: contents || '', // contents가 없으면 빈 문자열
-          startDate: startDate,
-          endDate: endDate
+          startDate: startDateTime,
+          endDate: endDateTime
         })
         
         this.success('일정이 추가되었습니다.')
@@ -1427,15 +1549,25 @@ export default {
     viewEvent(event) {
       this.selectedEvent = { ...event };
       this.isEditingEvent = false;
+      // 일정 더보기 모달이 열려있으면 닫기
+      if (this.showAllEventsDialog) {
+        this.showAllEventsDialog = false;
+      }
       this.showEventDetailDialog = true;
     },
     startEditEvent() {
+      // selectedEvent의 startDate, endDate는 "YYYY-MM-DDTHH:mm:ss" 형식
+      const startParts = this.selectedEvent.startDate.split('T');
+      const endParts = this.selectedEvent.endDate.split('T');
+      
       this.editEventForm = {
         id: this.selectedEvent.scheduleId,
         title: this.selectedEvent.title,
         contents: this.selectedEvent.contents || '',
-        startDate: this.selectedEvent.startDate,
-        endDate: this.selectedEvent.endDate
+        startDate: startParts[0], // YYYY-MM-DD
+        startTime: startParts[1].substring(0, 5), // HH:mm
+        endDate: endParts[0], // YYYY-MM-DD
+        endTime: endParts[1].substring(0, 5) // HH:mm
       };
       this.isEditingEvent = true;
     },
@@ -1443,13 +1575,17 @@ export default {
       this.isEditingEvent = false;
     },
     async updateEvent() {
-      const { id, title, contents, startDate, endDate } = this.editEventForm;
-      if (!title || !startDate || !endDate) {
+      const { id, title, contents, startDate, startTime, endDate, endTime } = this.editEventForm;
+      if (!title || !startDate || !startTime || !endDate || !endTime) {
         this.warning('필수 항목을 입력해주세요.');
         return;
       }
       
-      if (new Date(startDate) > new Date(endDate)) {
+      // 날짜와 시간을 합쳐서 LocalDateTime 형식으로 변환
+      const startDateTime = `${startDate}T${startTime}:00`;
+      const endDateTime = `${endDate}T${endTime}:00`;
+      
+      if (new Date(startDateTime) > new Date(endDateTime)) {
         this.warning('종료 날짜는 시작 날짜보다 이후여야 합니다.');
         return;
       }
@@ -1459,8 +1595,8 @@ export default {
         await apiClient.patch(`/workspace-service/calendar/update-my-schedule/${id}`, {
           title: title,
           contents: contents || '',
-          startDate: startDate,
-          endDate: endDate
+          startDate: startDateTime,
+          endDate: endDateTime
         });
         
         this.success('일정이 수정되었습니다.');
@@ -2257,81 +2393,243 @@ export default {
 }
 
 /* 전체 일정 보기 모달 스타일 */
+.all-events-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.all-events-dialog :deep(.el-dialog__body) {
+  padding: 0;
+  background: #f8fafc;
+}
+
+.all-events-dialog :deep(.el-dialog__header) {
+  padding: 0;
+  margin: 0;
+}
+
+/* 커스텀 헤더 */
+.custom-dialog-header {
+  padding: 0;
+}
+
+.all-events-dialog :deep(.el-dialog__header) {
+  padding: 24px 32px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.all-events-dialog :deep(.el-dialog__title) {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.all-events-dialog :deep(.el-dialog__headerbtn) {
+  top: 20px;
+  right: 20px;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* 이벤트 리스트 */
 .all-events-list {
-  max-height: 500px;
+  padding: 20px 32px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
-.no-events {
-  text-align: center;
-  padding: 40px;
-  color: #909399;
+.all-events-list::-webkit-scrollbar {
+  width: 8px;
 }
 
+.all-events-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.all-events-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.all-events-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 빈 상태 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.empty-icon {
+  font-size: 80px;
+  color: #cbd5e1;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.empty-title {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.empty-description {
+  margin: 0;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+/* 이벤트 컨테이너 */
+.events-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 이벤트 카드 */
 .full-event-item {
-  padding: 16px;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  border-left: 4px solid;
-  background: #f8f9fa;
-  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.full-event-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 12px 0 0 12px;
+  transition: width 0.25s;
 }
 
 .full-event-item:hover {
   transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
+}
+
+.full-event-item:hover::before {
+  width: 5px;
+}
+
+.full-event-item.meeting::before {
+  background: #3b82f6;
 }
 
 .full-event-item.meeting {
-  border-left-color: #3b82f6;
-  background: #eff6ff;
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 50%);
+}
+
+.full-event-item.meeting:hover {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%);
+}
+
+.full-event-item.reservation::before {
+  background: #10b981;
 }
 
 .full-event-item.reservation {
-  border-left-color: #10b981;
-  background: #f0fdf4;
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 50%);
+}
+
+.full-event-item.reservation:hover {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%);
+}
+
+.full-event-item.vacation::before {
+  background: #f59e0b;
 }
 
 .full-event-item.vacation {
-  border-left-color: #f59e0b;
-  background: #fffbeb;
+  background: linear-gradient(135deg, #ffffff 0%, #fffbeb 50%);
+}
+
+.full-event-item.vacation:hover {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%);
+}
+
+.full-event-item.businessTrip::before {
+  background: #ef4444;
 }
 
 .full-event-item.businessTrip {
-  border-left-color: #ef4444;
-  background: #fef2f2;
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 50%);
+}
+
+.full-event-item.businessTrip:hover {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 50%);
+}
+
+.full-event-item.personal::before {
+  background: #8b5cf6;
 }
 
 .full-event-item.personal {
-  border-left-color: #8b5cf6;
-  background: #faf5ff;
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 50%);
 }
 
-.event-header {
+.full-event-item.personal:hover {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%);
+}
+
+.event-indicator {
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.event-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.event-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.event-time {
-  font-size: 13px;
-  color: #606266;
-  font-weight: 500;
+  gap: 10px;
 }
 
 .event-type-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .event-type-badge.meeting {
@@ -2359,7 +2657,70 @@ export default {
   color: #7c3aed;
 }
 
+.event-time-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+}
+
+.time-icon {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.event-time {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.arrow-icon {
+  font-size: 20px;
+  color: #94a3b8;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.full-event-item:hover .arrow-icon {
+  color: #64748b;
+  transform: translateX(4px);
+}
+
+/* 푸터 */
+.dialog-footer-custom {
+  padding: 8px 32px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.close-btn {
+  min-width: 100px;
+  padding: 8px 20px;
+  font-weight: 500;
+}
+
 /* 일정 다이얼로그 공통 스타일 */
+.event-dialog :deep(.el-dialog) {
+  overflow: visible;
+}
+
+.event-dialog :deep(.el-dialog__body) {
+  overflow: visible;
+}
+
 .event-dialog :deep(.el-dialog__header) {
   padding: 24px 24px 16px;
   border-bottom: 1px solid #e4e7ed;
@@ -2372,7 +2733,7 @@ export default {
 }
 
 .event-dialog :deep(.el-dialog__body) {
-  padding: 24px;
+  padding: 24px 40px 24px 24px;
   max-height: 600px;
   overflow-y: auto;
 }
@@ -2385,10 +2746,12 @@ export default {
 /* 일정 폼 스타일 */
 .event-form {
   padding: 4px 0;
+  overflow: visible !important;
 }
 
 .event-form :deep(.el-form-item) {
   margin-bottom: 22px;
+  overflow: visible !important;
 }
 
 .event-form :deep(.el-form-item__label) {
@@ -2411,6 +2774,45 @@ export default {
   padding: 12px 15px;
   line-height: 1.6;
   border-radius: 4px;
+}
+
+/* 시간 선택기 팝업 스타일 - 최소한의 개선만 */
+.event-form :deep(.el-time-panel) {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 140px !important;
+}
+
+.event-form :deep(.el-time-spinner__item.is-active) {
+  color: #409eff;
+  font-weight: 600;
+  background: #ecf5ff;
+}
+
+.event-form :deep(.el-time-spinner__item:hover) {
+  background: #f5f7fa;
+  color: #409eff;
+}
+
+/* 시간 선택기 버튼 한글화 */
+.event-form :deep(.el-time-panel__btn.cancel) {
+  font-size: 0 !important;
+}
+
+.event-form :deep(.el-time-panel__btn.cancel::before) {
+  content: '취소';
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.event-form :deep(.el-time-panel__btn.confirm) {
+  font-size: 0 !important;
+}
+
+.event-form :deep(.el-time-panel__btn.confirm::before) {
+  content: '확인';
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* 일정 상세 보기 스타일 */
