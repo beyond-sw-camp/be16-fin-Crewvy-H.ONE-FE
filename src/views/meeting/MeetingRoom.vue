@@ -47,7 +47,7 @@
             <el-button circle :icon="icons.Setting" @click="openSettings" />
           </el-tooltip>
           <el-tooltip content="참가자" placement="top">
-            <el-button circle :icon="icons.User" @click="toggleParticipantList" />
+            <el-button circle :type="isParticipantListOpen ? 'primary' : 'default'" :icon="icons.User" @click="toggleParticipantList" />
           </el-tooltip>
           <el-tooltip content="채팅" placement="top">
             <el-button circle :type="isChatOpen ? 'primary' : 'default'" @click="toggleChat"
@@ -459,6 +459,7 @@
     border-left: 1px solid #1e1f24;
     background: #141519;
     color: #e5e7eb;
+    width: 360px;
   }
 
   .chat-header {
