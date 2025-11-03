@@ -56,6 +56,16 @@
                 <el-option v-for="policy in tripPolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
               </el-select>
             </el-form-item>
+
+            <el-form-item v-if="requestType === 'trip'" label="출장지" prop="workLocation" :rules="{ required: true, message: '출장지를 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.workLocation" placeholder="출장지를 선택하세요">
+                <el-option v-for="location in allowedWorkLocations" :key="location.workLocationId" :label="location.name" :value="location.name" />
+              </el-select>
+              <span v-if="selectedPolicy && selectedPolicy.ruleDetails?.tripRule?.allowedWorkLocations && selectedPolicy.ruleDetails.tripRule.allowedWorkLocations.length > 0" class="form-description">
+                * 이 정책은 {{ selectedPolicy.ruleDetails.tripRule.allowedWorkLocations.join(', ') }} 출장만 가능합니다.
+              </span>
+            </el-form-item>
+
             <el-form-item v-if="requestType === 'overtime'" label="연장근무 정책" prop="policyId" :rules="{ required: true, message: '연장근무 정책을 선택하세요', trigger: 'change' }">
               <el-select v-model="form.policyId" placeholder="연장근무 정책을 선택하세요">
                 <el-option v-for="policy in overtimePolicies" :key="policy.policyId" :label="policy.name" :value="policy.policyId" />
@@ -84,14 +94,6 @@
               <span v-if="selectedPolicy && selectedPolicy.allowedRequestUnits" class="form-description">
                 * 이 정책은 {{ formatAllowedUnits(selectedPolicy.allowedRequestUnits) }} 신청만 가능합니다.
               </span>
-            </el-form-item>
-
-            <!-- 문서 선택 (모든 신청 타입에 표시) -->
-            <el-form-item label="결재 문서" prop="documentId">
-              <el-select v-model="form.documentId" placeholder="결재 문서를 선택하세요 (선택사항)" clearable>
-                <el-option v-for="doc in documents" :key="doc.id" :label="doc.documentName" :value="doc.id" />
-              </el-select>
-              <span class="form-description">* 결재가 필요한 경우 문서를 선택하세요.</span>
             </el-form-item>
 
             <el-form-item v-if="form.requestUnit !== 'TIME_OFF'" label="기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
@@ -198,7 +200,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getDocumentList, getMyAllBalances } from '@/api/attendance';
+import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances } from '@/api/attendance';
 import { Refresh } from '@element-plus/icons-vue';
 
 export default {
@@ -214,7 +216,6 @@ export default {
     const allPolicies = ref([]);
     const allBalances = ref([]);
     const workLocations = ref([]);
-    const documents = ref([]);
 
     const form = ref({
       policyId: null,
@@ -224,7 +225,6 @@ export default {
       reason: '',
       requesterComment: '',
       workLocation: null,
-      documentId: null,
     });
 
     // --- 신청 현황 테이블용 상태 변수 ---
@@ -233,7 +233,12 @@ export default {
     const tableLoading = ref(false);
 
     const leavePolicies = computed(() =>
-      allPolicies.value.filter(p => p && p.typeCode && (p.typeCode.includes('LEAVE') || p.typeCode.startsWith('PTC00')))
+      allPolicies.value.filter(p =>
+        p && p.typeCode &&
+        (p.typeCode.includes('LEAVE') || p.typeCode.startsWith('PTC00')) &&
+        p.typeCode !== 'PTC004' &&  // 육아휴직 제외
+        p.typeCode !== 'PTC005'     // 가족돌봄휴가 제외
+      )
     );
     const childcarePolicies = computed(() => {
       return allPolicies.value.filter(p =>
@@ -258,6 +263,22 @@ export default {
     const selectedPolicy = computed(() => {
       if (!form.value.policyId) return null;
       return allPolicies.value.find(p => p.policyId === form.value.policyId);
+    });
+
+    // 출장 신청 시 허용된 출장지 목록
+    const allowedWorkLocations = computed(() => {
+      if (requestType.value !== 'trip') return workLocations.value;
+      if (!selectedPolicy.value) return workLocations.value;
+
+      const tripRule = selectedPolicy.value.ruleDetails?.tripRule;
+      if (!tripRule || !tripRule.allowedWorkLocations || tripRule.allowedWorkLocations.length === 0) {
+        return workLocations.value; // 정책에 제한이 없으면 전체 출장지 표시
+      }
+
+      // 정책에 설정된 출장지만 필터링
+      return workLocations.value.filter(loc =>
+        tripRule.allowedWorkLocations.includes(loc.name)
+      );
     });
 
     // 신청 단위 허용 여부 확인
@@ -390,7 +411,6 @@ export default {
       try {
         // 내게 할당된 정책만 가져오기
         const assignedPolicies = await getMyAssignedPolicies();
-        console.log('Fetched Assigned Policies:', assignedPolicies); // 데이터 확인용 콘솔 로그
         allPolicies.value = assignedPolicies || [];
 
         // 잔액 정보 가져오기 (분할 사용 현황 포함)
@@ -400,14 +420,6 @@ export default {
         workLocations.value = await getActiveWorkLocations();
       } catch (err) {
         error(err.message || '필요한 데이터를 불러오는 데 실패했습니다.');
-      }
-    };
-
-    const fetchDocuments = async () => {
-      try {
-        documents.value = await getDocumentList();
-      } catch (err) {
-        console.error('문서 목록 조회 실패:', err);
       }
     };
 
@@ -427,8 +439,7 @@ export default {
 
     onMounted(() => {
       fetchInitialData();
-      fetchDocuments();
-      fetchMyRequests(); // onMounted에 추가
+      fetchMyRequests();
     });
 
     const submitForm = async () => {
@@ -448,7 +459,6 @@ export default {
                 workLocation: form.value.workLocation,
                 reason: form.value.reason,
                 requesterComment: form.value.requesterComment || null,
-                documentId: form.value.documentId || null,
               };
               response = await createTripRequest(tripPayload);
             }
@@ -459,7 +469,6 @@ export default {
                 requestUnit: form.value.requestUnit,
                 reason: form.value.reason,
                 requesterComment: form.value.requesterComment || null,
-                documentId: form.value.documentId || null,
               };
 
               // 시간 단위 신청
@@ -488,16 +497,16 @@ export default {
 
             fetchMyRequests();
 
-            // documentId가 있으면 결재 화면으로 이동
-            if (form.value.documentId) {
+            // 백엔드에서 자동 매핑한 documentId가 있으면 결재 양식 화면으로 이동
+            if (response.documentId) {
               router.push({
-                name: 'ApprovalCreate',
+                path: `/approval/form/${response.documentId}`,
                 query: {
-                  requestId: response.id,
-                  documentId: form.value.documentId
+                  requestId: response.requestId
                 }
               });
             } else {
+              // 자동 승인되었으면 바로 근태 관리 화면으로
               router.push({ name: 'AttendanceManagement' });
             }
           } catch (err) {
@@ -562,6 +571,7 @@ export default {
       nightWorkPolicies,
       holidayWorkPolicies,
       workLocations,
+      allowedWorkLocations,
       submitForm,
       resetForm,
       handleRequestTypeChange,
@@ -583,7 +593,6 @@ export default {
       weeklyOvertimeWarning,
       splitUsageWarning,
       childcarePolicies,
-      documents,
     };
   },
 };
