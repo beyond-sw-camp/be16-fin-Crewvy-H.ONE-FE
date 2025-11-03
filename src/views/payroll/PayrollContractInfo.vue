@@ -50,7 +50,7 @@
               />
             </div>
             <div class="filter-actions">
-              <el-button type="success" @click="savePayrollData" :loading="saving">
+              <el-button type="primary" @click="savePayrollData" :loading="saving">
                 <i class="el-icon-check"></i> 저장
               </el-button>
             </div>
@@ -175,7 +175,7 @@
               </el-select>
             </div>
             <div class="filter-actions">
-              <el-button type="success" @click="saveItemPayrollData" :loading="saving">
+              <el-button type="primary" @click="saveItemPayrollData" :loading="saving">
                 <i class="el-icon-check"></i> 일괄 저장
               </el-button>
             </div>
