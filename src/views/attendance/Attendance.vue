@@ -560,6 +560,10 @@ export default {
       try {
         const policy = await getMyEffectivePolicy();
         effectivePolicy.value = policy;
+        console.log('🔄 정책 업데이트:', {
+          breakRuleType: policy?.ruleDetails?.breakRule?.type,
+          fullPolicy: policy
+        });
       } catch (err) {
         console.error('적용된 정책을 불러오는 데 실패했습니다.');
       }
@@ -611,7 +615,14 @@ export default {
 
     // 휴게 규칙 타입이 MANUAL인 경우에만 휴게 버튼 활성화
     const isBreakManualMode = computed(() => {
-      return effectivePolicy.value?.ruleDetails?.breakRule?.type === 'MANUAL';
+      const isManual = effectivePolicy.value?.ruleDetails?.breakRule?.type === 'MANUAL';
+      console.log('🔍 휴게 버튼 활성화 조건:', {
+        isManual,
+        workStatus: workStatus.value,
+        breakRuleType: effectivePolicy.value?.ruleDetails?.breakRule?.type,
+        shouldEnable: isManual && workStatus.value === 'WORKING'
+      });
+      return isManual;
     });
 
     // 현재 시간이 출퇴근 가능 시간 범위 내인지 확인
@@ -700,6 +711,11 @@ export default {
         });
         success(`${eventType} 기록 완료`);
         await fetchTodayData();
+
+        // 출근 시 정책을 다시 조회 (관리자가 정책을 변경했을 수 있음)
+        if (eventType === 'CLOCK_IN') {
+          await fetchEffectivePolicy();
+        }
       } catch (err) {
         error(err.message || '근태 기록에 실패했습니다.');
       }
