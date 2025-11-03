@@ -13,7 +13,7 @@
           <el-input v-model="form.companyName" placeholder="회사명을 입력해주세요."></el-input>
         </el-form-item>
         <el-form-item label="사업자 등록번호" prop="businessNumber">
-          <el-input v-model="form.businessNumber" placeholder="- 없이 숫자만 입력">
+          <el-input v-model="form.businessNumber" placeholder="사업자 등록번호를 입력하세요." @input="formatBusinessNumber">
             <template #append>
               <el-button @click="verifyBusinessNumber">확인</el-button>
             </template>
@@ -36,10 +36,12 @@
           <el-input type="password" v-model="form.checkPw" show-password placeholder="비밀번호를 다시 입력해주세요."></el-input>
         </el-form-item>
 
-        <el-button type="primary" @click="handleSignUp" class="signup-button" :loading="loading" :disabled="!isEmailVerified">
+        <el-button type="primary" @click="handleSignUp" class="signup-button" :loading="loading"
+          :disabled="!isEmailVerified || !isBusinessVerified">
           가입하기
         </el-button>
         <p v-if="!isEmailVerified" class="email-verification-prompt">이메일 중복확인을 진행해주세요.</p>
+        <p v-if="!isBusinessVerified" class="business-verification-prompt">사업자 등록번호 확인을 진행해주세요.</p>
       </el-form>
     </div>
   </div>
@@ -67,8 +69,28 @@ const form = reactive({
   checkPw: ''
 });
 
+const isBusinessVerified = ref(false); // Add this ref
+
 const onEmailInput = () => {
   isEmailVerified.value = false;
+};
+
+const formatBusinessNumber = (value) => {
+  if (!value) return '';
+  const rawValue = value.replace(/[^0-9]/g, '');
+  let formattedValue = '';
+
+  if (rawValue.length > 0) {
+    formattedValue = rawValue.substring(0, 3);
+  }
+  if (rawValue.length > 3) {
+    formattedValue += '-' + rawValue.substring(3, 5);
+  }
+  if (rawValue.length > 5) {
+    formattedValue += '-' + rawValue.substring(5, 10);
+  }
+  
+  form.businessNumber = formattedValue;
 };
 
 const validatePassConfirm = (rule, value, callback) => {
@@ -83,7 +105,17 @@ const validatePassConfirm = (rule, value, callback) => {
 
 const rules = reactive({
   companyName: [{ required: true, message: '회사명을 입력해주세요.', trigger: 'blur' }],
-  businessNumber: [{ required: true, message: '사업자 등록번호를 입력해주세요.', trigger: 'blur' }],
+  businessNumber: [
+    { required: true, message: '사업자 등록번호를 입력해주세요.', trigger: 'blur' },
+    { validator: (rule, value, callback) => {
+        if (!isBusinessVerified.value) {
+          callback(new Error('사업자 등록번호를 확인해주세요.'));
+        } else {
+          callback();
+        }
+      }, trigger: 'change'
+    }
+  ],
   name: [{ required: true, message: '대표자명을 입력해주세요.', trigger: 'blur' }],
   email: [
     { required: true, message: '이메일을 입력해주세요.', trigger: 'blur' },
@@ -96,31 +128,72 @@ const rules = reactive({
   checkPw: [{ required: true, validator: validatePassConfirm, trigger: 'blur' }]
 });
 
-const verifyBusinessNumber = () => {
-  // 추후 국세청 API 연동
-  if (form.businessNumber) {
-    success('정상적인 사업자번호입니다.');
-  } else {
+const verifyBusinessNumber = async () => {
+  if (!form.businessNumber) {
     error('사업자 등록번호를 입력해주세요.');
+    isBusinessVerified.value = false;
+    return;
+  }
+
+  const businessNumber = form.businessNumber.replace(/[^0-9]/g, '');
+  if (businessNumber.length !== 10) {
+    error('사업자 등록번호는 10자리 숫자여야 합니다.');
+    isBusinessVerified.value = false;
+    return;
+  }
+
+  try {
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/check-business-number`, {
+      params: { businessNumber: form.businessNumber }
+    });
+
+    if (response.data && response.data.success) {
+      const verificationData = response.data.data.data[0];
+      const taxType = verificationData.tax_type;
+      const businessStatus = verificationData.b_stt_cd;
+
+      if (taxType.includes('국세청에 등록되지 않은 사업자등록번호입니다')) {
+        error('국세청에 등록되지 않은 사업자등록번호입니다.');
+        isBusinessVerified.value = false;
+      } else if (businessStatus === '01') {
+        success('정상적인 사업자등록번호입니다.');
+        isBusinessVerified.value = true;
+      } else if (businessStatus === '02') {
+        error('휴업 중인 사업자등록번호입니다.');
+        isBusinessVerified.value = false;
+      } else if (businessStatus === '03') {
+        error('폐업한 사업자등록번호입니다.');
+        isBusinessVerified.value = false;
+      } else {
+        success('사업자등록번호가 확인되었습니다.');
+        isBusinessVerified.value = true;
+      }
+    } else {
+      error(response.data.message || '사업자등록번호 확인 중 오류가 발생했습니다.');
+      isBusinessVerified.value = false;
+    }
+  } catch (err) {
+    console.error('사업자등록번호 확인 오류:', err);
+    error(err.response?.data?.message || '사업자등록번호 확인 중 오류가 발생했습니다.');
+    isBusinessVerified.value = false;
   }
 };
-
-const checkEmailDuplicate = async () => {
-  if (!form.email) {
+  
+  const checkEmailDuplicate = async () => {  if (!form.email) {
     error('이메일을 먼저 입력해주세요.');
     return;
   }
   // 이메일 형식 유효성 검사
   const emailRule = rules.email.find(r => r.type === 'email');
   if (emailRule && !/^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/.test(form.email)) {
-      error(emailRule.message);
-      return;
+    error(emailRule.message);
+    return;
   }
 
   try {
     const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/check-email`, {
-        params: { email: form.email }
-      });
+      params: { email: form.email }
+    });
     // response.data.data에 boolean 값이 담겨 옴
     if (response.data.data) { // true이면 이미 존재
       error('이미 사용 중인 이메일입니다.');
@@ -231,9 +304,16 @@ const handleSignUp = async () => {
 }
 
 .email-verification-prompt {
-    text-align: center;
-    color: #f56c6c;
-    font-size: 12px;
-    margin-top: 10px;
+  text-align: center;
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.business-verification-prompt {
+  text-align: center;
+  color: #f56c6c;
+  font-size: 12px;
+  margin-top: 10px;
 }
 </style>

@@ -39,9 +39,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-// import { getTeamAttendanceStatus } from '@/api/attendance'; // TODO: API 준비되면 연동
 import { useSnackbar } from '@/composables/useSnackbar';
 import { Refresh } from '@element-plus/icons-vue';
+import { getTeamAttendanceStatus } from '@/api/attendance';
 
 const teamMembers = ref([]);
 const isLoading = ref(false);
@@ -50,20 +50,19 @@ const { success, error } = useSnackbar();
 const fetchTeamStatus = async () => {
   isLoading.value = true;
   try {
-    // TODO: 백엔드 API가 준비되면 아래 코드로 교체
-    // const response = await getTeamAttendanceStatus();
-    // teamMembers.value = response;
-    
-    // 임시 더미 데이터
-    teamMembers.value = [
-      { name: '김민준', title: '선임', status: '정상 근무', clockInTime: '08:55', effectivePolicy: '[기본] 9-6 근무 정책' },
-      { name: '이서아', title: '주임', status: '지각', clockInTime: '09:15', effectivePolicy: '[기본] 9-6 근무 정책' },
-      { name: '박도윤', title: '사원', status: '휴가 (연차)', clockInTime: '-', effectivePolicy: '2025년 연차 정책' },
-    ];
-    success(`팀원 현황을 조회했습니다.`);
+    const response = await getTeamAttendanceStatus();
+
+    if (response && Array.isArray(response)) {
+      teamMembers.value = response;
+      success(`팀원 현황을 조회했습니다. (${response.length}명)`);
+    } else {
+      teamMembers.value = [];
+      success('팀원 현황을 조회했습니다. (0명)');
+    }
 
   } catch (err) {
-    error(err.response?.data?.message || '팀원 근태 현황 조회에 실패했습니다.');
+    error(err.message || '팀원 근태 현황 조회에 실패했습니다.');
+    teamMembers.value = [];
   } finally {
     isLoading.value = false;
   }

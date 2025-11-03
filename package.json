@@ -46,6 +46,9 @@
     "env": {
       "node": true
     },
+    "globals": {
+      "daum": "readonly"
+    },
     "extends": [
       "plugin:vue/vue3-essential",
       "eslint:recommended"

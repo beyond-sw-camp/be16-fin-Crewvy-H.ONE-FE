@@ -74,19 +74,23 @@
         <el-form-item label="장소명" prop="name">
           <el-input v-model="locationForm.name" placeholder="예: 서울 본사" maxlength="100" show-word-limit></el-input>
         </el-form-item>
-        <el-form-item label="주소">
-          <el-input v-model="locationForm.address" placeholder="예: 서울시 강남구 테헤란로 123" maxlength="255" show-word-limit></el-input>
+        <el-form-item label="주소" prop="address">
+          <div style="display: flex; width: 100%;">
+            <el-input v-model="locationForm.address" placeholder="주소 검색 버튼을 클릭하여 입력" readonly />
+            <el-button @click="openAddressSearch" style="margin-left: 8px;">주소 검색</el-button>
+          </div>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="위도 (Latitude)">
               <el-input-number
                 v-model="locationForm.latitude"
-                placeholder="37.123456"
+                placeholder="자동 입력"
                 :precision="6"
                 :min="-90"
                 :max="90"
                 style="width: 100%;"
+                readonly
               />
             </el-form-item>
           </el-col>
@@ -94,11 +98,12 @@
             <el-form-item label="경도 (Longitude)">
               <el-input-number
                 v-model="locationForm.longitude"
-                placeholder="127.123456"
+                placeholder="자동 입력"
                 :precision="6"
                 :min="-180"
                 :max="180"
                 style="width: 100%;"
+                readonly
               />
             </el-form-item>
           </el-col>
@@ -165,6 +170,23 @@ import {
   deleteWorkLocation
 } from '@/api/attendance';
 import { ElMessageBox } from 'element-plus';
+
+// Promise 기반의 동적 스크립트 로더
+const loadScript = (src, id) => {
+  return new Promise((resolve, reject) => {
+    // ID로 이미 스크립트가 존재하는지 확인
+    if (document.getElementById(id)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`${src} 스크립트 로드 실패`));
+    document.head.appendChild(script);
+  });
+};
 
 export default {
   name: 'WorkLocationManagement',
@@ -284,6 +306,62 @@ export default {
       });
     };
 
+    const openAddressSearch = async () => {
+      try {
+        // ✅ Daum 주소 스크립트 로드
+        await loadScript(
+          '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js',
+          'kakao-postcode-script'
+        );
+
+        new window.daum.Postcode({
+          oncomplete: async (data) => {
+            // ✅ 주소 문자열 파싱
+            let fullAddress = data.address;
+            let extraAddress = '';
+
+            if (data.addressType === 'R') {
+              if (data.bname) extraAddress += data.bname;
+              if (data.buildingName)
+                extraAddress += extraAddress ? `, ${data.buildingName}` : data.buildingName;
+              if (extraAddress) fullAddress += ` (${extraAddress})`;
+            }
+
+            locationForm.address = fullAddress;
+
+            // ✅ 카카오 SDK 로드
+            try {
+              // autoload=false 파라미터를 추가하여 SDK의 자동 로딩을 막습니다.
+              const sdkSrc = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.VUE_APP_KAKAO_APP_KEY}&libraries=services&autoload=false`;
+              await loadScript(sdkSrc, 'kakao-sdk-script');
+
+              // kakao.maps.load를 사용하여 라이브러리 로딩이 완료되면 콜백을 실행합니다.
+              window.kakao.maps.load(() => {
+                const geocoder = new window.kakao.maps.services.Geocoder();
+                geocoder.addressSearch(data.address, (result, status) => {
+                  if (status === window.kakao.maps.services.Status.OK) {
+                    locationForm.latitude = parseFloat(result[0].y);
+                    locationForm.longitude = parseFloat(result[0].x);
+                    success('주소와 GPS 좌표가 자동으로 입력되었습니다.');
+                  } else {
+                    error('주소로 GPS 좌표를 찾는 데 실패했습니다. 직접 입력해주세요.');
+                    locationForm.latitude = null;
+                    locationForm.longitude = null;
+                  }
+                });
+              });
+            } catch (sdkError) {
+              error(sdkError.message);
+            }
+          },
+        }).open();
+
+      } catch (postcodeError) {
+        error(postcodeError.message);
+      }
+};
+
+    
     const toggleActive = async (workLocationId) => {
       try {
         await toggleWorkLocationActive(workLocationId);
@@ -354,6 +432,7 @@ export default {
       formRules,
       openLocationDialog,
       saveLocation,
+      openAddressSearch,
       toggleActive,
       deleteLocation,
       handlePageChange,

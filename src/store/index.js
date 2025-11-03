@@ -1,9 +1,11 @@
 import { createStore } from 'vuex';
 import notification from './modules/notification';
+import auth from './modules/auth';
 
 export default createStore({
   modules: {
     notification,
+    auth,
   },
   state: {
     user: null,

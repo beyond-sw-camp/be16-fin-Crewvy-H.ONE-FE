@@ -102,8 +102,8 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="입사일">
-              <el-date-picker v-model="form.joinDate" type="date" placeholder="입사일 선택"
-                style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
+              <el-date-picker v-model="form.joinDate" type="date" placeholder="입사일 선택" style="width: 100%;"
+                value-format="YYYY-MM-DD"></el-date-picker>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -113,7 +113,16 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="주소">
-              <el-input v-model="form.address"></el-input>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
@@ -135,25 +144,26 @@
           </div>
         </template>
         <div class="grade-history-list">
-          <div v-for="(grade, index) in filteredGradeHistorySet" :key="grade.gradeHistoryId || index" class="grade-history-item">
+          <div v-for="(grade, index) in filteredGradeHistorySet" :key="grade.gradeHistoryId || index"
+            class="grade-history-item">
             <el-row :gutter="24">
-              <el-col :span="11">
+              <el-col :span="filteredGradeHistorySet.length > 1 ? 11 : 12">
                 <el-form-item :label="`직급명 ${index + 1}`">
                   <el-select v-model="grade.gradeId" placeholder="직급 선택" style="width: 100%;">
                     <el-option v-for="g in allGrades" :key="g.id" :label="g.name" :value="g.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="11">
+              <el-col :span="filteredGradeHistorySet.length > 1 ? 11 : 12">
                 <el-form-item :label="`진급일 ${index + 1}`">
-                  <el-date-picker v-model="grade.promotionDate" type="date" placeholder="진급일 선택"
-                    style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
+                  <el-date-picker v-model="grade.promotionDate" type="date" placeholder="진급일 선택" style="width: 100%;"
+                    value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
-              <el-col :span="2" class="delete-grade-history-col">
+              <el-col :span="2" class="delete-grade-history-col" v-if="!grade.ynDel && activeGradeHistoryCount > 1">
                 <el-form-item label="&nbsp;">
                   <el-button type="danger" circle @click="removeGradeHistory(index)"
-                    v-if="filteredGradeHistorySet.length > 1">
+                    v-if="!grade.ynDel && activeGradeHistoryCount > 1">
                     <el-icon>
                       <Delete />
                     </el-icon>
@@ -161,8 +171,10 @@
                 </el-form-item>
               </el-col>
             </el-row>
-            <!-- <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag> -->
             <el-tag v-if="grade.isActive === false && grade.ynDel === false" type="warning" size="small">비활성화</el-tag>
+            <el-tag v-if="grade.ynDel === true" type="danger" size="small">삭제 예정</el-tag>
+            <el-button v-if="grade.ynDel === true" @click="permanentDeleteGradeHistory(grade.gradeHistoryId)"
+              type="danger" size="small" plain class="permanent-delete-btn">영구 삭제</el-button>
           </div>
           <p v-if="filteredGradeHistorySet.length === 0">진급 이력이 없습니다.</p>
         </div>
@@ -184,21 +196,26 @@
           </div>
         </template>
         <div class="positions-list">
-          <div v-for="(position, index) in filteredPositions" :key="position.memberPositionId || index" class="position-item">
+          <div v-for="(position, index) in filteredPositions" :key="position.memberPositionId || position.tempId || index"
+            class="position-item">
             <div class="position-item-header">
               <h4>직무 {{ index + 1 }}</h4>
               <div class="position-item-actions">
-                <el-button @click="softDeletePosition(position)" type="warning" plain size="small" v-if="!position.ynDel">직무 종료</el-button>
-                <el-button @click="permanentDeletePosition(position.memberPositionId, index)" type="danger" size="small" v-if="position.ynDel">영구 삭제</el-button>
+                <el-button @click="softDeletePosition(position)" type="warning" plain size="small"
+                  v-if="!position.ynDel">직무
+                  종료</el-button>
+                <el-button @click="permanentDeletePosition(position.memberPositionId, index)" type="danger" size="small"
+                  v-if="position.ynDel">영구 삭제</el-button>
               </div>
             </div>
             <el-row :gutter="24">
               <el-col :span="12">
                 <el-form-item label="부서">
-                  <el-select v-model="position.organizationId" placeholder="부서 선택" style="width: 100%;">
-                    <el-option v-for="org in allOrganizations" :key="org.id" :label="org.name"
-                      :value="org.id"></el-option>
-                  </el-select>
+                  <el-input :value="position.organizationName || '부서 선택'" readonly>
+                    <template #append>
+                      <el-button @click="openOrgModal(position.memberPositionId || position.tempId)">조직도</el-button>
+                    </template>
+                  </el-input>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -220,18 +237,19 @@
               </el-col>
               <el-col :span="8">
                 <el-form-item label="시작일">
-                  <el-date-picker v-model="position.startDate" type="date" placeholder="시작일 선택" style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
+                  <el-date-picker v-model="position.startDate" type="date" placeholder="시작일 선택" style="width: 100%;"
+                    value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
               <el-col :span="8">
                 <el-form-item label="종료일">
-                  <el-date-picker v-model="position.endDate" type="date" placeholder="종료일 선택" style="width: 100%;" value-format="YYYY-MM-DD"></el-date-picker>
+                  <el-date-picker v-model="position.endDate" type="date" placeholder="종료일 선택" style="width: 100%;"
+                    value-format="YYYY-MM-DD"></el-date-picker>
                 </el-form-item>
               </el-col>
             </el-row>
-            <!-- <el-tag v-if="position.ynDel === true" type="danger" size="small">삭제 예정</el-tag> -->
-            <el-button v-if="position.ynDel === true" @click="permanentDeletePosition(position.memberPositionId, index)" type="danger" size="small" plain class="permanent-delete-btn">영구 삭제</el-button>
-            <el-tag v-if="position.isActive === false && position.ynDel === false" type="warning" size="small">비활성화</el-tag>
+            <el-tag v-if="position.isActive === false && position.ynDel === false" type="warning"
+              size="small">비활성화</el-tag>
           </div>
         </div>
       </el-card>
@@ -241,6 +259,9 @@
         <el-button type="primary" @click="onSubmit">저장</el-button>
       </div>
     </el-form>
+
+    <OrganizationTreeModal :visible="isOrgModalVisible" @update:visible="isOrgModalVisible = $event"
+      @select="handleOrgSelect" />
   </div>
 </template>
 
@@ -248,12 +269,14 @@
 import employeeService from '../../api/employeeService';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Delete } from '@element-plus/icons-vue';
+import OrganizationTreeModal from '@/components/common/OrganizationTreeModal.vue';
 
 export default {
   name: 'EmployeeEdit',
   components: {
     Plus,
     Delete,
+    OrganizationTreeModal,
   },
   data() {
     return {
@@ -266,6 +289,7 @@ export default {
         extensionNumber: '',
         telNumber: '',
         address: '',
+        detailAddress: '',
         bank: '',
         bankAccount: '',
         joinDate: '',
@@ -280,6 +304,9 @@ export default {
       },
       showAllGradeHistory: false, // 상태 변수 추가
       showAllPositions: false,   // 상태 변수 추가
+      isOrgModalVisible: false,
+      editingPositionIdentifier: null,
+      newPositionCounter: 0,
       accountStatusMapping: {
         '정상': 'AS001',
         '비활성': 'AS002',
@@ -324,32 +351,45 @@ export default {
   },
   computed: {
     filteredGradeHistorySet() {
-      if (this.showAllGradeHistory) {
-        return this.form.gradeHistorySet;
-      }
-      return this.form.gradeHistorySet.filter(gh => gh.isActive === true);
-    },
-    filteredPositions() {
-      // Create a copy to avoid mutating the original array, then sort
-      const sortedPositions = [...this.form.positions].sort((a, b) => {
-        const dateA = a.startDate ? new Date(a.startDate) : 0;
-        const dateB = b.startDate ? new Date(b.startDate) : 0;
-        return dateB - dateA; // Sort in descending order
-      });
+      let gradeHistoryToFilter = [...this.form.gradeHistorySet];
 
-      if (this.showAllPositions) {
-        return sortedPositions;
+      if (!this.showAllGradeHistory) {
+        // By default, show only active (not soft-deleted) grade histories
+        return gradeHistoryToFilter.filter(gh => gh.ynDel === false && gh.isActive === true);
       }
-      
-      // By default, show only active (not soft-deleted) positions
-      return sortedPositions.filter(p => p.ynDel === false);
-    }
-  },
+      return gradeHistoryToFilter; // When showAllGradeHistory is true, return all (including soft-deleted)
+    },
+    activeGradeHistoryCount() {
+      return this.form.gradeHistorySet.filter(gh => gh.ynDel === false && gh.isActive === true).length;
+    },
+        filteredPositions() {
+          let positionsToFilter = [...this.form.positions];
+
+          // Sort only when showing all positions or when filtering by active positions
+          positionsToFilter.sort((a, b) => {
+            const dateA = a.startDate ? new Date(a.startDate) : 0;
+            const dateB = b.startDate ? new Date(b.startDate) : 0;
+            return dateB - dateA; // Sort in descending order
+          });
+
+          if (!this.showAllPositions) {
+            // By default, show only active (not soft-deleted) positions
+            return positionsToFilter.filter(p => p.ynDel === false);
+          }
+          return positionsToFilter; // When showAllPositions is true, return all (including soft-deleted)
+        }  },
   methods: {
     async fetchEmployeeData(id) {
       try {
         const response = await employeeService.getEmployeeForEdit(id);
         const editData = response.data.data;
+
+        // --- START CONSOLE LOGS FOR DEBUGGING ---
+        console.log('--- Debugging fetchEmployeeData ---');
+        console.log('Raw editData from API:', JSON.parse(JSON.stringify(editData))); // Deep copy to avoid mutation issues
+        console.log('editData.organizationResList (allOrganizations source):', editData.organizationResList);
+        console.log('editData.memberDetail.memberPositionResList (positions source):', editData.memberDetail.memberPositionResList);
+        // --- END CONSOLE LOGS FOR DEBUGGING ---
 
         const employmentTypeNameToValue = {
           '정규직': 'FULL',
@@ -374,6 +414,7 @@ export default {
           extensionNumber: editData.memberDetail.extensionNumber,
           telNumber: editData.memberDetail.telNumber,
           address: editData.memberDetail.address,
+          detailAddress: editData.memberDetail.detailAddress,
           bank: editData.memberDetail.bank,
           bankAccount: editData.memberDetail.bankAccount,
           joinDate: editData.memberDetail.joinDate,
@@ -386,20 +427,32 @@ export default {
           gradeHistorySet: editData.memberDetail.gradeHistoryList?.map(gh => ({
             gradeHistoryId: gh.gradeHistoryId, // gh.gradeHistoryId를 그대로 사용
             gradeId: gh.gradeId,
-            gradeName: gh.gradeName,
+            gradeName: gh.name,
             promotionDate: gh.promotionDate || null,
-            isActive: typeof gh.isActive === 'string' ? gh.isActive.toUpperCase() === 'TRUE' : (gh.isActive ?? true)
+            isActive: typeof gh.isActive === 'string' ? gh.isActive.toUpperCase() === 'TRUE' : (gh.isActive ?? true),
+            ynDel: typeof gh.ynDel === 'string' ? gh.ynDel.toUpperCase() === 'TRUE' : (gh.ynDel ?? false) // ynDel 초기화
           })) || [],
-          positions: editData.memberDetail.memberPositionResList?.map(p => ({
-            memberPositionId: p.id, // 기존 memberPositionId 추가
-            organizationId: p.organization ? p.organization.id : null,
-            titleId: p.title ? p.title.id : null,
-            roleId: p.role ? p.role.id : null,
-            startDate: p.startDate, // startDate 추가
-            endDate: p.endDate, // endDate 추가
-            isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true), // boolean으로 변환
-            ynDel: typeof p.ynDel === 'string' ? p.ynDel.toUpperCase() === 'TRUE' : (p.ynDel ?? false) // ynDel 추가
-          })) || []
+          positions: editData.memberDetail.memberPositionResList?.map(p => {
+            // --- START CONSOLE LOGS FOR DEBUGGING EACH POSITION ---
+            console.log('  --- Processing position (p) ---');
+            console.log('  p.id:', p.id);
+            console.log('  p.organization:', p.organization);
+            console.log('  p.organization.id:', p.organization ? p.organization.id : 'N/A');
+            console.log('  p.organization.label:', p.organization ? p.organization.label : 'N/A');
+            // --- END CONSOLE LOGS FOR DEBUGGING EACH POSITION ---
+
+            return {
+              memberPositionId: p.id, // 기존 memberPositionId 추가
+              organizationId: p.organization ? p.organization.id : null,
+              organizationName: p.organization ? p.organization.name : '', // Use name from p.organization
+              titleId: p.title ? p.title.id : null,
+              roleId: p.role ? p.role.id : null,
+              startDate: p.startDate, // startDate 추가
+              endDate: p.endDate, // endDate 추가
+              isActive: typeof p.isActive === 'string' ? p.isActive.toUpperCase() === 'TRUE' : (p.isActive ?? true),
+              ynDel: typeof p.ynDel === 'string' ? p.ynDel.toUpperCase() === 'TRUE' : (p.ynDel ?? false)
+            };
+          }) || [],
         };
 
         this.allOrganizations = editData.organizationResList;
@@ -421,6 +474,8 @@ export default {
       try {
         const updatePayload = {
           name: this.form.name,
+          address: this.form.address,
+          detailAddress: this.form.detailAddress,
           accountStatusCodeValue: this.accountStatusMapping[this.form.accountStatus] || this.form.accountStatus,
           employmentTypeCodeValue: this.employmentTypeMapping[this.form.employmentType] || this.form.employmentType,
           memberStatusCodeValue: this.memberStatusMapping[this.form.memberStatus] || this.form.memberStatus,
@@ -429,12 +484,15 @@ export default {
           telNumber: this.form.telNumber,
           joinDate: this.form.joinDate, // Ensure this is in a format backend expects (e.g., YYYY-MM-DD)
           // newPw is not handled here, assuming separate resetPassword API or user input
-          gradeHistoryReqList: this.form.gradeHistorySet.map(gh => ({
-            gradeHistoryId: gh.gradeHistoryId, // null이 아닌 경우 그대로 사용
-            gradeId: gh.gradeId,
-            promotionDate: gh.promotionDate,
-            isActive: gh.isActive,
-          })),
+          gradeHistoryReqList: this.form.gradeHistorySet
+            .filter(gh => !(gh.gradeHistoryId === null && gh.ynDel === true)) // Filter out new items that were soft-deleted
+            .map(gh => ({
+              gradeHistoryId: gh.gradeHistoryId, // null이 아닌 경우 그대로 사용
+              gradeId: gh.gradeId,
+              promotionDate: gh.promotionDate,
+              isActive: gh.isActive,
+              ynDel: gh.ynDel, // ynDel 추가
+            })),
           positionUpdateReqList: this.form.positions.map(p => ({
             memberPositionId: p.memberPositionId || null, // Send null for new entries
             organizationId: p.organizationId,
@@ -464,9 +522,14 @@ export default {
         confirmButtonText: '확인',
         cancelButtonText: '취소',
         type: 'warning'
-      }).then(() => {
-        // TODO: Implement actual password reset API call
-        ElMessage.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+      }).then(async () => {
+        try {
+          await employeeService.resetPassword(this.form.email);
+          ElMessage.success('사용자의 이메일로 임시 비밀번호가 발송되었습니다.');
+        } catch (error) {
+          console.error("비밀번호 초기화 실패:", error);
+          ElMessage.error(error.response?.data?.message || '비밀번호 초기화에 실패했습니다.');
+        }
       }).catch(() => {
         ElMessage.info('비밀번호 초기화가 취소되었습니다.');
       });
@@ -478,26 +541,69 @@ export default {
         gradeHistoryId: null, // 새로운 항목이므로 null로 초기화
         gradeId: null,
         promotionDate: new Date().toISOString().slice(0, 10),
-        isActive: true // 새로 추가된 직급은 기본적으로 활성으로 표시
+        isActive: true, // 새로 추가된 직급은 기본적으로 활성으로 표시
+        ynDel: false // 새로 추가된 직급은 삭제되지 않은 상태
       });
       ElMessage.info('새로운 직급 항목이 추가되었습니다. 저장 시 반영됩니다.');
     },
     removeGradeHistory(index) {
-      // 진급 이력 삭제 (프론트엔드에서만, 실제로는 소프트 삭제 API 호출 필요)
       ElMessageBox.confirm('해당 진급 이력을 삭제하시겠습니까?', '경고', {
         confirmButtonText: '확인',
         cancelButtonText: '취소',
         type: 'warning'
       }).then(() => {
-        this.form.gradeHistorySet.splice(index, 1);
-        ElMessage.success('진급 이력이 삭제되었습니다.');
+        const updatedGrade = { ...this.form.gradeHistorySet[index] };
+        updatedGrade.ynDel = true;
+        updatedGrade.isActive = false; // 비활성화 상태로 변경
+        this.form.gradeHistorySet.splice(index, 1, updatedGrade);
+        ElMessage.success('진급 이력이 삭제 처리되었습니다. 저장 시 반영됩니다.');
       }).catch(() => {
         ElMessage.info('진급 이력 삭제가 취소되었습니다.');
       });
     },
+    async permanentDeleteGradeHistory(gradeHistoryId) {
+      if (!gradeHistoryId) {
+        ElMessage.error('삭제할 진급 이력 ID가 없습니다.');
+        return;
+      }
+
+      try {
+        await ElMessageBox.confirm(
+          '이 진급 이력을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?',
+          '영구 삭제 확인',
+          {
+            confirmButtonText: '삭제',
+            cancelButtonText: '취소',
+            type: 'error',
+          }
+        );
+
+        await employeeService.hardDeleteGradeHistory(gradeHistoryId);
+
+        // Remove from frontend array after successful backend deletion
+        const targetIndex = this.form.gradeHistorySet.findIndex(gh => gh.gradeHistoryId === gradeHistoryId);
+        if (targetIndex !== -1) {
+          this.form.gradeHistorySet.splice(targetIndex, 1);
+        }
+
+        ElMessage.success('진급 이력이 영구적으로 삭제되었습니다.');
+
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error("진급 이력 영구 삭제에 실패했습니다:", error);
+          ElMessage.error(error.response?.data?.message || '영구 삭제에 실패했습니다.');
+        } else {
+          ElMessage.info('영구 삭제가 취소되었습니다.');
+        }
+      }
+    },
     addPosition() {
+      this.newPositionCounter++;
       this.form.positions.push({
+        tempId: `new-position-${this.newPositionCounter}`,
+        memberPositionId: null, // null로 초기화
         organizationId: null, // null로 초기화
+        organizationName: '', // organizationName 초기화
         titleId: null,       // null로 초기화
         roleId: null,        // null로 초기화
         startDate: new Date().toISOString().slice(0, 10),
@@ -517,9 +623,12 @@ export default {
           type: 'warning',
         }
       ).then(() => {
-        const originalIndex = this.form.positions.findIndex(p => p.memberPositionId === position.memberPositionId);
-        if (originalIndex !== -1) {
-            this.form.positions.splice(originalIndex, 1);
+        const targetIndex = this.form.positions.findIndex(p => p.memberPositionId === position.memberPositionId || p.tempId === position.tempId);
+        if (targetIndex !== -1) {
+          const updatedPosition = { ...this.form.positions[targetIndex] };
+          updatedPosition.ynDel = true;
+          updatedPosition.isActive = false; // 비활성화 상태로 변경
+          this.form.positions.splice(targetIndex, 1, updatedPosition);
         }
         ElMessage.success('직무가 종료 처리되었습니다. 저장 버튼을 눌러 최종 반영해주세요.');
       }).catch(() => {
@@ -530,13 +639,31 @@ export default {
       const item = list.find(item => item.id === id);
       return item ? item.name : '';
     },
-    async permanentDeletePosition(positionId, index) {
-      if (!positionId) {
-        this.form.positions.splice(index, 1);
+    async permanentDeletePosition(identifier) {
+      let targetIndex = -1;
+      let positionIdToDelete = null;
+
+      if (typeof identifier === 'string' && identifier.startsWith('new-position-')) {
+        // New position, find by its temporary ID
+        targetIndex = this.form.positions.findIndex(p => p.tempId === identifier);
+      } else if (typeof identifier === 'string') {
+        // Existing position, find by memberPositionId (UUID)
+        targetIndex = this.form.positions.findIndex(p => p.memberPositionId === identifier);
+        positionIdToDelete = identifier;
+      }
+
+      if (targetIndex === -1) {
+        ElMessage.error('삭제할 직무를 찾을 수 없습니다.');
+        return;
+      }
+
+      if (!positionIdToDelete) {
+        // If it's a new position (no memberPositionId), just remove from frontend
+        this.form.positions.splice(targetIndex, 1);
         ElMessage.info('새로 추가된 항목이 삭제되었습니다.');
         return;
       }
-      
+
       try {
         await ElMessageBox.confirm(
           '이 직무 이력을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?',
@@ -547,13 +674,13 @@ export default {
             type: 'error',
           }
         );
-        
-        await employeeService.hardDeleteMemberPosition(positionId);
-        
-        this.form.positions.splice(index, 1);
-        
+
+        await employeeService.hardDeleteMemberPosition(positionIdToDelete);
+
+        this.form.positions.splice(targetIndex, 1);
+
         ElMessage.success('직무 이력이 영구적으로 삭제되었습니다.');
-        
+
       } catch (error) {
         if (error !== 'cancel') {
           console.error("직무 이력 영구 삭제에 실패했습니다:", error);
@@ -562,6 +689,56 @@ export default {
           ElMessage.info('영구 삭제가 취소되었습니다.');
         }
       }
+    },
+    openOrgModal(identifier) {
+      this.editingPositionIdentifier = identifier;
+      this.isOrgModalVisible = true;
+    },
+    handleOrgSelect(organization) {
+      if (this.editingPositionIdentifier !== null) {
+        let targetIndex = -1;
+
+        if (typeof this.editingPositionIdentifier === 'string' && !this.editingPositionIdentifier.startsWith('new-position-')) {
+          targetIndex = this.form.positions.findIndex(p => p.memberPositionId === this.editingPositionIdentifier);
+        } else if (typeof this.editingPositionIdentifier === 'string' && this.editingPositionIdentifier.startsWith('new-position-')) {
+          targetIndex = this.form.positions.findIndex(p => p.tempId === this.editingPositionIdentifier);
+        }
+
+        if (targetIndex !== -1) {
+          const updatedPosition = { ...this.form.positions[targetIndex] };
+          updatedPosition.organizationId = organization.id;
+          updatedPosition.organizationName = organization.name;
+          this.form.positions.splice(targetIndex, 1, updatedPosition);
+        } else {
+          console.warn('Could not find target position for update with identifier:', this.editingPositionIdentifier);
+        }
+      }
+      this.isOrgModalVisible = false;
+    },
+    openAddressSearch() {
+      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
+        ElMessage.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
+        return;
+      }
+      new daum.Postcode({
+        oncomplete: (data) => {
+          let roadAddr = data.roadAddress;
+          let extraRoadAddr = '';
+
+          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+            extraRoadAddr += data.bname;
+          }
+          if (data.buildingName !== '' && data.apartment === 'Y') {
+            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          if (extraRoadAddr !== '') {
+            extraRoadAddr = ' (' + extraRoadAddr + ')';
+          }
+
+          this.form.address = roadAddr + extraRoadAddr;
+          this.form.detailAddress = ''; // Clear detail address for new input
+        }
+      }).open();
     }
   },
   created() {

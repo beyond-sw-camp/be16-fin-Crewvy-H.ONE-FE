@@ -10,7 +10,12 @@ const mutations = {
     state.unreadCount++;
   },
   SET_NOTIFICATIONS(state, notifications) {
-    state.notifications = notifications;
+    // 최신순으로 정렬 (createAt 기준 내림차순)
+    state.notifications = notifications.sort((a, b) => {
+      const dateA = new Date(a.createAt);
+      const dateB = new Date(b.createAt);
+      return dateB - dateA; // 최신순 (내림차순)
+    });
     state.unreadCount = notifications.length;
   },
   MARK_AS_READ(state, notificationId) {
@@ -50,8 +55,15 @@ const actions = {
       console.error('Failed to mark notification as read:', error);
     }
   },
-  markAllAsRead({ commit }) {
-    commit('MARK_ALL_AS_READ');
+  async markAllAsRead({ commit }) {
+    try {
+      await apiClient.patch('/workspace-service/notification/read-all');
+      commit('MARK_ALL_AS_READ');
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      // 에러가 발생해도 사용자에게는 조용히 처리
+      // 필요시 에러 메시지를 표시할 수도 있음
+    }
   },
   addNotification({ commit }, notification) {
     commit('ADD_NOTIFICATION', notification);

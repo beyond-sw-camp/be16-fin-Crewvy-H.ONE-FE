@@ -48,6 +48,14 @@ const hardDeleteMemberPosition = (memberPositionId) => {
   return apiClient.delete(`/member-service/member/position/${memberPositionId}/delete`);
 };
 
+const resetPassword = (email) => {
+  return apiClient.get(`/member-service/member/reset-password?email=${email}`);
+};
+
+const generateRandomPassword = () => {
+  return apiClient.get(`/member-service/member/generate-password`);
+};
+
 export default {
   getAllEmployees,
   searchEmployees,
@@ -58,4 +66,6 @@ export default {
   restoreEmployee,
   searchEmployeesByOrganizationId,
   hardDeleteMemberPosition,
+  resetPassword,
+  generateRandomPassword,
 };

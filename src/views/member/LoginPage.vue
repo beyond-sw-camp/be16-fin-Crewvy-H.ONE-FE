@@ -19,9 +19,7 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item>
-          <el-checkbox v-model="rememberMe">로그인 상태 유지</el-checkbox>
-        </el-form-item>
+
 
         <el-button type="primary" @click="handleLogin" class="login-button" :loading="loading">
           로그인
@@ -29,13 +27,12 @@
       </el-form>
 
       <div class="form-footer">
-        <router-link to="/unlock-account">아이디 찾기</router-link>
-        <span class="divider">|</span>
-        <router-link to="/unlock-account">비밀번호 찾기</router-link>
+        <a href="#" @click.prevent="openPasswordResetModal">비밀번호 재설정</a>
         <span class="divider">|</span>
         <router-link to="/terms-of-service">회원가입</router-link>
       </div>
     </div>
+    <PasswordResetModal ref="passwordResetModal" />
   </div>
 </template>
 
@@ -45,12 +42,14 @@ import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import axios from 'axios';
 import { useSnackbar } from '@/composables/useSnackbar';
+import PasswordResetModal from '@/components/member/PasswordResetModal.vue';
 
 const router = useRouter();
 const store = useStore();
 const { success, error } = useSnackbar();
 
 const formRef = ref(null);
+const passwordResetModal = ref(null); // Add ref for the modal
 const form = ref({
   email: '',
   password: ''
@@ -59,8 +58,12 @@ const rules = ref({
   email: [{ required: true, message: '이메일을 입력해주세요.', trigger: 'blur' }],
   password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }]
 });
-const rememberMe = ref(false);
+
 const loading = ref(false);
+
+const openPasswordResetModal = () => {
+  passwordResetModal.value.open();
+};
 
 const handleLogin = async () => {
   if (!formRef.value) return;
@@ -75,7 +78,7 @@ const handleLogin = async () => {
 
         if (response.data && response.data.success) {
           const { accessToken, refreshToken, userName, memberId, memberPositionId } = response.data.data;
-          
+
           // 로컬 스토리지에 사용자 정보 저장
           localStorage.setItem("accessToken", accessToken);
           localStorage.setItem("refreshToken", refreshToken);
