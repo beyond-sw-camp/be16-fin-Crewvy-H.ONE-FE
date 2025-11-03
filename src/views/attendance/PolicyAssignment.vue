@@ -43,7 +43,14 @@
                               </el-col>
                               <el-col :md="12" :sm="24">
                                 <el-form-item label="2. 할당할 정책 선택" required>
-                                  <el-select v-model="form.policyId" placeholder="정책을 선택하세요" style="width: 100%;">
+                                  <el-select
+                                    v-model="form.policyIds"
+                                    multiple
+                                    collapse-tags
+                                    collapse-tags-tooltip
+                                    placeholder="정책을 선택하세요 (다중 선택 가능)"
+                                    style="width: 100%;"
+                                  >
                                     <el-option
                                       v-for="policy in policies"
                                       :key="policy.policyId"
@@ -53,22 +60,31 @@
                                   </el-select>
                                 </el-form-item>
                                 
-                                <el-card v-if="checkedSummary.total > 0" shadow="never" class="selection-info">
+                                <el-card v-if="checkedSummary.total > 0 || form.policyIds.length > 0" shadow="never" class="selection-info">
                                    <div class="selection-header">
                                       <el-icon color="#409EFC" :size="20" style="margin-right: 8px;"><Pointer /></el-icon>
-                                      <h4>선택된 할당 대상 요약</h4>
+                                      <h4>선택된 할당 정보</h4>
                                    </div>
-                                  <p><strong>조직:</strong> {{ checkedSummary.organizations }} 개</p>
-                                  <p><strong>직원:</strong> {{ checkedSummary.members }} 명</p>
-                                   <p><strong>총:</strong> {{ checkedSummary.total }} 개</p>
+                                  <p><strong>선택된 정책:</strong> {{ form.policyIds.length }} 개</p>
+                                  <p><strong>대상 조직:</strong> {{ checkedSummary.organizations }} 개</p>
+                                  <p><strong>대상 직원:</strong> {{ checkedSummary.members }} 명</p>
+                                  <p><strong>총 할당 수:</strong> {{ form.policyIds.length * checkedSummary.total }} 건</p>
                                 </el-card>
                               </el-col>
                             </el-row>
                   
                             <el-form-item style="margin-top: 20px;">
-                              <el-button type="primary" @click="handleAssign" :loading="isAssigning" size="large" :disabled="checkedSummary.total === 0 || !form.policyId">
+                              <el-button
+                                type="primary"
+                                @click="handleAssign"
+                                :loading="isAssigning"
+                                size="large"
+                                :disabled="checkedSummary.total === 0 || form.policyIds.length === 0"
+                              >
                                 <el-icon><Check /></el-icon>
-                                <span style="margin-left: 8px;">선택한 {{ checkedSummary.total }}개 대상에 정책 할당</span>
+                                <span style="margin-left: 8px;">
+                                  {{ form.policyIds.length }}개 정책을 {{ checkedSummary.total }}개 대상에 할당 (총 {{ form.policyIds.length * checkedSummary.total }}건)
+                                </span>
                               </el-button>
                               <el-button @click="resetForm" size="large">초기화</el-button>
                             </el-form-item>
@@ -231,7 +247,7 @@
                                                                 const filterText = ref('');
                                                                 const organizationTree = ref([]);
                                           
-                                                                const form = ref({ policyId: null });
+                                                                const form = ref({ policyIds: [] });
                                           
                                                                 const nodeMap = computed(() => {
                                                                   const map = new Map();
@@ -275,8 +291,23 @@
                                                                       const checkedSummary = computed(() => {
                                                                         if (!treeRef.value) return { organizations: 0, members: 0, total: 0 };
                                                                         const checkedNodes = treeRef.value.getCheckedNodes();
-                                                                        const organizations = checkedNodes.filter(node => node.type !== 'member').length;
-                                                                        const members = checkedNodes.filter(node => node.type === 'member').length;
+
+                                                                        // 조직과 멤버 노드 분리
+                                                                        const organizationNodes = checkedNodes.filter(node => node.type !== 'member');
+                                                                        const memberNodes = checkedNodes.filter(node => node.type === 'member');
+
+                                                                        // 조직의 직계 자식 멤버인지 확인
+                                                                        const isChildOfCheckedOrg = (memberId) => {
+                                                                          const memberNodeInTree = nodeMap.value.get(memberId);
+                                                                          if (!memberNodeInTree || !memberNodeInTree.parent) return false;
+                                                                          return organizationNodes.some(org => org.id === memberNodeInTree.parent.id);
+                                                                        };
+
+                                                                        // 조직의 직계 자식이 아닌 멤버만 카운트
+                                                                        const filteredMembers = memberNodes.filter(member => !isChildOfCheckedOrg(member.id));
+
+                                                                        const organizations = organizationNodes.length;
+                                                                        const members = filteredMembers.length;
                                                                         return { organizations, members, total: organizations + members };
                                                                       });
                                           
@@ -385,31 +416,58 @@
                             };
                                           
                                               const handleAssign = async () => {
-                                                if (!form.value.policyId || checkedSummary.value.total === 0) {
+                                                if (form.value.policyIds.length === 0 || checkedSummary.value.total === 0) {
                                                   error('정책과 할당 대상을 모두 선택하세요.');
                                                   return;
                                                 }
                                                 isAssigning.value = true;
                                                 try {
                                                   const checkedNodes = treeRef.value.getCheckedNodes();
-                                                  const assignmentsPayload = checkedNodes.map(node => {
-                                                    let scopeType;
-                                                    if (node.type === 'member') {
-                                                      scopeType = 'MEMBER';
-                                                    } else if (node.type === 'company') {
-                                                      scopeType = 'COMPANY';
-                                                    } else {
-                                                      scopeType = 'ORGANIZATION';
-                                                    }
-                                                    return {
-                                                      policyId: form.value.policyId,
-                                                      targetId: node.id,
-                                                      scopeType: scopeType
-                                                    };
+
+                                                  // 조직과 멤버 노드 분리
+                                                  const organizationNodes = checkedNodes.filter(node => node.type !== 'member');
+                                                  const memberNodes = checkedNodes.filter(node => node.type === 'member');
+
+                                                  // 조직의 직계 자식 멤버인지 확인하는 함수
+                                                  const isChildOfCheckedOrg = (memberId) => {
+                                                    const memberNodeInTree = nodeMap.value.get(memberId);
+                                                    if (!memberNodeInTree || !memberNodeInTree.parent) return false;
+                                                    return organizationNodes.some(org => org.id === memberNodeInTree.parent.id);
+                                                  };
+
+                                                  // 조직의 직계 자식이 아닌 멤버만 포함 (조직이 체크되어 있으면 그 소속 직원은 제외)
+                                                  const filteredMembers = memberNodes.filter(member => !isChildOfCheckedOrg(member.id));
+
+                                                  // 최종 할당 대상: 조직 + 필터링된 멤버
+                                                  const targetNodes = [...organizationNodes, ...filteredMembers];
+
+                                                  // 여러 정책 × 여러 대상 = 모든 조합 생성
+                                                  const assignmentsPayload = [];
+
+                                                  form.value.policyIds.forEach(policyId => {
+                                                    targetNodes.forEach(node => {
+                                                      let scopeType;
+                                                      if (node.type === 'member') {
+                                                        scopeType = 'MEMBER';
+                                                      } else if (node.type === 'company') {
+                                                        scopeType = 'COMPANY';
+                                                      } else {
+                                                        scopeType = 'ORGANIZATION';
+                                                      }
+
+                                                      assignmentsPayload.push({
+                                                        policyId: policyId,
+                                                        targetId: node.id,
+                                                        scopeType: scopeType
+                                                      });
+                                                    });
                                                   });
+
                                                   const requestData = { assignments: assignmentsPayload };
                                                   await createAssignment(requestData);
-                                                  success(`${checkedSummary.value.total}개 대상에게 정책이 성공적으로 할당되었습니다.`);
+
+                                                  success(`${form.value.policyIds.length}개 정책을 ${targetNodes.length}개 대상에 할당했습니다. (총 ${assignmentsPayload.length}건)`);
+
                                                   fetchAllAssignments();
                                                   resetForm();
                                                 } catch (err) {
@@ -501,8 +559,9 @@
                                           
                                               const handleNodeCheck = (data) => {
                                                 const node = treeRef.value.getNode(data.id);
-                                                if (node && node.childNodes.length > 0) { // 자식이 있는 노드만 토글
-                                                  node.expanded = !node.expanded;
+                                                // 자식이 있고 접혀있는 노드만 최초 1번 펼치기 (이후에는 토글 안 함)
+                                                if (node && node.childNodes.length > 0 && !node.expanded) {
+                                                  node.expanded = true;
                                                 }
                                               };
                                           
@@ -511,7 +570,7 @@
                                               };
                                           
                                               const resetForm = () => {
-                                                form.value.policyId = null;
+                                                form.value.policyIds = [];
                                                 if (treeRef.value) {
                                                   treeRef.value.setCheckedKeys([]);
                                                 }
