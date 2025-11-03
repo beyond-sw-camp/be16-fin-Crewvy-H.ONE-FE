@@ -1122,7 +1122,9 @@ export default {
         '/meeting': '화상회의',
         '/approval': '전자결재',
         '/board': '게시판',
-        '/resource': '예약'
+        '/resource': '예약',
+        '/resource/reservation': '예약하기',
+        '/resource/management': '자원 관리'
       }
       return titles[this.$route.path] || 'H.ONE'
     },
