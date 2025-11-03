@@ -285,81 +285,8 @@
       </div>
     </div>
 
-    <!-- 조직도 모달 -->
-    <el-dialog v-model="showOrgModal" title="직원 찾기" width="800px" :before-close="handleClose"
-      class="organization-dialog">
-      <el-tabs v-model="activeOrgTab">
-        <el-tab-pane label="조직" name="org">
-          <div class="organization-modal">
-            <div class="org-tree-container-modal">
-              <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input-modal" />
-              <div class="tree-container">
-                <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id"
-                  @node-click="handleOrgNodeClick" :filter-node-method="filterNode" :expand-on-click-node="false"
-                  :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
-                  <template #default="{ node, data }">
-                    <div class="custom-tree-node-modal">
-                      <span>{{ node.label }}</span>
-                      <span v-if="data.members && data.members.length > 0" class="member-count">{{ data.members.length
-                      }}명</span>
-                    </div>
-                  </template>
-                </el-tree>
-              </div>
-            </div>
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="사원" name="employee">
-          <div class="employee-search-modal">
-            <div class="employee-search-bar-modal">
-              <el-input v-model="employeeSearch" placeholder="사원명, 부서, 연락처 등으로 검색" clearable
-                @keyup.enter="searchEmployees" class="search-input-field" />
-              <el-button type="primary" @click="searchEmployees" class="search-button">검색</el-button>
-            </div>
-            <div class="employee-search-results">
-              <el-table v-if="searchedEmployees.length > 0" :data="searchedEmployees" style="width: 100%" stripe
-                :header-cell-style="{ 'text-align': 'center' }" :cell-style="{ 'text-align': 'center' }"
-                :row-key="row => row.memberId">
-                <el-table-column prop="name" label="이름" width="120" show-overflow-tooltip></el-table-column>
-                <el-table-column label="부서" show-overflow-tooltip>
-                  <template #default="{ row }">
-                    <div class="multi-line-cell">
-                      <div v-for="orgItem in row.organizationList || []" :key="orgItem.id" class="line-item">
-                        {{ orgItem.name }}
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="직책" width="150" show-overflow-tooltip>
-                  <template #default="{ row }">
-                    <div class="multi-line-cell">
-                      <div v-for="title in row.titleName" :key="title" class="line-item">
-                        {{ title }}
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip></el-table-column>
-                <el-table-column prop="memberStatus" label="상태" width="100"></el-table-column>
-              </el-table>
-              <div v-else class="empty-state">
-                <el-icon>
-                  <Search />
-                </el-icon>
-                <span v-if="!hasSearched">검색어를 입력하여 직원을 찾아보세요.</span>
-                <span v-else>검색 결과가 없습니다.</span>
-              </div>
-            </div>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button v-if="activeOrgTab === 'org'" @click="goToOrganizationManagement">조직 관리</el-button>
-          <el-button @click="showOrgModal = false">닫기</el-button>
-        </span>
-      </template>
-    </el-dialog>
+    <!-- 조직도 모달 (개선된 버전) -->
+    <organization-tree-modal v-model:visible="showOrgModal" @select="handleEmployeeSelect" />
 
     <!-- 캘린더 모달 -->
     <el-dialog v-model="showCalendarModal" title="일정 관리" width="900px" :before-close="handleCalendarClose">
@@ -470,8 +397,6 @@ import { mapState, mapMutations, mapGetters, useStore } from 'vuex';
 import { useSnackbar } from '@/composables/useSnackbar';
 import SnackbarContainer from '../components/SnackbarContainer.vue';
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
-import employeeService from '@/api/employeeService';
-import organizationService from '@/api/organizationService';
 import { onMounted, onBeforeUnmount } from 'vue';
 import { useSse } from '@/composables/useSse.js';
 import { jwtDecode } from 'jwt-decode';
@@ -479,10 +404,11 @@ import axios from 'axios';
 import NotificationBell from '@/components/NotificationBell.vue';
 import SelectPositionModal from '@/components/member/SelectPositionModal.vue';
 import SessionExpiredModal from '@/components/SessionExpiredModal.vue';
+import OrganizationTreeModal from '@/components/common/OrganizationTreeModal.vue';
 
 export default {
   name: 'MainLayout',
-  components: { SnackbarContainer, NotificationBell, SelectPositionModal, SessionExpiredModal },
+  components: { SnackbarContainer, NotificationBell, SelectPositionModal, SessionExpiredModal, OrganizationTreeModal },
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const { connect, disconnect } = useSse();
@@ -507,22 +433,6 @@ export default {
       sidebarCollapsed: false,
       showOrgModal: false,
       showCalendarModal: false,
-      activeOrgTab: 'org',
-      orgSearch: '',
-      employeeSearch: '',
-      expandedDepartments: {
-        management: false,
-        sales: true
-      },
-      defaultExpandedOrgKeys: [],
-      orgTreeData: [],
-      defaultProps: {
-        children: 'children',
-        label: 'label',
-      },
-      allEmployees: [],
-      searchedEmployees: [],
-      hasSearched: false, // 검색 실행 여부 상태
 
       currentDate: new Date(2025, 8, 1), // 2025년 9월
       weekdays: ['일', '월', '화', '수', '목', '금', '토'],
@@ -811,6 +721,12 @@ export default {
     }
   },
   methods: {
+    handleEmployeeSelect(employee) {
+      // Handle the selected employee data, e.g., navigate to their profile
+      console.log('Selected Employee in AppLayout:', employee);
+      this.info(`선택된 직원: ${employee.name} (ID: ${employee.id})`);
+      // this.$router.push(`/employee/${employee.id}`); // Example navigation
+    },
     manualLogout() {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
@@ -902,143 +818,8 @@ export default {
           break
       }
     },
-    handleClose(done) {
-      this.showOrgModal = false
-      done()
-    },
-    goToOrganizationManagement() {
-      this.$router.push('/organization');
-      this.showOrgModal = false;
-    },
-    filterNode(value, data) {
-      if (!value) return true;
-      return data.label.indexOf(value) !== -1;
-    },
-    async handleOrgNodeClick(data) {
-      this.hasSearched = true; // 검색 실행 상태로 변경
-      console.log('Clicked Organization ID:', data.id);
-      try {
-        const response = await employeeService.searchEmployeesByOrganizationId(data.id);
-        console.log('API Response:', response.data);
-        this.searchedEmployees = response.data.data;
-        this.activeOrgTab = 'employee';
-      } catch (error) {
-        console.error('Failed to search employees by organization:', error);
-        this.error('조직별 직원 검색에 실패했습니다.');
-        this.searchedEmployees = [];
-      }
-    },
-
-    flattenOrgTree(nodes) {
-      let employees = [];
-      const traverse = (node, department, team) => {
-        if (node.members && node.members.length > 0) {
-          node.members.forEach(member => {
-            employees.push({
-              ...member,
-              department: department,
-              team: team,
-            });
-          });
-        }
-        if (node.children && node.children.length > 0) {
-          node.children.forEach(child => {
-            let nextDepartment = department;
-            let nextTeam = team;
-            if (child.type === 'department') {
-              nextDepartment = child.label;
-              nextTeam = '';
-            } else if (child.type === 'team') {
-              nextTeam = child.label;
-            }
-            traverse(child, nextDepartment, nextTeam);
-          });
-        }
-      };
-      nodes.forEach(node => traverse(node, '', ''));
-      return employees;
-    },
-    buildOrganizationTree(flatList) {
-      if (!flatList || flatList.length === 0) {
-        return [];
-      }
-      const map = {};
-      // First pass: create map and initialize children array
-      flatList.forEach(org => {
-        map[org.organizationId] = {
-          ...org,
-          id: org.organizationId,
-          label: org.label,
-          children: []
-        };
-      });
-
-      const roots = [];
-      // Second pass: link children to parents and find roots
-      Object.values(map).forEach(node => {
-        if (node.parentId) {
-          const parent = map[node.parentId];
-          if (parent) {
-            parent.children.push(node);
-          }
-        } else {
-          // No parent, it's a root
-          roots.push(node);
-        }
-      });
-      return roots;
-    },
-    async fetchOrganizationTree() {
-      try {
-        const orgTreeData = (await organizationService.getOrganizationTree()).data.data;
-        this.orgTreeData = this.buildOrganizationTree(orgTreeData);
-
-        // Expand all top-level nodes by default
-        if (this.orgTreeData && this.orgTreeData.length > 0) {
-          this.defaultExpandedOrgKeys = this.orgTreeData.map(rootNode => rootNode.id);
-        }
-
-      } catch (error) {
-        console.error('Failed to fetch organization tree:', error);
-        this.error('조직도를 불러오는데 실패했습니다.');
-      }
-    },
     showOrganizationModal() {
       this.showOrgModal = true;
-      this.activeOrgTab = 'org'; // 조직 탭을 기본으로 설정
-      this.orgSearch = '';
-      this.employeeSearch = '';
-      this.searchedEmployees = []; // 직원 목록 초기화
-      this.hasSearched = false; // 검색 상태 초기화
-
-      // Always fetch the latest organization tree data when the modal is opened
-      this.fetchOrganizationTree();
-      // this.fetchAllEmployees(); // This is for the employee tab, can be fetched when that tab is active or on demand.
-    },
-    async fetchAllEmployees() {
-      try {
-        const response = await employeeService.getAllEmployees();
-        this.allEmployees = response.data.data; // Corrected to access nested 'data' property
-        this.searchedEmployees = this.allEmployees;
-      } catch (error) {
-        console.error('Failed to fetch all employees:', error);
-        this.error('직원 목록을 불러오는데 실패했습니다.');
-      }
-    },
-    async searchEmployees() {
-      this.hasSearched = true; // 검색이 실행되었음을 표시
-      if (!this.employeeSearch) {
-        this.searchedEmployees = [];
-        return;
-      }
-      try {
-        const response = await employeeService.searchEmployees(this.employeeSearch);
-        this.searchedEmployees = response.data.data;
-      } catch (error) {
-        console.error('Failed to search employees:', error);
-        this.error('직원 검색에 실패했습니다.');
-        this.searchedEmployees = [];
-      }
     },
     openCalendarModal() {
       this.showCalendarModal = true
@@ -1202,7 +983,6 @@ export default {
   },
   async created() {
     if (localStorage.getItem('accessToken')) {
-      await this.fetchOrganizationTree();
       this.$store.dispatch('auth/fetchPermissions');
     }
   },

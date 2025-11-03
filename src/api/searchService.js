@@ -50,6 +50,31 @@ class SearchService {
       },
     });
   }
+
+  getOrganizationTree() {
+    const accessToken = localStorage.getItem('accessToken');
+    const companyId = localStorage.getItem('companyId');
+    return axios.get(`${API_URL}/search/organization`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-User-CompanyId': companyId,
+      },
+    });
+  }
+
+  searchEmployeesByOrganization(organizationId) {
+    const accessToken = localStorage.getItem('accessToken');
+    const companyId = localStorage.getItem('companyId');
+    return axios.get(`${API_URL}/search/employees/organization`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-User-CompanyId': companyId,
+      },
+      params: {
+        organizationId,
+      },
+    });
+  }
 }
 
 export default new SearchService();
