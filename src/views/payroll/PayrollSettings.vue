@@ -84,8 +84,8 @@
             </div>
           </div>
           <div class="actions">
-            <el-button type="primary" :loading="saving" @click="savePolicy">저장</el-button>
             <el-button @click="resetPolicy">초기화</el-button>
+            <el-button type="primary" :loading="saving" @click="savePolicy">저장</el-button>
           </div>
         </el-form>
       </el-card>
