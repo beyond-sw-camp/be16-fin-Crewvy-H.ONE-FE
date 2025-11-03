@@ -141,7 +141,7 @@
             <el-menu-item index="/payroll/settings">
               <span>급여 설정</span>
             </el-menu-item>
-            <el-menu-item index="/payroll/basic-info">
+            <el-menu-item index="/payroll/contract-info">
               <span>급여 계약 정보</span>
             </el-menu-item>
             <el-menu-item index="/payroll/actual-calculation">
@@ -169,6 +169,9 @@
             </el-menu-item>
             <el-menu-item index="/payroll/status-output">
               <span>급여 현황 출력</span>
+            </el-menu-item>
+            <el-menu-item index="/payroll/my-inquiry">
+              <span>내 급여 조회</span>
             </el-menu-item>
           </el-sub-menu>
         </el-sub-menu>
@@ -1111,6 +1114,7 @@ export default {
         '/payroll/item-inquiry': '급여 항목별 조회',
         '/payroll/insurance-deduction': '월별 보험료 공제 현황',
         '/payroll/status-output': '급여 현황 출력',
+        '/payroll/my-inquiry': '내 급여 조회',
         '/payroll/withholding-report': '원천징수이행신고서',
         '/payroll/elderly-incentive': '고령자장려금신고서',
         '/chat': '채팅',

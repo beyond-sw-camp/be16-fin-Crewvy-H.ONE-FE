@@ -14,7 +14,6 @@
         <div class="button-row">
             <el-button @click="searchPayroll" class="action-btn">조회</el-button>
             <el-button @click="savePayroll" class="action-btn">저장</el-button>
-            <el-button @click="deletePayroll" class="action-btn">삭제</el-button>
             <el-button @click="printPayroll" class="primary-btn">인쇄</el-button>
         </div>
         <!-- 모든 필드와 계산하기 버튼을 한 행에 -->
@@ -28,7 +27,7 @@
                 placeholder="2025.09"
                 format="YYYY.MM"
                 value-format="YYYY.MM"
-                size="mini"
+                size="small"
                 style="width: 100%"
                 @change="onPayrollMonthChange"
               />
@@ -43,21 +42,22 @@
                 placeholder="2025.09.26"
                 format="YYYY.MM.DD"
                 value-format="YYYY.MM.DD"
-                size="mini"
-                style="width: 100%"
+                size="small"
+            style="width: 100%"
+            readonly
               />
             </div>
           </el-col>
           <!-- <el-col :span="3">
             <div class="search-item">
               <label>급여내역</label>
-              <el-input v-model="searchForm.payrollDetails" placeholder="급여내역" size="mini" />
+              <el-input v-model="searchForm.payrollDetails" placeholder="급여내역" size="small" />
             </div>
           </el-col>
           <el-col :span="3">
             <div class="search-item">
               <label>급여구분</label>
-              <el-select v-model="searchForm.payrollType" placeholder="급여" size="mini">
+              <el-select v-model="searchForm.payrollType" placeholder="급여" size="small">
                 <el-option label="급여" value="salary" />
                 <el-option label="상여금" value="bonus" />
                 <el-option label="퇴직금" value="severance" />
@@ -67,7 +67,7 @@
           <el-col :span="3">
             <div class="search-item">
               <label>부서</label>
-              <el-select v-model="searchForm.department" placeholder="부서" size="mini">
+              <el-select v-model="searchForm.department" placeholder="부서" size="small">
                 <el-option label="전체" value="" />
                 <el-option label="개발팀" value="개발팀" />
                 <el-option label="디자인팀" value="디자인팀" />
@@ -82,7 +82,7 @@
           <el-col :span="3">
             <div class="search-item">
               <label>전체</label>
-              <el-input v-model="searchForm.searchAll" placeholder="전체" size="mini" />
+              <el-input v-model="searchForm.searchAll" placeholder="전체" size="small" />
             </div>
           </el-col>
           <el-col :span="3">
@@ -115,7 +115,7 @@
             :data="payrollData" 
             style="width: 100%"
             border
-            height="540"
+            max-height="540"
             stripe
             :show-summary="true"
             :summary-method="getSummaries"
@@ -237,7 +237,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
-import axios from 'axios'
+import apiClient from '@/api/http'
+import { getAuthHeadersFromToken } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollActualCalculation',
@@ -251,8 +252,13 @@ export default {
       showPersonalInfo: false,
       selectedEmployees: [], // 선택된 사원들
       searchForm: {
-        payrollMonth: '2025.09',
-        paymentDate: '2025.09.26',
+        payrollMonth: (() => {
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          return `${year}.${month}`
+        })(),
+        paymentDate: '',
         payrollDetails: '',
         payrollType: 'salary',
         department: '',
@@ -350,14 +356,12 @@ export default {
         // '2025.09' 형식을 'YYYY-MM' 형식으로 변환
         const yearMonth = value.replace('.', '-')
         
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-policy/payment-date`, {
+        const response = await apiClient.get(`/workforce-service/salary-policy/payment-date`, {
           params: {
             companyId: companyId,
             yearMonth: yearMonth
           }
         })
-        
-        console.log('지급일 응답:', response.data)
         
         // 응답 데이터에서 지급일 추출
         if (response.data) {
@@ -402,8 +406,15 @@ export default {
       try {
         const companyId = 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
         
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
-          params: { companyId }
+        // 인증 헤더 가져오기
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await apiClient.get(`/workforce-service/payrollItem/list`, {
+          params: { companyId },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -486,6 +497,20 @@ export default {
           })
         }
 
+        // 고정수당 매핑 - 동적으로 프로퍼티 생성 (지급항목으로 처리)
+        if (salary.fixedList) {
+          salary.fixedList.forEach(item => {
+            // 항목 이름으로 해당하는 지급항목 찾기
+            const allowanceItem = this.allowanceItems.find(a => a.name === item.salaryName || a.name === item.allowanceName)
+            if (allowanceItem) {
+              // 기존 값이 있으면 더하기, 없으면 설정
+              const currentAmount = transformed[allowanceItem.property] || 0
+              const fixedAmount = Number(item.amount) || 0
+              transformed[allowanceItem.property] = currentAmount + fixedAmount
+            }
+          })
+        }
+
         return transformed
       })
     },
@@ -498,62 +523,42 @@ export default {
         const yearMonth = this.searchForm.payrollMonth.replace('.', '-') // '2025-09' 형식
         
         // 급여 정보 조회
-        const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary/calculate`, {
+        const memberPositionId = localStorage.getItem('memberPositionId')
+        const response = await apiClient.post(`/workforce-service/salary/calculate`, {
           companyId: companyId,
           yearMonth: yearMonth
+        }, {
+          headers: {
+            ...(memberPositionId ? { 'X-User-MemberPositionId': memberPositionId } : {})
+          }
         })
         
-        console.log('========== 급여 정보 응답 ==========')
-        console.log('전체 응답:', response)
-        console.log('응답 데이터:', response.data)
-        console.log('응답 데이터 타입:', typeof response.data)
-        console.log('응답 데이터 배열 여부:', Array.isArray(response.data))
-        
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          console.log('첫 번째 급여 데이터 상세:', JSON.stringify(response.data[0], null, 2))
-          console.log('totalAllowance:', response.data[0].totalAllowance)
-          console.log('totalDeduction:', response.data[0].totalDeduction)
-          console.log('netPay:', response.data[0].netPay)
-        }
-        
-        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          console.log('조회된 급여 데이터 개수:', response.data.length)
-          console.log('첫 번째 급여 데이터:', response.data[0])
           this.payrollData = this.transformApiData(response.data)
-          console.log('변환된 급여 데이터:', this.payrollData)
           this.success('급여 정보를 조회했습니다.')
         } else if (response.data && !Array.isArray(response.data)) {
-          console.log('응답이 배열이 아닙니다. 응답 구조:', response.data)
-          // response.data가 success, data 형태일 수 있음
           if (response.data.data && Array.isArray(response.data.data)) {
-            console.log('response.data.data에서 데이터 추출')
-            console.log('조회된 급여 데이터 개수:', response.data.data.length)
-            this.payrollData = this.transformApiData(response.data.data)
-            this.success('급여 정보를 조회했습니다.')
+            // 빈 배열인 경우 체크
+            if (response.data.data.length === 0) {
+              this.payrollData = []
+              this.warning('조회된 급여 정보가 없습니다.')
+            } else {
+              this.payrollData = this.transformApiData(response.data.data)
+              this.success('급여 정보를 조회했습니다.')
+            }
           } else {
-            console.log('유효한 데이터가 없습니다.')
             this.payrollData = []
             this.warning('조회된 급여 정보가 없습니다.')
           }
         } else {
-          console.log('조회된 급여 정보가 없습니다.')
           this.payrollData = []
           this.warning('조회된 급여 정보가 없습니다.')
         }
       } catch (err) {
-        console.error('========== 급여 조회 실패 ==========')
-        console.error('에러:', err)
-        console.error('에러 메시지:', err.message)
-        console.error('에러 응답:', err.response)
-        if (err.response) {
-          console.error('에러 상태:', err.response.status)
-          console.error('에러 데이터:', err.response.data)
-        }
         this.error('급여 정보 조회에 실패했습니다.')
         this.payrollData = []
       } finally {
         this.loading = false
-        console.log('========== 급여 정보 조회 종료 ==========')
       }
     },
     
@@ -562,40 +567,111 @@ export default {
         this.warning('저장할 사원을 선택해주세요.')
         return
       }
+      
       try {
-        // TODO: 저장 로직 구현
-        // await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary`, data)
-        this.success('급여 정보를 저장했습니다.')
+        this.loading = true
+        const companyId = 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        
+        // 인증 헤더 가져오기
+        const authHeaders = getAuthHeadersFromToken()
+        if (!authHeaders || !authHeaders['X-User-MemberPositionId']) {
+          this.error('인증 정보를 찾을 수 없습니다.')
+          return
+        }
+        
+        // paymentDate 형식 변환 (YYYY.MM.DD -> YYYY-MM-DD)
+        let paymentDate = this.searchForm.paymentDate || ''
+        if (paymentDate && paymentDate.includes('.')) {
+          paymentDate = paymentDate.replace(/\./g, '-')
+        }
+        
+        // salaryName 생성 (급여년월 기반)
+        const salaryName = `급여 ${this.searchForm.payrollMonth || ''}`
+        
+        // 선택된 사원들의 데이터를 API 형식으로 변환
+        const salaryCreateReqList = this.selectedEmployees.map(employee => {
+          // 지급항목 리스트 생성 및 총지급액 계산
+          const allowanceList = []
+          let totalAllowance = 0
+          let baseSalary = 0
+          
+          // 기본급 찾기 및 분리
+          const baseSalaryItem = this.allowanceItems.find(item => item.name === '기본급')
+          if (baseSalaryItem) {
+            const amount = Number(employee[baseSalaryItem.property]) || 0
+            if (amount > 0) {
+              baseSalary = amount
+            }
+          }
+          
+          // 모든 지급항목들
+          this.allowanceItems.forEach(item => {
+            const amount = Number(employee[item.property]) || 0
+            if (amount > 0) {
+              allowanceList.push({
+                salaryName: item.name,
+                amount: amount.toString()
+              })
+              totalAllowance += amount
+            }
+          })
+          
+          // 공제항목 리스트 생성 및 총공제액 계산
+          const deductionList = []
+          let totalDeduction = 0
+          this.deductionItems.forEach(item => {
+            const amount = Number(employee[item.property]) || 0
+            if (amount > 0) {
+              deductionList.push({
+                salaryName: item.name,
+                amount: amount.toString()
+              })
+              totalDeduction += amount
+            }
+          })
+          
+          // 총지급액과 총공제액이 이미 계산되어 있는 경우 사용, 없으면 합산값 사용
+          const finalTotalAllowance = employee.totalAllowance || totalAllowance
+          const finalTotalDeduction = employee.totalDeduction || totalDeduction
+          const finalNetPay = employee.netPay || (finalTotalAllowance - finalTotalDeduction)
+          
+          return {
+            memberId: employee.employeeId,
+            salaryName: salaryName,
+            baseSalary: baseSalary.toString(),
+            totalAllowance: finalTotalAllowance.toString(),
+            totalDeduction: finalTotalDeduction.toString(),
+            netPay: finalNetPay.toString(),
+            paymentDate: paymentDate,
+            allowanceList: allowanceList,
+            deductionList: deductionList
+          }
+        })
+        
+        // API 요청
+        await apiClient.post(
+          `/workforce-service/salary/save`,
+          salaryCreateReqList,
+          {
+            headers: {
+              'Authorization': authHeaders['Authorization'],
+              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+            },
+            params: {
+              companyId: companyId
+            }
+          }
+        )
+        
+        this.success(`${this.selectedEmployees.length}명의 급여 정보를 저장했습니다.`)
+        
+        // 저장 후 데이터 재조회
+        await this.searchPayroll()
       } catch (err) {
         console.error('급여 저장 실패:', err)
         this.error('급여 정보 저장에 실패했습니다.')
-      }
-    },
-    
-    async deletePayroll() {
-      if (this.selectedEmployees.length === 0) {
-        this.warning('삭제할 사원을 선택해주세요.')
-        return
-      }
-      
-      try {
-        const accessToken = localStorage.getItem('accessToken')
-        // 선택된 사원들의 급여 ID로 삭제
-        for (const employee of this.selectedEmployees) {
-          if (employee.salaryId) {
-            await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary/${employee.salaryId}`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-          }
-        }
-        this.success('급여 정보를 삭제했습니다.')
-        await this.searchPayroll() // 삭제 후 재조회
-      } catch (err) {
-        console.error('급여 삭제 실패:', err)
-        this.error('급여 정보 삭제에 실패했습니다.')
+      } finally {
+        this.loading = false
       }
     },
     
@@ -623,6 +699,8 @@ export default {
   async mounted() {
     // 급여 항목 목록 로드
     await this.loadPayrollItems()
+    // 현재 급여년월 기준 지급일 자동 조회
+    await this.onPayrollMonthChange(this.searchForm.payrollMonth)
     // 컴포넌트 마운트 시 자동 조회
     await this.searchPayroll()
   }
@@ -815,8 +893,8 @@ export default {
 
 /* 주요 버튼 (인쇄) */
 .primary-btn {
-  background-color: #1976d2 !important;
-  border: 1px solid #1976d2 !important;
+  background-color: rgb(64, 158, 255) !important;
+  border: 1px solid rgb(64, 158, 255) !important;
   color: #ffffff !important;
   font-weight: 500 !important;
   padding: 8px 16px !important;
@@ -826,8 +904,8 @@ export default {
 }
 
 .primary-btn:hover {
-  background-color: #1565c0 !important;
-  border-color: #1565c0 !important;
+  background-color: rgb(53, 138, 230) !important;
+  border-color: rgb(53, 138, 230) !important;
   color: #ffffff !important;
 }
 
@@ -967,6 +1045,20 @@ export default {
 
 .payroll-employee-table :deep(.el-table__footer-wrapper .cell) {
   font-weight: 600;
+}
+
+/* Footer와 Body 사이 공간 제거 */
+.payroll-employee-table :deep(.el-table__footer-wrapper) {
+  width: 100% !important;
+  margin-top: 0 !important;
+}
+
+.payroll-employee-table :deep(.el-table__body-wrapper) {
+  margin-bottom: 0 !important;
+}
+
+.payroll-employee-table :deep(.el-table__footer) {
+  width: 100% !important;
 }
 
 /* 지급항목 그룹 헤더 - 연한 녹색 */
