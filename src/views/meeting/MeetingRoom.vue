@@ -89,7 +89,7 @@
   import { Room, RoomEvent, Track, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
   import * as icons from '@element-plus/icons-vue'
   import { getChatMessages, sendChatMessage } from '@/api/videoConference'
-  import ParticipantList from '@/components/ParticipantList.vue'
+  import ParticipantList from '@/components/meeting/ParticipantList.vue'
 
   export default {
     name: 'MeetingRoom',
@@ -441,7 +441,7 @@
   }
 
   .controls {
-    position: absolute;
+    position: fixed;
     left: 50%;
     bottom: 16px;
     transform: translateX(-50%);
