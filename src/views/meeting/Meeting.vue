@@ -8,7 +8,11 @@
       <div class="header-actions">
         <el-button type="primary" @click="startMeeting">
           <el-icon><VideoCamera /></el-icon>
-          <span style="margin-left: 8px;">새 회의 시작</span>
+          <span style="margin-left: 8px;">화상회의 시작</span>
+        </el-button>
+        <el-button type="primary" @click="scheduleMeeting">
+          <el-icon><Plus /></el-icon>
+          <span style="margin-left: 8px;">화상회의 예약</span>
         </el-button>
         <el-button @click="joinMeeting">
           <el-icon><Connection /></el-icon>
@@ -69,6 +73,9 @@
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="진행 중인 회의" name="active">
           <div class="active-meetings">
+            <div class="section-header">
+              <h3>진행 중인 회의</h3>
+            </div>
             <div class="meeting-item" v-for="meeting in activeMeetingsList" :key="meeting.id">
               <div class="meeting-info">
                 <div class="meeting-title">{{ meeting.title }}</div>
@@ -83,10 +90,10 @@
                   <el-icon><Connection /></el-icon>
                   참여
                 </el-button>
-                <el-button @click="endMeeting">
+                <!-- <el-button @click="endMeeting">
                   <el-icon><Close /></el-icon>
                   종료
-                </el-button>
+                </el-button> -->
               </div>
             </div>
           </div>
@@ -96,10 +103,6 @@
           <div class="scheduled-meetings">
             <div class="section-header">
               <h3>예정된 회의</h3>
-              <el-button type="primary" @click="scheduleMeeting">
-                <el-icon><Plus /></el-icon>
-                회의 일정 등록
-              </el-button>
             </div>
             
             <div class="meeting-list">
@@ -113,7 +116,7 @@
                   </div>
                   <div class="meeting-description">{{ meeting.description }}</div>
                 </div>
-                <div class="meeting-actions">
+                <div class="meeting-actions" v-if="meeting.hostId===this.memberId">
                   <el-button type="primary" @click="startScheduledMeeting(meeting)">
                     <el-icon><VideoCamera /></el-icon>
                     시작
@@ -175,9 +178,9 @@
                     <el-icon><VideoPlay /></el-icon>
                     녹화 보기
                   </el-button>
-                  <el-button type="text" @click="downloadTranscript(meeting)">
-                    <el-icon><Download /></el-icon>
-                    회의록 다운로드
+                  <el-button type="text" @click="viewMinute(meeting)" v-if="meeting.hasMinute">
+                    <el-icon><Document /></el-icon>
+                    회의록 보기
                   </el-button>
                 </div>
               </div>
@@ -331,6 +334,7 @@ export default {
       HOUR_MS: 60 * 60 * 1000,
       DAY_MS: 24 * 60 * 60 * 1000,
       
+      memberId: null, // 현재 로그인한 사용자의 ID
       activeTab: 'active',
       showStartMeeting: false,
       showScheduleMeeting: false,
@@ -372,6 +376,9 @@ export default {
         { id: '550e8400-e29b-41d4-a716-446655440000', name: '정수진' }
       ]
     }
+  },
+  created() {
+    this.memberId = localStorage.getItem('memberId');
   },
   mounted() {
     this.loadMeetingLists()
@@ -419,6 +426,7 @@ export default {
           rawDateTime: dt,
           dateTimeFormatted: datetimeStr,
           host: m.host || '주최자',
+          hostId: m.hostId || null, // hostId 추가
           participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
           description: m.description || '',
           isRecording: m.isRecording === true,
@@ -435,6 +443,7 @@ export default {
         duration: m.duration || '-',
         participants: m.participants || 0,
         url: m.recordingUrl,
+        hasMinute: m.hasMinute,
         status: '완료'
       }))
     },
@@ -682,6 +691,10 @@ export default {
         month: 'short',
         day: 'numeric'
       })
+    },
+    viewMinute(meeting) {
+      this.$router.push("/meeting/minutes/" + meeting.id);
+      // this.success(`${meeting.title} 회의록을 확인합니다.`)
     }
   }
 }

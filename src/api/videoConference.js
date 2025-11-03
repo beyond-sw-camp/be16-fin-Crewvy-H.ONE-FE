@@ -56,4 +56,8 @@ export const getChatMessages = async (videoConferenceId) => {
   return data.data.content
 }
 
+export const getVideoConferenceMinutes = async (videoConferenceId) => {
+  const { data } = await api.get(`${VC_BASE}/${videoConferenceId}/minutes`);
+  return data;
+};
 

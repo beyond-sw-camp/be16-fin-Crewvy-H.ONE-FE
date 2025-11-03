@@ -1,5 +1,6 @@
 import Meeting from '../../views/meeting/Meeting.vue'
 import MeetingRoom from '../../views/meeting/MeetingRoom.vue'
+import MeetingMinutes from '../../views/meeting/MeetingMinutes.vue'
 
 const routes = [
   {
@@ -13,6 +14,12 @@ const routes = [
     name: 'MeetingRoom',
     component: MeetingRoom,
     meta: { layout: 'BlankLayout' }
+  },
+  {
+    path: '/meeting/minutes/:id',
+    name: 'MeetingMinutes',
+    component: MeetingMinutes,
+    meta: { requiresAuth: true }
   },
 ];
 
