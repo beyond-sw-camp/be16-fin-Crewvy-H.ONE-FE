@@ -262,7 +262,13 @@ export default {
         } else if (blockName === 'expenseRule' && !policy.value.ruleDetails.expenseRule) {
             policy.value.ruleDetails.expenseRule = { allowExpense: false };
         } else if (blockName === 'tripRule' && !policy.value.ruleDetails.tripRule) {
-            policy.value.ruleDetails.tripRule = { allowTrip: false };
+            policy.value.ruleDetails.tripRule = {
+                type: '',
+                perDiemAmount: 0,
+                accommodationLimit: 0,
+                transportationLimit: 0,
+                allowedWorkLocations: []
+            };
         }
     };
 
