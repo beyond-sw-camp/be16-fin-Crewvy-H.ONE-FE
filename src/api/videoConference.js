@@ -33,8 +33,11 @@ export const startVideoConference = async (videoConferenceId) => {
   return data.data
 }
 
-export const getMyVideoConferences = async (status, page = 0, size = 10) => {
+export const getMyVideoConferences = async (status, page = 0, size = 10, sort = null) => {
   const params = { status, page, size };
+  if (sort) {
+    params.sort = sort;
+  }
   const { data } = await api.get(`${VC_BASE}`, { params });
   return data.data;
 };

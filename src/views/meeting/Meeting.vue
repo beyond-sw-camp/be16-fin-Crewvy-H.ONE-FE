@@ -511,7 +511,7 @@ export default {
     },
     async loadScheduledMeetings() {
       try {
-        const waiting = await getMyVideoConferences('WAITING', this.scheduledCurrentPage - 1, this.scheduledPageSize);
+        const waiting = await getMyVideoConferences('WAITING', this.scheduledCurrentPage - 1, this.scheduledPageSize, 'scheduledStartTime,asc');
         this.scheduledMeetings = this.parseScheduledMeetings(waiting);
         this.scheduledTotalPages = waiting.totalPages || 1;
       } catch (e) {
