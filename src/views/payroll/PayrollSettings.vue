@@ -289,7 +289,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
-import axios from 'axios'
+import apiClient from '@/api/http'
+import { getAuthHeadersFromToken } from '@/utils/authUtils'
 import { Plus, Document, RefreshLeft, Delete, Loading, Refresh } from '@element-plus/icons-vue'
 
 export default {
@@ -400,8 +401,15 @@ export default {
     // 항목명 옵션을 API에서 가져오기
     async loadItemOptions() {
       try {
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
-          params: { companyId: this.getCompanyId() } // 특정 회사 ID로 요청 (백엔드에서 null 포함해서 응답)
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await apiClient.get(`/workforce-service/payrollItem/list`, {
+          params: { companyId: this.getCompanyId() }, // 특정 회사 ID로 요청 (백엔드에서 null 포함해서 응답)
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -443,8 +451,15 @@ export default {
       try {
         this.loading = true
         
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/list`, {
-          params: { companyId: this.getCompanyId() }
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await apiClient.get(`/workforce-service/payrollItem/list`, {
+          params: { companyId: this.getCompanyId() },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -605,9 +620,16 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
+          // 헤더 설정
+          const authHeaders = getAuthHeadersFromToken()
+          
           // axios delete 요청으로 RequestBody에 항목의 uuid 배열로 전송 (일괄 삭제 대응)
-          await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, {
-            data: [item.uuid]
+          await apiClient.delete(`/workforce-service/payrollItem`, {
+            data: [item.uuid],
+            headers: authHeaders ? {
+              'Authorization': authHeaders['Authorization'],
+              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+            } : {}
           })
           
           // 백엔드 삭제 성공 시 로컬에서도 삭제
@@ -724,16 +746,29 @@ export default {
           }
         })
         
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
         // 새 항목 저장 (POST) - 각 항목을 단일 객체로 전송
         if (newItems.length > 0) {
           for (const newItem of newItems) {
-            await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, newItem)
+            await apiClient.post(`/workforce-service/payrollItem`, newItem, {
+              headers: authHeaders ? {
+                'Authorization': authHeaders['Authorization'],
+                'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+              } : {}
+            })
           }
         }
         
         // 변경된 기존 항목 수정 (PUT)
         if (changedItems.length > 0) {
-          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem`, changedItems)
+          await apiClient.put(`/workforce-service/payrollItem`, changedItems, {
+            headers: authHeaders ? {
+              'Authorization': authHeaders['Authorization'],
+              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+            } : {}
+          })
         }
         
         this.success('급여 항목이 성공적으로 저장되었습니다.', {
@@ -772,7 +807,7 @@ export default {
     // 급여 정책 로드
     async loadPolicy() {
       try {
-        const res = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-policy/list`, {
+        const res = await apiClient.get(`/workforce-service/salary-policy/list`, {
           params: { companyId: this.getCompanyId() }
         })
         let policy = null
@@ -886,7 +921,7 @@ export default {
         }
 
         const endpoint = this.policyExists ? 'update' : 'create'
-        await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-policy/${endpoint}`, payload)
+        await apiClient.post(`/workforce-service/salary-policy/${endpoint}`, payload)
         this.success('급여 정책이 저장되었습니다.')
       } catch (e) {
         this.error('정책 저장 중 오류가 발생했습니다.')
