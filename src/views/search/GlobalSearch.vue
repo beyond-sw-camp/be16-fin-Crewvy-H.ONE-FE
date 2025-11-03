@@ -8,18 +8,15 @@
     </div>
 
     <div class="search-section">
-      <el-input
-        v-model="searchQuery"
-        placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요."
-        prefix-icon="Search"
-        clearable
-        @keyup.enter="performSearch"
-        style="width: 100%;"
-      >
-        <template #append>
-          <el-button @click="performSearch">검색</el-button>
-        </template>
-      </el-input>
+            <el-input
+              v-model="searchQuery"
+              placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요."
+              prefix-icon="Search"
+              clearable
+              @keyup.enter="performSearch"
+            >
+            </el-input>
+            <el-button @click="performSearch">검색</el-button>
     </div>
 
     <div class="search-results">
@@ -42,7 +39,8 @@
                 <div class="employee-list-cell">연락처</div>
                 <div class="employee-list-cell">상태</div>
               </div>
-              <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
+              <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id"
+                class="employee-list-row" @click="navigateTo(result)">
                 <div class="employee-list-cell">{{ result.title }}</div>
                 <div class="employee-list-cell">{{ result.department }}</div>
                 <div class="employee-list-cell">{{ result.position }}</div>
@@ -50,20 +48,31 @@
                 <div class="employee-list-cell">{{ result.status }}</div>
               </div>
               <div v-if="getResultsByCategory('employee').length > 5" class="view-more-container">
-                <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{ getResultsByCategory('employee').length - 5 }}개)</el-button>
+                <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{
+                  getResultsByCategory('employee').length -
+                  5 }}개)</el-button>
               </div>
             </div>
 
             <!-- Approval Results in All Tab -->
-            <div v-if="getResultsByCategory('approval').length > 0" class="result-group">
+            <div v-if="approvalResults.length > 0" class="result-group">
               <h2 class="group-title">결재문서</h2>
-              <div v-for="result in getResultsByCategory('approval').slice(0, 5)" :key="result.id" class="result-item">
-                <div class="result-header">
-                  <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
-                </div>
+              <div class="approval-list-header">
+                <div class="approval-list-cell">제목</div>
+                <div class="approval-list-cell">직책명</div>
+                <div class="approval-list-cell">이름</div>
+                <div class="approval-list-cell">작성일</div>
               </div>
-              <div v-if="getResultsByCategory('approval').length > 5" class="view-more-container">
-                <el-button type="text" @click="activeTab = 'approval'">결재문서 더보기 ({{ getResultsByCategory('approval').length - 5 }}개)</el-button>
+              <div v-for="result in approvalResults.slice(0, 5)" :key="result.id" class="approval-list-row"
+                @click="navigateTo(result)">
+                <div class="approval-list-cell">{{ result.title }}</div>
+                <div class="approval-list-cell">{{ result.titleName }}</div>
+                <div class="approval-list-cell">{{ result.memberName }}</div>
+                <div class="approval-list-cell">{{ formatDateTime(result.createAt) }}</div>
+              </div>
+              <div v-if="approvalTotalItems > 5" class="view-more-container">
+                <el-button type="text" @click="activeTab = 'approval'">결재문서 더보기 ({{ approvalTotalItems - 5
+                }}개)</el-button>
               </div>
             </div>
           </div>
@@ -85,7 +94,8 @@
               <div class="employee-list-cell">연락처</div>
               <div class="employee-list-cell">상태</div>
             </div>
-            <div v-for="result in getResultsByCategory('employee')" :key="result.id" class="employee-list-row" @click="navigateTo(result)">
+            <div v-for="result in getResultsByCategory('employee')" :key="result.id" class="employee-list-row"
+              @click="navigateTo(result)">
               <div class="employee-list-cell">{{ result.title }}</div>
               <div class="employee-list-cell">{{ result.department }}</div>
               <div class="employee-list-cell">{{ result.position }}</div>
@@ -97,33 +107,36 @@
 
         <!-- Approval Tab -->
         <el-tab-pane label="결재문서" name="approval">
-            <div v-if="!searched">
-              <el-empty description="검색어를 입력해주세요."></el-empty>
+          <div v-if="!searched">
+            <el-empty description="검색어를 입력해주세요."></el-empty>
+          </div>
+          <div v-else-if="approvalResults.length === 0">
+            <el-empty :description="`'${searchQuery}'에 대한 결재문서 검색 결과가 없습니다.`"></el-empty>
+          </div>
+          <div v-else>
+            <div class="approval-list-header">
+              <div class="approval-list-cell">제목</div>
+              <div class="approval-list-cell">직책명</div>
+              <div class="approval-list-cell">이름</div>
+              <div class="approval-list-cell">작성일</div>
             </div>
-            <div v-else-if="approvalResults.length === 0">
-              <el-empty :description="`'${searchQuery}'에 대한 결재문서 검색 결과가 없습니다.`"></el-empty>
+            <div v-for="result in approvalResults" :key="result.id" class="approval-list-row"
+              @click="navigateTo(result)">
+              <div class="approval-list-cell">{{ result.title }}</div>
+              <div class="approval-list-cell">{{ result.titleName }}</div>
+              <div class="approval-list-cell">{{ result.memberName }}</div>
+              <div class="approval-list-cell">{{ formatDateTime(result.createAt) }}</div>
             </div>
-            <div v-else>
-              <div v-for="result in approvalResults" :key="result.id" class="result-item">
-                <div class="result-header">
-                  <h3 class="result-title" @click="navigateTo(result)">{{ result.title }}</h3>
-                </div>
-              </div>
-              <el-pagination
-                background
-                layout="prev, pager, next"
-                :total="approvalTotalItems"
-                :page-size="approvalsPerPage"
-                v-model:current-page="approvalCurrentPage"
-                @current-change="handleApprovalPageChange"
-                class="pagination-container"
-              />
-            </div>
+            <el-pagination background layout="prev, pager, next" :total="approvalTotalItems"
+              :page-size="approvalsPerPage" v-model:current-page="approvalCurrentPage"
+              @current-change="handleApprovalPageChange" class="pagination-container" />
+          </div>
         </el-tab-pane>
 
         <!-- Other tabs will be dynamically created here, but won't have content yet -->
-        <el-tab-pane v-for="category in categories.filter(c => c.name !== 'employee' && c.name !== 'approval')" :key="category.name" :label="category.label" :name="category.name">
-            <el-empty :description="`'${category.label}'에 대한 검색 기능은 아직 준비중입니다.`"></el-empty>
+        <el-tab-pane v-for="category in categories.filter(c => c.name !== 'employee' && c.name !== 'approval')"
+          :key="category.name" :label="category.label" :name="category.name">
+          <el-empty :description="`'${category.label}'에 대한 검색 기능은 아직 준비중입니다.`"></el-empty>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -201,6 +214,9 @@ export default {
               id: res.id,
               type: '결재문서',
               title: res.title,
+              titleName: res.titleName, // Added
+              memberName: res.memberName, // Added
+              createAt: res.createAt, // Added
               category: 'approval',
               path: `/approval/detail/${res.id}`
             };
@@ -228,6 +244,9 @@ export default {
           id: doc.approvalId,
           type: '결재문서',
           title: doc.title,
+          titleName: doc.titleName, // Added
+          memberName: doc.memberName, // Added
+          createAt: doc.createAt, // Added
           category: 'approval',
           path: `/approval/detail/${doc.approvalId}`
         }));
@@ -245,6 +264,15 @@ export default {
     },
     navigateTo(result) {
       this.$router.push(result.path);
+    }, // Added comma here
+    formatDateTime(dateTimeArray) {
+      if (!dateTimeArray || dateTimeArray.length < 5) return '';
+      const year = dateTimeArray[0];
+      const month = String(dateTimeArray[1]).padStart(2, '0');
+      const day = String(dateTimeArray[2]).padStart(2, '0');
+      const hour = String(dateTimeArray[3]).padStart(2, '0');
+      const minute = String(dateTimeArray[4]).padStart(2, '0');
+      return `${year}-${month}-${day} ${hour}:${minute}`;
     }
   }
 };
@@ -252,150 +280,402 @@ export default {
 
 <style scoped>
 .global-search {
-  max-width: 1000px;
+
+  max-width: 1200px;
+  /* Increased max-width for more spacious layout */
+
   margin: 0 auto;
+
+  padding: 20px;
+
+  font-family: 'Noto Sans KR', sans-serif;
+
+  color: #333;
+
 }
 
+
+
 .page-header {
-  margin-bottom: 24px;
+
+
+
+  text-align: left;
+  /* Align to top-left */
+
+
+
+  margin-bottom: 20px;
+  /* Reduced margin */
+
+
+
+  padding: 0;
+  /* Remove background and padding */
+
+
+
+  background-color: transparent;
+  /* Remove background */
+
+
+
+  box-shadow: none;
+  /* Remove shadow */
+
+
+
+  border-radius: 0;
 }
 
 .header-content h1 {
-  font-size: 32px;
+  font-size: 24px;
+  /* Adjusted to match typical page titles */
   font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 8px;
+  color: #303133;
+  /* Darker text for standard title */
+  margin-bottom: 5px;
+  /* Reduced margin */
 }
+
+
+
+
+
+
 
 .header-content p {
-  font-size: 16px;
-  color: #606266;
+
+
+
+  font-size: 14px;
+  /* Smaller for subtitle */
+
+
+
+  color: #909399;
+  /* Lighter text for subtitle */
+
+
+
   margin: 0;
+
+
+
 }
 
+
+
 .search-section {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  display: flex;
+  gap: 10px;
 }
+
+.search-section .el-input {
+  flex-grow: 1;
+  --el-input-border-radius: 10px;
+  --el-input-height: 50px;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.search-section .el-input__inner {
+  padding-left: 15px;
+}
+
+.search-section .el-input-group__append {
+  display: none;
+}
+
+.search-section .el-button {
+  padding: 0 25px;
+  height: 50px;
+  background-color: #409eff;
+  border-color: #409eff;
+  color: white;
+  font-weight: 600;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.search-section .el-button:hover {
+  background-color: #66b1ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+
 
 .search-results {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 20px; /* Slightly reduced padding for tabs */
 }
 
-.result-item {
-  padding: 20px 0;
-  border-bottom: 1px solid #f0f0f0;
+/* Customizing El-Tabs */
+.el-tabs__header {
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
 }
 
-.result-item:last-child {
-  border-bottom: none;
-}
-
-.result-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.result-type {
-  background-color: #f0f2f5;
-  color: #606266;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 4px;
-  margin-right: 12px;
-}
-
-.result-title {
-  font-size: 18px;
+.el-tabs__item {
+  font-size: 16px;
   font-weight: 600;
-  color: #333;
-  cursor: pointer;
-  margin: 0;
-}
-
-.result-title:hover {
-  color: #667eea;
-}
-
-.result-snippet {
-  font-size: 14px;
   color: #606266;
-  line-height: 1.6;
+  padding: 0 15px;
+  height: 45px;
+  line-height: 45px;
 }
+
+.el-tabs__item.is-active {
+  color: #409eff;
+}
+
+.el-tabs__active-bar {
+  background-color: #409eff;
+}
+
+.el-tabs__nav-wrap::after {
+  height: 0; /* Remove default bottom border */
+}
+
+
 
 .result-group {
-  margin-bottom: 24px;
+
+  margin-bottom: 30px;
+
+  border: 1px solid #ebeef5;
+
+  border-radius: 8px;
+
+  overflow: hidden;
+
 }
+
+
 
 .group-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #eee;
-  margin-bottom: 16px;
+  font-size: 20px; /* Slightly smaller for better balance */
+  font-weight: 700;
+  color: #303133;
+  padding: 12px 20px; /* Adjusted padding */
+  background-color: #fcfdff; /* Lighter background */
+  border-bottom: 1px solid #e4e7ed; /* Slightly softer border */
+  border-left: 5px solid #409eff; /* Accent border on the left */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
+
+
 
 .employee-list-header,
-.employee-list-row {
+.approval-list-header {
   display: flex;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.employee-list-header {
-  font-weight: 600;
+  padding: 15px 20px;
   background-color: #f5f7fa;
-  border-top: 1px solid #f0f0f0;
+  font-weight: 600;
+  color: #303133;
+  border-bottom: 1px solid #e4e7ed;
+  font-size: 14px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 
-.employee-list-row:hover {
-  background-color: #f9f9f9;
+.employee-list-row,
+.approval-list-row {
+  display: flex;
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f2f5;
+  align-items: center;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: white;
+}
+
+.employee-list-row:last-child,
+.approval-list-row:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.employee-list-row:hover,
+.approval-list-row:hover {
+  background-color: #f9fbfd;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
   cursor: pointer;
 }
 
-.employee-list-cell {
+.employee-list-cell,
+.approval-list-cell {
   flex: 1;
-  text-align: center;
-  padding: 0 8px;
+  text-align: left;
+  padding: 0 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
+  color: #606266;
 }
 
-.organization-list-header,
-.organization-list-row {
-  display: flex;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+.employee-list-cell:first-child,
+.approval-list-cell:first-child {
+  font-weight: 500;
+  color: #303133;
 }
 
-.organization-list-header {
-  font-weight: 600;
-  background-color: #f5f7fa;
-  border-top: 1px solid #f0f0f0;
-}
 
-.organization-list-row:hover {
-  background-color: #f9f9f9;
-  cursor: pointer;
-}
-
-.organization-list-cell {
-  flex: 1;
-  text-align: center;
-  padding: 0 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .view-more-container {
+
   text-align: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
-}</style>
+
+  padding: 15px 0;
+
+  background-color: #f9fafb;
+
+  border-top: 1px solid #ebeef5;
+
+}
+
+
+
+.view-more-container .el-button {
+
+  color: #409eff;
+
+  font-weight: 600;
+
+}
+
+
+
+/* Pagination styling */
+
+.pagination-container {
+
+  margin-top: 30px;
+
+  text-align: center;
+
+}
+
+
+
+/* Responsive adjustments */
+
+@media (max-width: 768px) {
+
+  .global-search {
+
+    padding: 10px;
+
+  }
+
+
+
+  .page-header {
+
+    margin-bottom: 20px;
+
+  }
+
+
+
+  .header-content h1 {
+
+    font-size: 28px;
+
+  }
+
+
+
+  .header-content p {
+
+    font-size: 16px;
+
+  }
+
+
+
+  .search-section {
+
+    margin-bottom: 20px;
+
+  }
+
+
+
+  .search-results {
+
+    padding: 15px;
+
+  }
+
+
+
+  .group-title {
+
+    font-size: 20px;
+
+    padding: 10px 15px;
+
+  }
+
+
+
+  .employee-list-header,
+
+  .approval-list-header,
+
+  .employee-list-row,
+
+  .approval-list-row {
+
+    flex-wrap: wrap;
+
+    padding: 10px 15px;
+
+  }
+
+
+
+  .employee-list-cell,
+
+  .approval-list-cell {
+
+    flex: 1 1 50%;
+
+    text-align: left;
+
+    margin-bottom: 5px;
+
+  }
+
+
+
+  .employee-list-cell:nth-child(odd),
+
+  .approval-list-cell:nth-child(odd) {
+
+    padding-right: 10px;
+
+  }
+
+
+
+  .employee-list-cell:nth-child(even),
+
+  .approval-list-cell:nth-child(even) {
+
+    padding-left: 10px;
+
+  }
+
+}
+</style>

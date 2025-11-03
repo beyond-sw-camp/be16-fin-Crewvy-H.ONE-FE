@@ -64,7 +64,6 @@
           class="employee-card" 
           v-for="employee in filteredEmployees" 
           :key="employee.id"
-          @click="selectEmployee(employee)"
         >
           <div class="card-header">
             <el-avatar :src="employee.avatar || defaultAvatarSvg" :size="60" />
@@ -114,7 +113,7 @@
 
       <!-- 테이블 뷰 -->
       <div v-else class="employee-table">
-        <el-table :data="filteredEmployees" style="width: 100%" @row-click="selectEmployee">
+        <el-table :data="filteredEmployees" style="width: 100%">
           <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip>
             <template #default="scope">
               <div class="table-employee">
@@ -432,21 +431,6 @@ const activeEmployees = computed(() => {
 // Methods
 const goToAddEmployee = () => {
   router.push('/employee/add');
-};
-
-const selectEmployee = async (employee) => {
-  if (!employee || !employee.id) {
-    error('직원 ID가 유효하지 않습니다.');
-    return;
-  }
-  try {
-    const response = await employeeService.getEmployeeDetails(employee.id); // Use getEmployeeDetails
-    selectedEmployee.value = response.data.data; // Extract memberDetail from MemberEditRes
-    showEmployeeDetail.value = true;
-  } catch (err) {
-    console.error('직원 상세 정보를 불러오는 데 실패했습니다:', err);
-    error(err.response?.data?.message || '직원 상세 정보를 불러오는 데 실패했습니다.');
-  }
 };
 
 const editEmployee = (emp) => {

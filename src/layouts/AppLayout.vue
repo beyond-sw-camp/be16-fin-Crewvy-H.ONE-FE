@@ -806,12 +806,21 @@ export default {
     },
     sessionTimeLeft(newVal) {
       if (newVal === '00:00') {
-        this.logout();
+        this.sessionExpiredLogout();
       }
     }
   },
   methods: {
-    logout() {
+    manualLogout() {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('memberId');
+      localStorage.removeItem('memberPositionId');
+      localStorage.removeItem('companyId');
+      this.$router.push('/landing');
+    },
+    sessionExpiredLogout() {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userName');
@@ -889,7 +898,7 @@ export default {
           this.showSelectPositionModal = true;
           break;
         case 'logout':
-          this.logout();
+          this.manualLogout();
           break
       }
     },
@@ -1202,6 +1211,7 @@ export default {
       this.initSessionTimer();
     }
     this.updatePayrollMenuState();
+    window.addEventListener('session-expired', this.sessionExpiredLogout);
   },
   beforeUnmount() {
     if (this.sessionTimer) {
@@ -1210,6 +1220,7 @@ export default {
     if (this.blinkerInterval) {
       clearInterval(this.blinkerInterval);
     }
+    window.removeEventListener('session-expired', this.sessionExpiredLogout);
   }
 }
 </script>
