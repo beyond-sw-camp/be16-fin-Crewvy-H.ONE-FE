@@ -291,8 +291,23 @@
                                                                       const checkedSummary = computed(() => {
                                                                         if (!treeRef.value) return { organizations: 0, members: 0, total: 0 };
                                                                         const checkedNodes = treeRef.value.getCheckedNodes();
-                                                                        const organizations = checkedNodes.filter(node => node.type !== 'member').length;
-                                                                        const members = checkedNodes.filter(node => node.type === 'member').length;
+
+                                                                        // 조직과 멤버 노드 분리
+                                                                        const organizationNodes = checkedNodes.filter(node => node.type !== 'member');
+                                                                        const memberNodes = checkedNodes.filter(node => node.type === 'member');
+
+                                                                        // 조직의 직계 자식 멤버인지 확인
+                                                                        const isChildOfCheckedOrg = (memberId) => {
+                                                                          const memberNodeInTree = nodeMap.value.get(memberId);
+                                                                          if (!memberNodeInTree || !memberNodeInTree.parent) return false;
+                                                                          return organizationNodes.some(org => org.id === memberNodeInTree.parent.id);
+                                                                        };
+
+                                                                        // 조직의 직계 자식이 아닌 멤버만 카운트
+                                                                        const filteredMembers = memberNodes.filter(member => !isChildOfCheckedOrg(member.id));
+
+                                                                        const organizations = organizationNodes.length;
+                                                                        const members = filteredMembers.length;
                                                                         return { organizations, members, total: organizations + members };
                                                                       });
                                           
@@ -408,12 +423,29 @@
                                                 isAssigning.value = true;
                                                 try {
                                                   const checkedNodes = treeRef.value.getCheckedNodes();
-                                          
+
+                                                  // 조직과 멤버 노드 분리
+                                                  const organizationNodes = checkedNodes.filter(node => node.type !== 'member');
+                                                  const memberNodes = checkedNodes.filter(node => node.type === 'member');
+
+                                                  // 조직의 직계 자식 멤버인지 확인하는 함수
+                                                  const isChildOfCheckedOrg = (memberId) => {
+                                                    const memberNodeInTree = nodeMap.value.get(memberId);
+                                                    if (!memberNodeInTree || !memberNodeInTree.parent) return false;
+                                                    return organizationNodes.some(org => org.id === memberNodeInTree.parent.id);
+                                                  };
+
+                                                  // 조직의 직계 자식이 아닌 멤버만 포함 (조직이 체크되어 있으면 그 소속 직원은 제외)
+                                                  const filteredMembers = memberNodes.filter(member => !isChildOfCheckedOrg(member.id));
+
+                                                  // 최종 할당 대상: 조직 + 필터링된 멤버
+                                                  const targetNodes = [...organizationNodes, ...filteredMembers];
+
                                                   // 여러 정책 × 여러 대상 = 모든 조합 생성
                                                   const assignmentsPayload = [];
-                                          
+
                                                   form.value.policyIds.forEach(policyId => {
-                                                    checkedNodes.forEach(node => {
+                                                    targetNodes.forEach(node => {
                                                       let scopeType;
                                                       if (node.type === 'member') {
                                                         scopeType = 'MEMBER';
@@ -422,7 +454,7 @@
                                                       } else {
                                                         scopeType = 'ORGANIZATION';
                                                       }
-                                          
+
                                                       assignmentsPayload.push({
                                                         policyId: policyId,
                                                         targetId: node.id,
@@ -430,13 +462,12 @@
                                                       });
                                                     });
                                                   });
-                                          
+
                                                   const requestData = { assignments: assignmentsPayload };
                                                   await createAssignment(requestData);
-                                          
-                                                  const totalAssignments = form.value.policyIds.length * checkedSummary.value.total;
-                                                  success(`${form.value.policyIds.length}개 정책을 ${checkedSummary.value.total}개 대상에 할당했습니다. (총 ${totalAssignments}건)`);
-                                          
+
+                                                  success(`${form.value.policyIds.length}개 정책을 ${targetNodes.length}개 대상에 할당했습니다. (총 ${assignmentsPayload.length}건)`);
+
                                                   fetchAllAssignments();
                                                   resetForm();
                                                 } catch (err) {
@@ -528,8 +559,9 @@
                                           
                                               const handleNodeCheck = (data) => {
                                                 const node = treeRef.value.getNode(data.id);
-                                                if (node && node.childNodes.length > 0) { // 자식이 있는 노드만 토글
-                                                  node.expanded = !node.expanded;
+                                                // 자식이 있고 접혀있는 노드만 최초 1번 펼치기 (이후에는 토글 안 함)
+                                                if (node && node.childNodes.length > 0 && !node.expanded) {
+                                                  node.expanded = true;
                                                 }
                                               };
                                           
