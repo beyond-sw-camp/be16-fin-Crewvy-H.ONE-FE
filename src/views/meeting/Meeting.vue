@@ -169,7 +169,7 @@
           <div class="meeting-history">
             <div class="section-header">
               <h3>회의 기록</h3>
-              <div class="filter-options">
+              <!-- <div class="filter-options">
                 <el-date-picker
                   v-model="dateRange"
                   type="daterange"
@@ -184,7 +184,7 @@
                   <el-option label="김철수" value="김철수" />
                   <el-option label="박민수" value="박민수" />
                 </el-select>
-              </div>
+              </div> -->
             </div>
             
             <div class="history-list">
@@ -195,7 +195,7 @@
                     <span class="meeting-date">{{ meeting.date }}</span>
                     <span class="meeting-host">주최: {{ meeting.host }}</span>
                     <span class="meeting-duration">{{ meeting.duration }}</span>
-                    <span class="meeting-participants">{{ meeting.participants }}명 참여</span>
+                    <!-- <span class="meeting-participants">{{ meeting.participants }}명 참여</span> -->
                   </div>
                   <!-- <div class="meeting-status">
                     <el-tag :type="meeting.status === '완료' ? 'success' : 'warning'" size="small">
