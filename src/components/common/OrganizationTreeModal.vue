@@ -1,5 +1,6 @@
 <template>
-  <el-dialog v-model="isModalVisible" title="직원 찾기" width="900px" @close="closeModal" top="5vh" custom-class="org-employee-modal">
+  <el-dialog v-model="isModalVisible" title="직원 찾기" width="70%" @close="closeModal" top="5vh"
+    custom-class="org-employee-modal" height="70%">
     <el-tabs v-model="activeTab" class="main-tabs">
       <!-- Organization Tree Tab -->
       <el-tab-pane label="조직도" name="orgTree">
@@ -8,17 +9,9 @@
           <div class="left-pane">
             <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
             <div class="tree-container">
-              <el-tree
-                ref="orgTree"
-                :data="orgTreeData"
-                :props="defaultProps"
-                node-key="id"
-                @node-click="handleOrgNodeClick"
-                :filter-node-method="filterNode"
-                :expand-on-click-node="false"
-                :default-expanded-keys="defaultExpandedOrgKeys"
-                class="org-tree"
-              >
+              <el-tree ref="orgTree" :data="orgTreeData" :props="defaultProps" node-key="id"
+                @node-click="handleOrgNodeClick" :filter-node-method="filterNode" :expand-on-click-node="false"
+                :default-expanded-keys="defaultExpandedOrgKeys" class="org-tree">
                 <template #default="{ node, data }">
                   <div class="custom-tree-node">
                     <span><i class="el-icon-folder"></i> {{ node.label }}</span>
@@ -36,7 +29,7 @@
             <div v-if="!selectedOrg.id">
               <el-empty description="조직을 선택해주세요"></el-empty>
             </div>
-            <div v-else>
+            <div v-else class="employee-list-container">
               <h2 class="group-title">{{ selectedOrg.name }}</h2>
               <div v-if="isLoadingMembers" class="loading-container">
                 <el-spinner />
@@ -44,39 +37,42 @@
               <div v-else-if="!selectedOrg.members || selectedOrg.members.length === 0">
                 <el-empty :description="`${selectedOrg.name}에 소속된 직원이 없습니다.`"></el-empty>
               </div>
-              <div v-else class="employee-list">
-                <div class="employee-list-header">
-                  <div class="employee-list-cell name">이름</div>
-                  <div class="employee-list-cell position">직책</div>
-                  <div class="employee-list-cell contact">연락처</div>
-                  <div class="employee-list-cell email">이메일</div>
-                  <div class="employee-list-cell status">상태</div>
-                  <div class="employee-list-cell action">동작</div>
-                </div>
-                <div v-for="member in selectedOrg.members" :key="member.id" class="employee-list-row">
-                  <div class="employee-list-cell name">
-                    <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.name }}</span>
-                    </el-tooltip>
+              <div v-else class="employee-list-wrapper">
+                <div class="employee-list">
+                  <div class="employee-list-header">
+                    <div class="employee-list-cell name">이름</div>
+                    <div class="employee-list-cell position">직책</div>
+                    <div class="employee-list-cell contact">연락처</div>
+                    <div class="employee-list-cell email">이메일</div>
+                    <div class="employee-list-cell status">상태</div>
                   </div>
-                  <div class="employee-list-cell position">
-                     <el-tooltip :content="member.titleName ? member.titleName.join(', ') : (member.position || '')" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : (member.position || '') }}</span>
-                    </el-tooltip>
-                  </div>
-                  <div class="employee-list-cell contact">
-                    <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
-                    </el-tooltip>
-                  </div>
-                  <div class="employee-list-cell email">
-                    <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.email || 'N/A' }}</span>
-                    </el-tooltip>
-                  </div>
-                  <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
-                  <div class="employee-list-cell action">
-                    <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                  <div v-for="member in selectedOrg.members" :key="member.id" class="employee-list-row">
+                    <div class="employee-list-cell name">
+                      <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
+                        <span class="cell-content">{{ member.name }}</span>
+                      </el-tooltip>
+                    </div>
+                    <div class="employee-list-cell position">
+                      <el-tooltip :content="member.titleName ? member.titleName.join(', ') : (member.position || '')"
+                        placement="top" effect="dark" :show-after="1000">
+                        <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : (member.position
+                          || '')
+                        }}</span>
+                      </el-tooltip>
+                    </div>
+                    <div class="employee-list-cell contact">
+                      <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark"
+                        :show-after="1000">
+                        <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
+                      </el-tooltip>
+                    </div>
+                    <div class="employee-list-cell email">
+                      <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
+                        <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle
+                            plain @click="copyToClipboard(member.email, '이메일')" /></span>
+                      </el-tooltip>
+                    </div>
+                    <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
                   </div>
                 </div>
               </div>
@@ -88,16 +84,13 @@
       <!-- Employee Search Tab -->
       <el-tab-pane label="직원 검색" name="empSearch">
         <div class="full-width-search-pane">
-          <el-input 
-            v-model="employeeSearchQuery" 
-            placeholder="직원 이름, 부서, 연락처로 검색" 
-            clearable 
-            class="search-input"
-            @keyup.enter="searchEmployees"
-          >
+          <el-input v-model="employeeSearchQuery" placeholder="직원 이름, 부서, 연락처로 검색" clearable class="search-input"
+            @keyup.enter="searchEmployees">
             <template #append>
               <el-button @click="searchEmployees" :loading="isEmployeeSearchLoading">
-                <el-icon><Search /></el-icon>
+                <el-icon>
+                  <Search />
+                </el-icon>
               </el-button>
             </template>
           </el-input>
@@ -105,39 +98,39 @@
             <div v-if="isEmployeeSearchLoading" class="loading-container">
               <el-spinner />
             </div>
-            <div v-else-if="employeeSearchResults.length > 0" class="employee-list">
-              <div class="employee-list-header">
-                <div class="employee-list-cell name">이름</div>
-                <div class="employee-list-cell position">직책</div>
-                <div class="employee-list-cell contact">연락처</div>
-                <div class="employee-list-cell email">이메일</div>
-                <div class="employee-list-cell status">상태</div>
-                <div class="employee-list-cell action">동작</div>
-              </div>
-              <div v-for="member in employeeSearchResults" :key="member.memberId" class="employee-list-row">
-                <div class="employee-list-cell name">
-                  <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
-                    <span class="cell-content">{{ member.name }}</span>
-                  </el-tooltip>
+            <div v-else-if="employeeSearchResults.length > 0" class="employee-list-wrapper">
+              <div class="employee-list">
+                <div class="employee-list-header">
+                  <div class="employee-list-cell name">이름</div>
+                  <div class="employee-list-cell position">직책</div>
+                  <div class="employee-list-cell contact">연락처</div>
+                  <div class="employee-list-cell email">이메일</div>
+                  <div class="employee-list-cell status">상태</div>
                 </div>
-                <div class="employee-list-cell position">
-                  <el-tooltip :content="member.titleName ? member.titleName.join(', ') : ''" placement="top" effect="dark" :show-after="1000">
-                    <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : '' }}</span>
-                  </el-tooltip>
-                </div>
-                <div class="employee-list-cell contact">
-                  <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                    <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
-                  </el-tooltip>
-                </div>
-                <div class="employee-list-cell email">
-                  <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                    <span class="cell-content">{{ member.email || 'N/A' }}</span>
-                  </el-tooltip>
-                </div>
-                <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
-                <div class="employee-list-cell action">
-                  <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                <div v-for="member in employeeSearchResults" :key="member.memberId" class="employee-list-row">
+                  <div class="employee-list-cell name">
+                    <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ member.name }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell position">
+                    <el-tooltip :content="member.titleName ? member.titleName.join(', ') : ''" placement="top"
+                      effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : '' }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell contact">
+                    <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell email">
+                    <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle plain
+                          @click="copyToClipboard(member.email, '이메일')" /></span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
                 </div>
               </div>
             </div>
@@ -147,9 +140,17 @@
       </el-tab-pane>
     </el-tabs>
     <template #footer>
-      <span class="dialog-footer">
+      <div class="dialog-footer-flex">
+        <div class="pagination-wrapper">
+          <el-pagination v-if="activeTab === 'orgTree' && orgEmployeeTotal > 0" background layout="prev, pager, next"
+            :total="orgEmployeeTotal" :page-size="orgEmployeeSize" v-model:current-page="orgEmployeePage"
+            class="pagination-container" />
+          <el-pagination v-if="activeTab === 'empSearch' && searchTotal > 0" background layout="prev, pager, next"
+            :total="searchTotal" :page-size="searchSize" v-model:current-page="searchPage"
+            class="pagination-container" />
+        </div>
         <el-button @click="closeModal">닫기</el-button>
-      </span>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -189,9 +190,16 @@ export default {
         name: '',
         members: [],
       },
+      currentSelectedOrgNode: null, // Store the selected node
+      orgEmployeePage: 1,
+      orgEmployeeSize: 5,
+      orgEmployeeTotal: 0,
       isLoadingMembers: false,
       employeeSearchQuery: '',
       employeeSearchResults: [],
+      searchPage: 1,
+      searchSize: 5,
+      searchTotal: 0,
       isEmployeeSearchLoading: false,
     };
   },
@@ -215,14 +223,27 @@ export default {
         this.resetSelection();
       }
     },
+    orgEmployeePage(newPage) {
+      if (this.currentSelectedOrgNode) {
+        this.handleOrgNodeClick(this.currentSelectedOrgNode, newPage);
+      }
+    },
+    searchPage(newPage) {
+      this.searchEmployees(newPage);
+    },
   },
   methods: {
     resetSelection() {
-        this.selectedOrg = { id: null, name: '', members: [] };
-        this.employeeSearchQuery = '';
-        this.employeeSearchResults = [];
-        this.activeTab = 'orgTree';
-        this.isLoadingMembers = false;
+      this.selectedOrg = { id: null, name: '', members: [] };
+      this.currentSelectedOrgNode = null;
+      this.employeeSearchQuery = '';
+      this.employeeSearchResults = [];
+      this.activeTab = 'orgTree';
+      this.isLoadingMembers = false;
+      this.orgEmployeePage = 1;
+      this.orgEmployeeTotal = 0;
+      this.searchPage = 1;
+      this.searchTotal = 0;
     },
     closeModal() {
       this.isModalVisible = false;
@@ -231,60 +252,63 @@ export default {
       if (!value) return true;
       return data.label.indexOf(value) !== -1;
     },
-    async handleOrgNodeClick(data) {
-      this.selectedOrg.id = data.id;
-      this.selectedOrg.name = data.label;
-      this.selectedOrg.members = [];
-      this.isLoadingMembers = true;
 
-      const memberSummaries = data.members || [];
-      if (memberSummaries.length === 0) {
-        this.isLoadingMembers = false;
+    async handleOrgNodeClick(data, page = 1) {
+      // If the same node is clicked, do nothing unless the page changes.
+      if (this.currentSelectedOrgNode && this.currentSelectedOrgNode.id === data.id && this.orgEmployeePage === page) {
         return;
       }
-
-      const emailMap = new Map(memberSummaries.map(m => [m.id, m.email]));
+      this.currentSelectedOrgNode = data; // Save current node
+      this.selectedOrg.id = data.id;
+      this.selectedOrg.name = data.label;
+      this.isLoadingMembers = true;
+      this.orgEmployeePage = page;
 
       try {
-        const response = await searchService.searchEmployeesByOrganization(data.id);
-        const fullMembers = response.data.data || [];
-        
-        const enrichedMembers = fullMembers.map(member => ({
-          ...member,
-          id: member.memberId,
-          email: emailMap.get(member.memberId) || 'N/A',
-        }));
-
-        this.selectedOrg.members = enrichedMembers;
+        const response = await searchService.searchEmployeesByOrganization(
+          data.id,
+          { page: this.orgEmployeePage - 1, size: this.orgEmployeeSize }
+        );
+        const pageData = response.data.data;
+        this.selectedOrg.members = pageData.content || [];
+        this.orgEmployeeTotal = pageData.totalElements || 0;
       } catch (err) {
-        console.error('Failed to fetch full member details:', err);
-        this.error('직원 상세 정보를 불러오는데 실패했습니다.');
+        console.error('Failed to fetch members for organization:', err);
+        this.error('조직의 직원 정보를 불러오는데 실패했습니다.');
+        this.selectedOrg.members = [];
+        this.orgEmployeeTotal = 0;
       } finally {
         this.isLoadingMembers = false;
       }
     },
-    async searchEmployees() {
+
+    async searchEmployees(page = 1) {
       if (!this.employeeSearchQuery) {
         this.employeeSearchResults = [];
+        this.searchTotal = 0;
         return;
       }
       this.isEmployeeSearchLoading = true;
+      this.searchPage = page;
       try {
-        const response = await searchService.searchEmployees(this.employeeSearchQuery);
-        // Now that backend provides email, bind it directly.
-        this.employeeSearchResults = response.data.data.map(member => ({
-          ...member,
-          id: member.memberId, // Ensure consistent ID property
-          email: member.email || 'N/A', // Bind actual email, fallback to N/A
-        }));
+        const response = await searchService.searchEmployees(
+          this.employeeSearchQuery,
+          { page: this.searchPage - 1, size: this.searchSize }
+        );
+        const pageData = response.data.data;
+        this.employeeSearchResults = pageData.content || [];
+        this.searchTotal = pageData.totalElements || 0;
+
       } catch (err) {
         console.error("Failed to search employees:", err);
         this.error("직원 검색에 실패했습니다.");
         this.employeeSearchResults = [];
+        this.searchTotal = 0;
       } finally {
         this.isEmployeeSearchLoading = false;
       }
     },
+
     selectEmployee(member) {
       const selection = {
         id: member.memberId || member.id,
@@ -307,29 +331,29 @@ export default {
       });
     },
     buildOrganizationTree(nodes) {
-        const map = {};
-        nodes.forEach(node => {
-            map[node.organizationId] = {
-                ...node,
-                id: node.organizationId,
-                label: node.label,
-                members: node.memberList || [],
-                children: [],
-            };
-        });
+      const map = {};
+      nodes.forEach(node => {
+        map[node.organizationId] = {
+          ...node,
+          id: node.organizationId,
+          label: node.label,
+          members: node.memberList || [],
+          children: [],
+        };
+      });
 
-        const roots = [];
-        Object.values(map).forEach(node => {
-            if (node.parentId) {
-                const parent = map[node.parentId];
-                if (parent) {
-                    parent.children.push(node);
-                }
-            } else {
-                roots.push(node);
-            }
-        });
-        return roots;
+      const roots = [];
+      Object.values(map).forEach(node => {
+        if (node.parentId) {
+          const parent = map[node.parentId];
+          if (parent) {
+            parent.children.push(node);
+          }
+        } else {
+          roots.push(node);
+        }
+      });
+      return roots;
     },
     async fetchOrganizationTree() {
       try {
@@ -349,21 +373,76 @@ export default {
 </script>
 
 <style>
-/* General modal style override */
-.org-employee-modal .el-dialog__body {
-  padding: 0;
-  height: 65vh;
+.el-dialog.org-employee-modal {
+  height: 70vh !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
-.org-employee-modal .el-tabs__header {
+
+.el-dialog.org-employee-modal .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.el-dialog.org-employee-modal .el-dialog__body {
+  flex-grow: 1 !important;
+  overflow-y: hidden !important;
+  padding: 0 !important;
+}
+
+.el-dialog.org-employee-modal .el-tabs__header {
   margin: 0 15px;
+  flex-shrink: 0 !important;
 }
-.org-employee-modal .el-tabs__content {
-  height: calc(100% - 55px); /* Adjust based on tab header height */
-  overflow-y: auto;
+
+.el-dialog.org-employee-modal .el-tabs__content {
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+}
+
+.el-dialog.org-employee-modal .el-dialog__footer {
+  padding: 10px 20px;
+  border-top: 1px solid #e4e7ed;
+  flex-shrink: 0 !important;
+}
+
+.dialog-footer-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-wrapper {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
 }
 </style>
 
 <style scoped>
+:deep(.org-employee-modal) {
+  height: 70vh !important;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.org-employee-modal .el-dialog__body) {
+  flex-grow: 1;
+  overflow-y: hidden;
+  padding: 0;
+}
+
+:deep(.org-employee-modal .el-tabs) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.org-employee-modal .el-tabs__content) {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 0 15px;
+}
+
 .main-tabs {
   height: 100%;
   display: flex;
@@ -388,10 +467,12 @@ export default {
 .search-input {
   margin-bottom: 15px;
 }
+
 .tree-container {
   flex: 1;
   overflow-y: auto;
 }
+
 .custom-tree-node {
   flex: 1;
   display: flex;
@@ -400,6 +481,7 @@ export default {
   font-size: 14px;
   padding-right: 8px;
 }
+
 .member-count {
   color: #909399;
   font-size: 12px;
@@ -414,8 +496,16 @@ export default {
   width: 60%;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: hidden;
+  /* Changed from auto */
 }
+
+.employee-list-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .group-title {
   font-size: 18px;
   font-weight: 600;
@@ -425,34 +515,51 @@ export default {
   margin: 0;
   flex-shrink: 0;
 }
+
+.employee-list-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
+
 .employee-list {
   flex: 1;
   overflow-y: auto;
 }
-.employee-list-header, .employee-list-row {
+
+.pagination-container {
+  padding: 10px 0;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.employee-list-header,
+.employee-list-row {
   display: flex;
   padding: 12px 20px;
   align-items: center;
   border-bottom: 1px solid #f0f2f5;
 }
+
 .employee-list-header {
   background-color: #f5f7fa;
   font-weight: 600;
   color: #303133;
   font-size: 14px;
 }
+
 .employee-list-row:hover {
   background-color: #f9fbfd;
 }
+
 .employee-list-cell {
   font-size: 14px;
   color: #606266;
   padding: 0 5px;
   text-align: center;
-  /* The following are now handled by the child span */
-  /* white-space: nowrap; */
-  /* overflow: hidden; */
-  /* text-overflow: ellipsis; */
+  min-width: 0;
 }
 
 .cell-content {
@@ -462,18 +569,39 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.employee-list-cell.name { flex: 1.5; font-weight: 500; color: #303133; }
-.employee-list-cell.position { flex: 1.5; }
-.employee-list-cell.contact { flex: 2; }
-.employee-list-cell.email { flex: 2.5; }
-.employee-list-cell.status { flex: 1; }
-.employee-list-cell.action { flex: 1; text-align: center; }
+
+.employee-list-cell.name {
+  flex: 1.5;
+  font-weight: 500;
+  color: #303133;
+}
+
+.employee-list-cell.position {
+  flex: 1.5;
+}
+
+.employee-list-cell.contact {
+  flex: 2;
+}
+
+.employee-list-cell.email {
+  flex: 2.5;
+}
+
+.employee-list-cell.status {
+  flex: 1;
+}
+
+.employee-list-cell.action {
+  flex: 1;
+  text-align: center;
+}
 
 .loading-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 
 /* Full-width Employee Search Pane */
@@ -481,13 +609,16 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: hidden;
+  /* Changed from auto */
   padding: 15px;
 }
+
 .employee-search-results-full-width {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
   margin-top: 15px;
 }
-
 </style>

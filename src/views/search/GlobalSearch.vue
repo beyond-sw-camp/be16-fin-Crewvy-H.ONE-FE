@@ -8,15 +8,10 @@
     </div>
 
     <div class="search-section">
-            <el-input
-              v-model="searchQuery"
-              placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요."
-              prefix-icon="Search"
-              clearable
-              @keyup.enter="performSearch"
-            >
-            </el-input>
-            <el-button @click="performSearch">검색</el-button>
+      <el-input v-model="searchQuery" placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요." prefix-icon="Search" clearable
+        @keyup.enter="performSearch">
+      </el-input>
+      <el-button @click="performSearch">검색</el-button>
     </div>
 
     <div class="search-results">
@@ -32,25 +27,47 @@
             <!-- Employee Results in All Tab -->
             <div v-if="getResultsByCategory('employee').length > 0" class="result-group">
               <h2 class="group-title">직원</h2>
-              <div class="employee-list-header">
-                <div class="employee-list-cell">이름</div>
-                <div class="employee-list-cell">부서</div>
-                <div class="employee-list-cell">직책</div>
-                <div class="employee-list-cell">연락처</div>
-                <div class="employee-list-cell">상태</div>
-              </div>
-              <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id"
-                class="employee-list-row" @click="navigateTo(result)">
-                <div class="employee-list-cell">{{ result.title }}</div>
-                <div class="employee-list-cell">{{ result.department }}</div>
-                <div class="employee-list-cell">{{ result.position }}</div>
-                <div class="employee-list-cell">{{ result.contact }}</div>
-                <div class="employee-list-cell">{{ result.status }}</div>
+              <div class="employee-list">
+                <div class="employee-list-header">
+                  <div class="employee-list-cell name">이름</div>
+                  <div class="employee-list-cell position">직책</div>
+                  <div class="employee-list-cell contact">연락처</div>
+                  <div class="employee-list-cell email">이메일</div>
+                  <div class="employee-list-cell status">상태</div>
+                </div>
+                <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id"
+                  class="employee-list-row" @click="navigateTo(result)">
+                  <div class="employee-list-cell name">
+                    <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ result.title }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell position">
+                    <el-tooltip :content="result.position" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ result.position }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell contact">
+                    <el-tooltip :content="result.contact" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ result.contact }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell email">
+                    <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
+                      <el-button icon="CopyDocument" circle plain @click.stop="copyToClipboard(result.email, '이메일')" />
+                      <span class="cell-content">{{ result.email }}</span>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell status">
+                    <el-tooltip :content="result.status" placement="top" effect="dark" :show-after="1000">
+                      <span class="cell-content">{{ result.status }}</span>
+                    </el-tooltip>
+                  </div>
+                </div>
               </div>
               <div v-if="getResultsByCategory('employee').length > 5" class="view-more-container">
                 <el-button type="text" @click="activeTab = 'employee'">직원 더보기 ({{
-                  getResultsByCategory('employee').length -
-                  5 }}개)</el-button>
+                  getResultsByCategory('employee').length - 5 }}개)</el-button>
               </div>
             </div>
 
@@ -86,21 +103,43 @@
           <div v-else-if="getResultsByCategory('employee').length === 0">
             <el-empty :description="`'${searchQuery}'에 대한 직원 검색 결과가 없습니다.`"></el-empty>
           </div>
-          <div v-else>
+          <div v-else class="employee-list">
             <div class="employee-list-header">
-              <div class="employee-list-cell">이름</div>
-              <div class="employee-list-cell">부서</div>
-              <div class="employee-list-cell">직책</div>
-              <div class="employee-list-cell">연락처</div>
-              <div class="employee-list-cell">상태</div>
+              <div class="employee-list-cell name">이름</div>
+              <div class="employee-list-cell position">직책</div>
+              <div class="employee-list-cell contact">연락처</div>
+              <div class="employee-list-cell email">이메일</div>
+              <div class="employee-list-cell status">상태</div>
             </div>
             <div v-for="result in getResultsByCategory('employee')" :key="result.id" class="employee-list-row"
               @click="navigateTo(result)">
-              <div class="employee-list-cell">{{ result.title }}</div>
-              <div class="employee-list-cell">{{ result.department }}</div>
-              <div class="employee-list-cell">{{ result.position }}</div>
-              <div class="employee-list-cell">{{ result.contact }}</div>
-              <div class="employee-list-cell">{{ result.status }}</div>
+              <div class="employee-list-cell name">
+                <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
+                  <span class="cell-content">{{ result.title }}</span>
+                </el-tooltip>
+              </div>
+              <div class="employee-list-cell position">
+                <el-tooltip :content="result.position" placement="top" effect="dark" :show-after="1000">
+                  <span class="cell-content">{{ result.position }}</span>
+                </el-tooltip>
+              </div>
+              <div class="employee-list-cell contact">
+                <el-tooltip :content="result.contact" placement="top" effect="dark" :show-after="1000">
+                  <span class="cell-content">{{ result.contact }}</span>
+                </el-tooltip>
+              </div>
+              <div class="employee-list-cell email">
+                <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
+                  <span class="cell-content">{{ result.email }}
+                    <el-button icon="CopyDocument" circle plain
+                      @click.stop="copyToClipboard(result.email, '이메일')" /></span>
+                </el-tooltip>
+              </div>
+              <div class="employee-list-cell status">
+                <el-tooltip :content="result.status" placement="top" effect="dark" :show-after="1000">
+                  <span class="cell-content">{{ result.status }}</span>
+                </el-tooltip>
+              </div>
             </div>
           </div>
         </el-tab-pane>
@@ -145,9 +184,15 @@
 
 <script>
 import searchService from '@/api/searchService';
+import { useSnackbar } from '@/composables/useSnackbar';
 
 export default {
   name: 'GlobalSearch',
+  components: {},
+  setup() {
+    const { success, error } = useSnackbar();
+    return { success, error };
+  },
   data() {
     return {
       searchQuery: '',
@@ -205,6 +250,7 @@ export default {
               department: res.department,
               position: res.position,
               contact: res.contact,
+              email: res.email, // Added email
               status: res.status,
               category: 'employee',
               path: `/member/detail/${res.id}`
@@ -263,8 +309,22 @@ export default {
       return this.results.filter(result => result.category === category);
     },
     navigateTo(result) {
-      this.$router.push(result.path);
-    }, // Added comma here
+      if (result.category !== 'employee') { // Prevent navigation for employee rows
+        this.$router.push(result.path);
+      }
+    },
+    copyToClipboard(text, type) {
+      if (!text || text === 'N/A') {
+        this.error(`${type} 정보가 없어 복사할 수 없습니다.`);
+        return;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        this.success(`${type}이 클립보드에 복사되었습니다.`);
+      }, (err) => {
+        console.error('Could not copy text: ', err);
+        this.error('복사에 실패했습니다.');
+      });
+    },
     formatDateTime(dateTimeArray) {
       if (!dateTimeArray || dateTimeArray.length < 5) return '';
       const year = dateTimeArray[0];
@@ -280,91 +340,34 @@ export default {
 
 <style scoped>
 .global-search {
-
   max-width: 1200px;
-  /* Increased max-width for more spacious layout */
-
   margin: 0 auto;
-
   padding: 20px;
-
   font-family: 'Noto Sans KR', sans-serif;
-
   color: #333;
-
 }
 
-
-
 .page-header {
-
-
-
   text-align: left;
-  /* Align to top-left */
-
-
-
   margin-bottom: 20px;
-  /* Reduced margin */
-
-
-
   padding: 0;
-  /* Remove background and padding */
-
-
-
   background-color: transparent;
-  /* Remove background */
-
-
-
   box-shadow: none;
-  /* Remove shadow */
-
-
-
   border-radius: 0;
 }
 
 .header-content h1 {
   font-size: 24px;
-  /* Adjusted to match typical page titles */
   font-weight: 600;
   color: #303133;
-  /* Darker text for standard title */
   margin-bottom: 5px;
-  /* Reduced margin */
 }
-
-
-
-
-
-
 
 .header-content p {
-
-
-
   font-size: 14px;
-  /* Smaller for subtitle */
-
-
-
   color: #909399;
-  /* Lighter text for subtitle */
-
-
-
   margin: 0;
-
-
-
 }
-
-
 
 .search-section {
   margin-bottom: 40px;
@@ -405,16 +408,13 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-
-
 .search-results {
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 20px; /* Slightly reduced padding for tabs */
+  padding: 20px;
 }
 
-/* Customizing El-Tabs */
 .el-tabs__header {
   margin-bottom: 20px;
   border-bottom: 1px solid #ebeef5;
@@ -438,244 +438,204 @@ export default {
 }
 
 .el-tabs__nav-wrap::after {
-  height: 0; /* Remove default bottom border */
+  height: 0;
 }
-
-
 
 .result-group {
-
   margin-bottom: 30px;
-
   border: 1px solid #ebeef5;
-
   border-radius: 8px;
-
   overflow: hidden;
-
 }
 
-
-
 .group-title {
-  font-size: 20px; /* Slightly smaller for better balance */
+  font-size: 20px;
   font-weight: 700;
   color: #303133;
-  padding: 12px 20px; /* Adjusted padding */
-  background-color: #fcfdff; /* Lighter background */
-  border-bottom: 1px solid #e4e7ed; /* Slightly softer border */
-  border-left: 5px solid #409eff; /* Accent border on the left */
+  padding: 12px 20px;
+  background-color: #fcfdff;
+  border-bottom: 1px solid #e4e7ed;
+  border-left: 5px solid #409eff;
   margin: 0;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-
-
+/* New Employee List Styles */
 .employee-list-header,
-.approval-list-header {
+.employee-list-row {
   display: flex;
-  padding: 15px 20px;
+  padding: 12px 20px;
+  align-items: center;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.employee-list-header {
   background-color: #f5f7fa;
   font-weight: 600;
   color: #303133;
-  border-bottom: 1px solid #e4e7ed;
   font-size: 14px;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
 }
 
-.employee-list-row,
-.approval-list-row {
-  display: flex;
-  padding: 15px 20px;
-  border-bottom: 1px solid #f0f2f5;
-  align-items: center;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: white;
-}
-
-.employee-list-row:last-child,
-.approval-list-row:last-child {
-  border-bottom: none;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.employee-list-row:hover,
-.approval-list-row:hover {
+.employee-list-row:hover {
   background-color: #f9fbfd;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transform: translateY(-1px);
   cursor: pointer;
 }
 
-.employee-list-cell,
-.approval-list-cell {
-  flex: 1;
-  text-align: left;
-  padding: 0 10px;
+.employee-list-cell {
+  font-size: 14px;
+  color: #606266;
+  padding: 0 5px;
+  text-align: center;
+  min-width: 0;
+}
+
+.cell-content {
+  display: block;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 14px;
-  color: #606266;
 }
 
-.employee-list-cell:first-child,
-.approval-list-cell:first-child {
+.employee-list-cell.name {
+  flex: 1.5;
   font-weight: 500;
   color: #303133;
+  text-align: center;
 }
 
+.employee-list-cell.position {
+  flex: 1.5;
+  text-align: center;
+}
 
+.employee-list-cell.contact {
+  flex: 2;
+  text-align: center;
+}
+
+.employee-list-cell.email {
+  flex: 2.5;
+  text-align: center;
+}
+
+.employee-list-cell.status {
+  flex: 1;
+}
+
+.employee-list-cell.action {
+  flex: 1;
+}
+
+/* Original Approval List Styles */
+.approval-list-header,
+.approval-list-row {
+  display: flex;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0f2f5;
+  align-items: center;
+}
+
+.approval-list-header {
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+
+.approval-list-row:last-child {
+  border-bottom: none;
+}
+
+.approval-list-row:hover {
+  background-color: #f9fbfd;
+  cursor: pointer;
+}
+
+.approval-list-cell {
+  flex: 1;
+  padding: 0 5px;
+  font-size: 14px;
+  color: #606266;
+  text-align: center;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .view-more-container {
-
   text-align: center;
-
   padding: 15px 0;
-
   background-color: #f9fafb;
-
   border-top: 1px solid #ebeef5;
-
 }
-
-
 
 .view-more-container .el-button {
-
   color: #409eff;
-
   font-weight: 600;
-
 }
-
-
-
-/* Pagination styling */
 
 .pagination-container {
-
   margin-top: 30px;
-
   text-align: center;
-
 }
 
-
-
-/* Responsive adjustments */
-
 @media (max-width: 768px) {
-
   .global-search {
-
     padding: 10px;
-
   }
-
-
 
   .page-header {
-
     margin-bottom: 20px;
-
   }
-
-
 
   .header-content h1 {
-
     font-size: 28px;
-
   }
-
-
 
   .header-content p {
-
     font-size: 16px;
-
   }
-
-
 
   .search-section {
-
     margin-bottom: 20px;
-
   }
-
-
 
   .search-results {
-
     padding: 15px;
-
   }
-
-
 
   .group-title {
-
     font-size: 20px;
-
     padding: 10px 15px;
-
   }
-
-
 
   .employee-list-header,
-
   .approval-list-header,
-
   .employee-list-row,
-
   .approval-list-row {
-
     flex-wrap: wrap;
-
     padding: 10px 15px;
-
   }
-
-
 
   .employee-list-cell,
-
   .approval-list-cell {
-
     flex: 1 1 50%;
-
     text-align: left;
-
     margin-bottom: 5px;
-
   }
-
-
 
   .employee-list-cell:nth-child(odd),
-
   .approval-list-cell:nth-child(odd) {
-
     padding-right: 10px;
-
   }
-
-
 
   .employee-list-cell:nth-child(even),
-
   .approval-list-cell:nth-child(even) {
-
     padding-left: 10px;
-
   }
-
 }
 </style>
