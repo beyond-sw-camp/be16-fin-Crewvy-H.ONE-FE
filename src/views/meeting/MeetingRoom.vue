@@ -7,6 +7,7 @@
         <div class="subtitle">참가자 {{ participantCount }}명</div>
       </div>
       <div class="header-right">
+        <el-button circle @click="toggleParticipantList" :type="isParticipantListOpen ? 'primary' : 'default'" :icon="icons.User" />
         <el-button circle @click="toggleChat" :type="isChatOpen ? 'primary' : 'default'" :icon="icons.ChatDotRound" />
         <el-button circle type="danger" @click="leaveSession" :icon="icons.Close" />
       </div>
@@ -20,6 +21,10 @@
             :muted="mainVideoTrack.isLocal"></video>
           <div class="participant-name">{{ mainVideoTrack.isLocal ? '나' : (mainVideoTrack.participant ?
             mainVideoTrack.participant.identity : '') }}</div>
+        </div>
+        <div class="screen-share-preview" v-if="screenShareActive && localScreenTrack">
+          <video :ref="el => { if (el) localScreenTrack.attach(el) }" autoplay playsinline muted></video>
+          <div class="preview-label">내 화면 공유 중</div>
         </div>
         <div class="thumbnail-videos">
           <div v-for="track in thumbnailVideoTracks" :key="track.sid" class="video-item"
@@ -43,9 +48,9 @@
             <el-button circle :type="screenShareActive ? 'primary' : 'default'" @click="toggleScreenShare"
               :icon="icons.Monitor" />
           </el-tooltip>
-          <el-tooltip content="설정" placement="top">
+          <!-- <el-tooltip content="설정" placement="top">
             <el-button circle :icon="icons.Setting" @click="openSettings" />
-          </el-tooltip>
+          </el-tooltip> -->
           <el-tooltip content="참가자" placement="top">
             <el-button circle :type="isParticipantListOpen ? 'primary' : 'default'" :icon="icons.User" @click="toggleParticipantList" />
           </el-tooltip>
@@ -86,7 +91,7 @@
 
 <script>
 
-  import { Room, RoomEvent, Track, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
+  import { Room, RoomEvent, Track, TrackEvent, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
   import * as icons from '@element-plus/icons-vue'
   import { getChatMessages, sendChatMessage } from '@/api/videoConference'
   import ParticipantList from '@/components/meeting/ParticipantList.vue'
@@ -105,6 +110,7 @@
         remoteParticipants: [],
         localVideoTrack: null,
         localAudioTrack: null,
+        localScreenTrack: null,
         screenSharePublication: null,
         videoConferenceId: null,
         audioEnabled: true,
@@ -262,10 +268,11 @@
           try {
             const screenTracks = await createLocalScreenTracks({ audio: true })
             this.screenSharePublication = await this.localParticipant.publishTrack(screenTracks[0])
+            this.localScreenTrack = screenTracks[0];
             if (screenTracks.length > 1) {
               await this.localParticipant.publishTrack(screenTracks[1])
             }
-            screenTracks[0].on(Track.Event.Ended, () => {
+            screenTracks[0].on(TrackEvent.Ended, () => {
               this.stopScreenShare()
             })
             this.screenShareActive = true
@@ -282,6 +289,7 @@
         try {
           await this.localParticipant.unpublishTrack(this.screenSharePublication.track)
           this.screenSharePublication = null
+          this.localScreenTrack = null;
         } finally {
           this.screenShareActive = false
         }
@@ -437,6 +445,37 @@
     color: #fff;
     padding: 4px 8px;
     border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .screen-share-preview {
+    position: absolute;
+    bottom: 80px; /* 컨트롤 바 위에 위치 */
+    right: 20px;
+    width: 240px;
+    height: 135px;
+    border: 2px solid #4f46e5;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    z-index: 100;
+  }
+
+  .screen-share-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .preview-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 4px;
+    text-align: center;
     font-size: 12px;
   }
 
