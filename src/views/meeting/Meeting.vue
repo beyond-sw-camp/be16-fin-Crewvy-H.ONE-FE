@@ -916,6 +916,7 @@ export default {
   border-radius: 12px;
   border: 1px solid #e9ecef;
   transition: all 0.3s ease;
+  min-height: 80px;
 }
 
 .meeting-item:hover {
@@ -925,6 +926,9 @@ export default {
 
 .meeting-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .meeting-title {
@@ -932,6 +936,7 @@ export default {
   font-weight: 600;
   color: #2c3e50;
   margin-bottom: 8px;
+  min-height: 24px;
 }
 
 .meeting-details {
