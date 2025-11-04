@@ -28,6 +28,11 @@ export const joinVideoConference = async (videoConferenceId) => {
   return data.data
 }
 
+export const joinVideoConferenceWithPassword = async (payload) => {
+  const { data } = await api.post(`${VC_BASE}/join`, payload)
+  return data.data
+}
+
 export const startVideoConference = async (videoConferenceId) => {
   const { data } = await api.post(`${VC_BASE}/${videoConferenceId}/start`)
   return data.data

@@ -362,7 +362,8 @@ import {
   startVideoConference,
   getMyVideoConferences,
   updateVideoConference,
-  deleteVideoConference
+  deleteVideoConference,
+  joinVideoConferenceWithPassword
 } from '@/api/videoConference'
 
 export default {
@@ -697,7 +698,11 @@ export default {
     },
     async joinMeetingRoom() {
       try {
-        const res = await joinVideoConference(this.joinForm.meetingId)
+        const payload = {
+          id: this.joinForm.meetingId,
+          password: this.joinForm.password
+        }
+        const res = await joinVideoConferenceWithPassword(payload)
         this.success('회의에 참여합니다.')
         this.openMeetingWindow(res, '', this.joinForm.meetingId)
         this.showJoinMeeting = false
