@@ -454,8 +454,8 @@ export default {
       return (inProgress?.content || []).map(m => ({
         id: m.id,
         title: m.name || '임시 회의',
-        host: m.host || '주최자',
-        participants: m.participants || 0,
+        host: m.hostName || '주최자',
+        participants: m.participantsCnt || 0,
         duration: this.calculateElapsedTime(m.actualStartTime),
         actualStartTime: m.actualStartTime
       }))
@@ -478,7 +478,7 @@ export default {
           time: (time || '').slice(0, 8),
           rawDateTime: dt,
           dateTimeFormatted: datetimeStr,
-          host: m.host || '주최자',
+          host: m.hostName || '주최자',
           hostId: m.hostId || null, // hostId 추가
           participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
           description: m.description || '',
@@ -492,7 +492,7 @@ export default {
         id: m.id,
         title: m.name || '임시 회의',
         date: this.formatMeetingDate(m.actualStartTime || m.scheduledStartTime),
-        host: m.host || '주최자',
+        host: m.hostName || '주최자',
         duration: m.duration || '-',
         participants: m.participants || 0,
         url: m.recordingUrl,
