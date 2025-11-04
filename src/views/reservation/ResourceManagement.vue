@@ -315,6 +315,7 @@ import { ElMessageBox } from 'element-plus'
 import { Plus, Search, Setting, DataAnalysis, Download } from '@element-plus/icons-vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import axios from 'axios'
+import { getAuthHeadersFromToken } from '@/utils/authUtils'
 import Chart from 'chart.js/auto'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -464,8 +465,15 @@ export default {
     async loadResourceList() {
       this.loading = true
       try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' }
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -563,8 +571,16 @@ export default {
           }
         )
         
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
         // 실제 API 삭제 요청
-        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/delete/${resource.id}`)
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/delete/${resource.id}`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
         
         // 삭제 후 목록을 다시 로드하여 최신 데이터 반영
         await this.loadResourceList()
@@ -587,6 +603,13 @@ export default {
         
         const selectedCategory = this.categories.find(cat => cat.value === this.resourceForm.category)
         
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        const requestHeaders = authHeaders ? {
+          'Authorization': authHeaders['Authorization'],
+          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+        } : {}
+        
         if (this.isEditMode) {
           // 수정
           const updateData = {
@@ -601,7 +624,9 @@ export default {
             reservationTypeStatus: this.resourceForm.status
           }
           
-          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData)
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData, {
+            headers: requestHeaders
+          })
           
           // 자원 수정 후 목록을 다시 로드하여 최신 데이터 반영
           await this.loadResourceList()
@@ -619,7 +644,9 @@ export default {
             description: this.resourceForm.description
           }
           
-          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/register`, createData)
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/register`, createData, {
+            headers: requestHeaders
+          })
           
           // 자원 추가 후 목록을 다시 로드하여 최신 데이터 반영
           await this.loadResourceList()
@@ -768,8 +795,15 @@ export default {
     async loadCategories() {
       this.categorySaving = true
       try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
         const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' }
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -789,7 +823,15 @@ export default {
 
     async loadStatusOptions() {
       try {
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/status-list`)
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/status-list`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
         const list = Array.isArray(data) ? data : (data?.data || [])
         
         // 백엔드 응답을 statusOptions 형식으로 매핑
@@ -815,11 +857,20 @@ export default {
         
         this.categorySaving = true
         
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        const requestHeaders = authHeaders ? {
+          'Authorization': authHeaders['Authorization'],
+          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+        } : {}
+        
         if (this.isCategoryEditMode) {
           // 수정: PUT /update/{id}
           const id = this.categories[this.editingCategoryIndex]?.id
           await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/update/${id}`, {
             name: this.categoryForm.name
+          }, {
+            headers: requestHeaders
           })
           this.success('카테고리가 수정되었습니다.')
         } else {
@@ -827,6 +878,8 @@ export default {
           await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
             name: this.categoryForm.name,
             companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+          }, {
+            headers: requestHeaders
           })
           this.success('카테고리가 추가되었습니다.')
         }
@@ -870,7 +923,15 @@ export default {
           }
         )
         
-        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/delete/${category.id}`)
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/delete/${category.id}`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
         await this.loadCategories()
         this.success('카테고리가 삭제되었습니다.')
         
@@ -918,14 +979,17 @@ export default {
     // 통계용 예약 데이터 로드
     async loadAllReservationsForStatistics() {
       try {
-        const memberPositionId = localStorage.getItem('memberPositionId')
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
         const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
           params: { 
             companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
           },
-          headers: {
-            'X-User-MemberPositionId': memberPositionId
-          }
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         

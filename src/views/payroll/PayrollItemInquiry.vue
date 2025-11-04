@@ -57,26 +57,87 @@
           </el-row>
         </div>
         
-        <el-table :data="itemData" style="width: 100%" class="item-table">
-          <el-table-column prop="employeeName" label="직원명" min-width="120" align="center" />
-          <el-table-column prop="department" label="부서" min-width="100" align="center" />
-          <el-table-column prop="itemName" label="항목명" min-width="120" align="center" />
-          <el-table-column prop="itemType" label="항목구분" min-width="100" align="center" />
-          <el-table-column prop="amount" label="금액" min-width="120" align="center">
+        <el-table 
+          :data="combinedItems" 
+          style="width: 100%" 
+          class="item-table"
+          v-loading="loading"
+          @row-click="handleRowClick"
+        >
+          <el-table-column label="급여항목" min-width="200" align="center">
             <template #default="scope">
-              {{ scope.row.amount.toLocaleString() }}원
+              <span 
+                v-if="scope.row.allowanceItem"
+                class="clickable-item"
+                @click.stop="openDetailModal(scope.row.allowanceItem)"
+              >
+                {{ scope.row.allowanceItem.itemName }}
+              </span>
+              <span v-else class="empty-cell">-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="calculation" label="계산식" min-width="150" align="center" />
-          <el-table-column prop="period" label="적용기간" min-width="120" align="center" />
-          <el-table-column prop="status" label="상태" min-width="100" align="center">
+          <el-table-column label="지급액" min-width="180" align="center">
             <template #default="scope">
-              <el-tag :type="scope.row.status === '적용' ? 'success' : 'warning'">
-                {{ scope.row.status }}
-              </el-tag>
+              <span 
+                v-if="scope.row.allowanceItem"
+                class="amount-text clickable-item"
+                @click.stop="openDetailModal(scope.row.allowanceItem)"
+              >
+                {{ scope.row.allowanceItem.totalAmount.toLocaleString() }}원
+              </span>
+              <span v-else class="empty-cell">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="공제항목" min-width="200" align="center" class-name="deduction-column">
+            <template #default="scope">
+              <span 
+                v-if="scope.row.deductionItem"
+                class="clickable-item"
+                @click.stop="openDetailModal(scope.row.deductionItem)"
+              >
+                {{ scope.row.deductionItem.itemName }}
+              </span>
+              <span v-else class="empty-cell">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="공제액" min-width="180" align="center">
+            <template #default="scope">
+              <span 
+                v-if="scope.row.deductionItem"
+                class="amount-text deduction-text clickable-item"
+                @click.stop="openDetailModal(scope.row.deductionItem)"
+              >
+                {{ scope.row.deductionItem.totalAmount.toLocaleString() }}원
+              </span>
+              <span v-else class="empty-cell">-</span>
             </template>
           </el-table-column>
         </el-table>
+        
+        <!-- 상세 정보 모달 -->
+        <el-dialog
+          v-model="detailModalVisible"
+          :title="selectedItemDetail && selectedItemDetail.itemName ? `${selectedItemDetail.itemName} 상세 내역` : '상세 내역'"
+          width="80%"
+          :before-close="closeDetailModal"
+        >
+          <el-table :data="detailData" style="width: 100%" border v-loading="detailLoading">
+            <el-table-column prop="department" label="부서" min-width="120" align="center" />
+            <el-table-column prop="position" label="직급" min-width="100" align="center" />
+            <el-table-column prop="sabun" label="사번" min-width="120" align="center" />
+            <el-table-column prop="memberName" label="성명" min-width="120" align="center" />
+            <el-table-column prop="amount" label="금액" min-width="150" align="center">
+              <template #default="scope">
+                <span class="amount-text">{{ scope.row.amount.toLocaleString() }}원</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="closeDetailModal">닫기</el-button>
+            </span>
+          </template>
+        </el-dialog>
       </el-card>
     </div>
   </div>
@@ -84,6 +145,7 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import apiClient from '@/api/http'
 
 export default {
   name: 'PayrollItemInquiry',
@@ -92,109 +154,243 @@ export default {
     return { success, error, warning, info }
   },
   created() {
-    // 목업 데이터 늘리기 (총 50행)
-    const base = [...this.itemData]
-    const targetCount = 50
-    const mockNames = ['김민준','이서연','박도윤','최지우','정하준','한유진','조준서','윤예린','장수아','임시우','오태윤','서연우','신아윤','권승현','황재민','문서윤','홍지안','강유나','배민서','류하린']
-    let i = 0
-    while (this.itemData.length < targetCount) {
-      const src = base[i % base.length]
-      const idx = this.itemData.length + 1
-      const varied = {
-        employeeName: mockNames[idx % mockNames.length],
-        department: src.department,
-        itemName: src.itemName,
-        itemType: src.itemType,
-        amount: src.amount + (idx % 9) * 10000,
-        calculation: src.calculation,
-        period: src.period,
-        status: src.status
-      }
-      this.itemData.push(varied)
-      i++
-    }
+    // 초기 데이터 로드
+    this.loadSummaryData()
   },
   data() {
+    // 초기값: 당월 설정
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
     return {
-      inquiryPeriod: new Date(),
+      inquiryPeriod: currentYearMonth,
       employeeName: '',
       selectedItem: '',
       selectedDepartment: '',
-      itemData: [
-        {
-          employeeName: '김철수',
-          department: '개발팀',
-          itemName: '기본급',
-          itemType: '지급',
-          amount: 3000000,
-          calculation: '월급 × 1',
-          period: '2024-09',
-          status: '적용'
-        },
-        {
-          employeeName: '김철수',
-          department: '개발팀',
-          itemName: '야근수당',
-          itemType: '지급',
-          amount: 150000,
-          calculation: '시간 × 1.5',
-          period: '2024-09',
-          status: '적용'
-        },
-        {
-          employeeName: '이영희',
-          department: '영업팀',
-          itemName: '기본급',
-          itemType: '지급',
-          amount: 2800000,
-          calculation: '월급 × 1',
-          period: '2024-09',
-          status: '적용'
-        },
-        {
-          employeeName: '이영희',
-          department: '영업팀',
-          itemName: '영업수당',
-          itemType: '지급',
-          amount: 300000,
-          calculation: '고정금액',
-          period: '2024-09',
-          status: '적용'
-        },
-        {
-          employeeName: '박민수',
-          department: '인사팀',
-          itemName: '기본급',
-          itemType: '지급',
-          amount: 2500000,
-          calculation: '월급 × 1',
-          period: '2024-09',
-          status: '적용'
-        }
-      ]
+      summaryData: [], // 항목별 요약 데이터
+      detailModalVisible: false,
+      selectedItemDetail: null, // 선택된 항목 정보
+      detailData: [], // 모달에 표시할 상세 데이터
+      loading: false,
+      detailLoading: false // 모달 상세 데이터 로딩
     }
   },
-  methods: {
-    exportData() {
-      this.success('데이터 내보내기가 완료되었습니다.')
+  computed: {
+    // 지급 항목 필터링
+    allowanceItems() {
+      return this.summaryData.filter(item => item.itemType === '지급')
     },
+    
+    // 공제 항목 필터링
+    deductionItems() {
+      return this.summaryData.filter(item => item.itemType === '공제')
+    },
+    
+    // 지급 항목과 공제 항목을 결합하여 하나의 테이블로 표시
+    combinedItems() {
+      const allowances = this.allowanceItems
+      const deductions = this.deductionItems
+      const maxLength = Math.max(allowances.length, deductions.length)
+      const combined = []
+      
+      for (let i = 0; i < maxLength; i++) {
+        combined.push({
+          allowanceItem: allowances[i] || null,
+          deductionItem: deductions[i] || null
+        })
+      }
+      
+      return combined
+    },
+    
+  },
+  methods: {
+    // 항목별 요약 데이터 로드
+    async loadSummaryData() {
+      try {
+        this.loading = true
+        
+        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        let yearMonth = ''
+        
+        // 조회기간을 yyyy-MM 형식으로 변환
+        if (this.inquiryPeriod && this.inquiryPeriod !== null && this.inquiryPeriod !== '') {
+          if (typeof this.inquiryPeriod === 'string') {
+            yearMonth = this.inquiryPeriod
+          } else {
+            const date = new Date(this.inquiryPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+          this.inquiryPeriod = yearMonth
+        }
+        
+        // 헤더 설정
+        const accessToken = localStorage.getItem('accessToken')
+        const memberPositionId = localStorage.getItem('memberPositionId')
+        
+        const headers = {}
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`
+        }
+        if (memberPositionId) {
+          headers['X-User-MemberPositionId'] = memberPositionId
+        }
+        
+        const response = await apiClient.get('/workforce-service/salary/summary', {
+          params: {
+            companyId: companyId,
+            yearMonth: yearMonth
+          },
+          headers: headers
+        })
+        
+        const responseData = response.data?.data || response.data || {}
+        const paymentItems = responseData.paymentItems || []
+        const deductionItems = responseData.deductionItems || []
+        
+        // API 응답을 컴포넌트 형식으로 변환
+        const paymentData = paymentItems.map(item => ({
+          itemName: item.name || '',
+          itemType: '지급',
+          totalAmount: item.totalAmount || 0
+        }))
+        
+        const deductionData = deductionItems.map(item => ({
+          itemName: item.name || '',
+          itemType: '공제',
+          totalAmount: item.totalAmount || 0
+        }))
+        
+        this.summaryData = [...paymentData, ...deductionData]
+        
+        this.success('급여 항목별 조회 데이터를 불러왔습니다.')
+      } catch (err) {
+        console.error('급여 항목별 조회 데이터 로드 실패:', err)
+        this.error('급여 항목별 조회 데이터를 불러오는데 실패했습니다.')
+        this.summaryData = []
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 행 클릭 핸들러
+    handleRowClick(row) {
+      // 행 전체 클릭 시에는 지급 항목이 있으면 지급 항목의 상세, 없으면 공제 항목의 상세 표시
+      if (row.allowanceItem) {
+        this.openDetailModal(row.allowanceItem)
+      } else if (row.deductionItem) {
+        this.openDetailModal(row.deductionItem)
+      }
+    },
+    
+    // 상세 모달 열기
+    async openDetailModal(item) {
+      if (!item || !item.itemName) {
+        console.error('Invalid item:', item)
+        this.error('항목 정보를 불러올 수 없습니다.')
+        return
+      }
+      
+      // 선택된 항목 정보 저장 (깊은 복사)
+      this.selectedItemDetail = { ...item }
+      
+      // 모달 열기
+      this.detailModalVisible = true
+      this.detailData = []
+      
+      try {
+        this.detailLoading = true
+        
+        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+        let yearMonth = ''
+        
+        // 조회기간을 yyyy-MM 형식으로 변환
+        if (this.inquiryPeriod && this.inquiryPeriod !== null && this.inquiryPeriod !== '') {
+          if (typeof this.inquiryPeriod === 'string') {
+            yearMonth = this.inquiryPeriod
+          } else {
+            const date = new Date(this.inquiryPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+        }
+        
+        // 헤더 설정
+        const accessToken = localStorage.getItem('accessToken')
+        const memberPositionId = localStorage.getItem('memberPositionId')
+        
+        const headers = {}
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`
+        }
+        if (memberPositionId) {
+          headers['X-User-MemberPositionId'] = memberPositionId
+        }
+        
+        const response = await apiClient.get('/workforce-service/salary/summary-details', {
+          params: {
+            companyId: companyId,
+            yearMonth: yearMonth,
+            name: item.itemName
+          },
+          headers: headers
+        })
+        
+        const apiData = response.data?.data || response.data || []
+        
+        // API 응답을 컴포넌트 형식으로 변환
+        this.detailData = apiData.map(detail => ({
+          department: detail.department || '',
+          position: detail.role || '',
+          sabun: detail.sabun || '',
+          memberName: detail.memberName || '',
+          amount: detail.amount || 0
+        }))
+        
+      } catch (err) {
+        console.error('상세 데이터 로드 실패:', err)
+        this.error('상세 데이터를 불러오는데 실패했습니다.')
+        this.detailData = []
+      } finally {
+        this.detailLoading = false
+      }
+    },
+    
+    // 상세 모달 닫기
+    closeDetailModal() {
+      this.detailModalVisible = false
+      this.selectedItemDetail = null
+      this.detailData = []
+    },
+    
     refreshData() {
+      this.loadSummaryData()
       this.success('데이터가 새로고침되었습니다.')
     },
     // CSV 파일 다운로드
     downloadCSV() {
-      const headers = ['직원명', '부서', '항목명', '항목구분', '금액', '계산식', '적용기간', '상태']
+      const headers = ['항목명', '항목구분', '총액']
       const csvContent = [
         headers.join(','),
-        ...this.itemData.map(item => [
-          item.employeeName,
-          item.department,
+        ...this.summaryData.map(item => [
           item.itemName,
           item.itemType,
-          item.amount,
-          item.calculation,
-          item.period,
-          item.status
+          item.totalAmount
         ].join(','))
       ].join('\n')
 
@@ -221,20 +417,15 @@ export default {
           ['급여 항목별 조회'],
           [`생성일: ${new Date().toLocaleDateString()}`],
           [''],
-          ['직원명', '부서', '항목명', '항목구분', '금액', '계산식', '적용기간', '상태']
+          ['항목명', '항목구분', '총액']
         ]
         
         // 데이터 행 추가
-        this.itemData.forEach(item => {
+        this.summaryData.forEach(item => {
           worksheetData.push([
-            item.employeeName,
-            item.department,
             item.itemName,
             item.itemType,
-            item.amount,
-            item.calculation,
-            item.period,
-            item.status
+            item.totalAmount
           ])
         })
         
@@ -305,7 +496,79 @@ export default {
   border-radius: 8px;
 }
 
+.inquiry-filters :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.inquiry-filters :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.inquiry-filters :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 8px;
+}
+
+.inquiry-filters :deep(.el-date-editor) {
+  width: 100%;
+}
+
 .item-table {
   margin-top: 20px;
+}
+
+.item-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.item-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+/* 지급액과 공제항목 사이 세로선 */
+.item-table :deep(.el-table__header .deduction-column),
+.item-table :deep(.el-table__body .deduction-column) {
+  border-left: 0.5px solid #e4e7ed;
+  position: relative;
+}
+
+.item-table :deep(.deduction-column .cell) {
+  padding-left: 12px;
+}
+
+.item-table :deep(.deduction-column)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.5px;
+  background-color: #e4e7ed;
+}
+
+.clickable-item {
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.clickable-item:hover {
+  color: #409eff;
+  text-decoration: underline;
+}
+
+.empty-cell {
+  color: #c0c4cc;
+}
+
+.amount-text {
+  color: #303133;
+}
+
+.deduction-text {
+  color: #303133;
+}
+
+.dialog-footer {
+  text-align: right;
 }
 </style>

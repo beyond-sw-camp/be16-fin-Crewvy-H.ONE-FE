@@ -2,11 +2,22 @@
   <div class="leave-management">
     <div class="content-card">
       <div class="card-header">
-        <h3>관리자 연차 현황</h3>
-        <el-button type="primary" @click="exportToExcel">
-          <el-icon><Download /></el-icon>
-          <span style="margin-left: 8px;">엑셀로 내보내기</span>
-        </el-button>
+        <h3>연차 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
+        <div style="display: flex; gap: 12px;">
+          <el-date-picker
+            v-model="selectedYear"
+            type="year"
+            placeholder="연도 선택"
+            format="YYYY년"
+            value-format="YYYY"
+            style="width: 140px;"
+            @change="fetchLeaveData"
+          />
+          <el-button type="primary" @click="exportToExcel">
+            <el-icon><Download /></el-icon>
+            <span style="margin-left: 8px;">엑셀로 내보내기</span>
+          </el-button>
+        </div>
       </div>
       <div class="filter-section">
         <el-input
@@ -19,9 +30,13 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
+        <el-button @click="fetchLeaveData" :loading="isLoading">
+          <el-icon><Refresh /></el-icon>
+          <span style="margin-left: 8px;">새로고침</span>
+        </el-button>
       </div>
       <div class="leave-table">
-        <el-table :data="filteredLeaveData" style="width: 100%">
+        <el-table :data="filteredLeaveData" v-loading="isLoading" style="width: 100%">
           <el-table-column prop="employeeName" label="이름" width="150" />
           <el-table-column prop="department" label="부서" width="180" />
           <el-table-column prop="totalLeave" label="총 연차" width="120" />
@@ -43,37 +58,58 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
 import { useSnackbar } from '@/composables/useSnackbar';
+import { getLeaveBalanceStatus } from '@/api/attendance';
+import { Download, Search, Refresh } from '@element-plus/icons-vue';
 
 export default {
   name: 'LeaveManagement',
+  components: { Download, Search, Refresh },
   setup() {
-    const { success, info } = useSnackbar();
+    const { success, info, error } = useSnackbar();
 
     const searchQuery = ref('');
+    const isLoading = ref(false);
+    const selectedYear = ref(new Date().getFullYear().toString());
+    const leaveData = ref([]);
 
-    const leaveData = ref([
-      { id: 1, employeeName: '김철수', department: '개발팀', totalLeave: 15, usedLeave: 5 },
-      { id: 2, employeeName: '이영희', department: '디자인팀', totalLeave: 15, usedLeave: 10 },
-      { id: 3, employeeName: '박민준', department: '개발팀', totalLeave: 21, usedLeave: 20 },
-      { id: 4, employeeName: '최지우', department: '마케팅팀', totalLeave: 18, usedLeave: 7 },
-      { id: 5, employeeName: '정다솜', department: '개발팀', totalLeave: 15, usedLeave: 2 },
-      { id: 6, employeeName: '홍길동', department: '영업팀', totalLeave: 15, usedLeave: 15 },
-    ]);
+    // 백엔드 API로부터 연차 데이터 조회 (권한 기반 자동 범위 결정)
+    const fetchLeaveData = async () => {
+      isLoading.value = true;
+      try {
+        const response = await getLeaveBalanceStatus({ year: parseInt(selectedYear.value) });
+
+        // 백엔드 응답을 프론트엔드 형식으로 변환
+        leaveData.value = response.map((item) => ({
+          id: item.memberId,
+          employeeName: item.memberName || '-',
+          department: item.organizationName || '-',
+          totalLeave: item.totalGranted || 0,
+          usedLeave: item.totalUsed || 0,
+        }));
+
+        success(`연차 현황을 조회했습니다. (${response.length}명)`);
+      } catch (err) {
+        error(err.message || '연차 현황을 불러오는 데 실패했습니다.');
+        leaveData.value = [];
+      } finally {
+        isLoading.value = false;
+      }
+    };
 
     const processedLeaveData = computed(() => {
       return leaveData.value.map(item => ({
         ...item,
         remainingLeave: item.totalLeave - item.usedLeave,
-        usageRate: Math.round((item.usedLeave / item.totalLeave) * 100)
+        usageRate: item.totalLeave > 0 ? Math.round((item.usedLeave / item.totalLeave) * 100) : 0
       }));
     });
 
     const filteredLeaveData = computed(() => {
       return processedLeaveData.value.filter(item => {
-        const matchesSearch = !searchQuery.value || 
+        const matchesSearch = !searchQuery.value ||
                               item.employeeName.includes(searchQuery.value) ||
                               item.department.includes(searchQuery.value);
         return matchesSearch;
@@ -95,12 +131,19 @@ export default {
       success('엑셀 내보내기가 완료되었습니다.');
     };
 
+    // 컴포넌트 마운트 시 데이터 조회
+    onMounted(() => {
+      fetchLeaveData();
+    });
+
     return {
       searchQuery,
+      selectedYear,
+      isLoading,
       filteredLeaveData,
       getUsageRateColor,
       exportToExcel,
-      success, info, // Return snackbar functions
+      fetchLeaveData,
     };
   }
 }

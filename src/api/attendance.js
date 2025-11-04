@@ -68,10 +68,14 @@ export const reactivateAssignments = (assignmentIds) => workforceClient.patch('/
 // --- 휴가/근태 신청 (Request) ---
 
 export const createLeaveRequest = (data) => workforceClient.post('/requests/leave', data);
+export const createTripRequest = (data) => workforceClient.post('/requests/trip', data);
 export const getMyRequests = (params) => workforceClient.get('/requests/my', { params });
 export const getMyLeaveRequests = (params) => workforceClient.get('/requests/my-leaves', { params });
 export const getRequestById = (requestId) => workforceClient.get(`/requests/${requestId}`);
 export const cancelRequest = (requestId) => workforceClient.delete(`/requests/${requestId}/cancel`);
+
+// 문서 목록 조회 API 추가 (결재 문서 연동용)
+export const getDocumentList = () => workforceClient.get('/approval/get-document-list');
 
 // --- 근무지 관리 (Work Location) ---
 
@@ -105,6 +109,49 @@ export const recordAttendanceEvent = (data) => workforceClient.post('/attendance
 export const getMyTodayAttendance = () => workforceClient.get('/attendance/my/today');
 export const getMyBalance = () => workforceClient.get('/attendance/my/balance');
 
+/**
+ * 내 모든 휴가 정책 잔액 조회 (연차, 병가, 육아휴직 등)
+ * @returns {Promise<Array<object>>}
+ */
+export const getMyAllBalances = () => workforceClient.get('/attendance/my/balances');
+
+/**
+ * 내게 할당된 모든 정책 조회 (휴가 신청 시 사용)
+ * @returns {Promise<Array<object>>}
+ */
+export const getMyAssignedPolicies = () => workforceClient.get('/attendance/my/assigned-policies');
+
+/**
+ * 팀원 근태 현황 조회 (오늘 날짜 기준)
+ * @returns {Promise<Array<object>>}
+ */
+export const getTeamAttendanceStatus = () => workforceClient.get('/attendance/team/status');
+
+/**
+ * 연차 현황 조회 (권한에 따라 조회 범위 자동 결정)
+ * - COMPANY 권한: 전사 직원 연차 현황
+ * - TEAM 권한: 본인 조직 및 하위 조직 직원 연차 현황
+ * @param {object} params - { year?: number }
+ * @returns {Promise<Array<object>>}
+ */
+export const getLeaveBalanceStatus = (params) => workforceClient.get('/attendance/leave-balance/status', { params });
+
+// --- 급여 정산용 조회 (Admin/COMPANY Level) ---
+
+/**
+ * 기간별 전체 직원 일일 근태 조회 (COMPANY 레벨 권한 필요)
+ * @param {object} params - { startDate: 'yyyy-MM-dd', endDate: 'yyyy-MM-dd' }
+ * @returns {Promise<Array<object>>}
+ */
+export const getDailyAttendanceSummary = (params) => workforceClient.get('/attendance/summary/daily', { params });
+
+/**
+ * 연도별 전체 직원 잔여 일수 조회 (COMPANY 레벨 권한 필요)
+ * @param {object} params - { year: number }
+ * @returns {Promise<Array<object>>}
+ */
+export const getMemberBalanceSummary = (params) => workforceClient.get('/attendance/summary/balance', { params });
+
 // --- 디바이스 관리 (Device Management) ---
 
 export const registerDevice = (data) => workforceClient.post('/requests/devices/register', data);
@@ -112,3 +159,5 @@ export const getMyDevices = (params) => workforceClient.get('/requests/devices/m
 export const getPendingDevices = (params) => workforceClient.get('/requests/devices/pending', { params });
 export const approveDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/approve`);
 export const rejectDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/reject`);
+
+export const runAnnualLeaveAccrualBatch = () => workforceClient.post('/batch/attendance/annual-leave-accrual');

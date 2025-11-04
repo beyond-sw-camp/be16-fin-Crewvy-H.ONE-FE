@@ -1,5 +1,5 @@
 <template>
-  <div class="payroll-basic-info">
+  <div class="payroll-contract-info">
     <div class="page-header">
       <h1>급여 계약 정보 설정</h1>
       <p>직원별 기본급과 매월 고정적으로 지급되는 수당 항목을 관리합니다.</p>
@@ -50,7 +50,7 @@
               />
             </div>
             <div class="filter-actions">
-              <el-button type="success" @click="savePayrollData" :loading="saving">
+              <el-button type="primary" @click="savePayrollData" :loading="saving">
                 <i class="el-icon-check"></i> 저장
               </el-button>
             </div>
@@ -70,9 +70,10 @@
         <!-- 데이터 표시 -->
         <div v-else class="table-wrap">
           <el-table 
+            ref="employeeTable"
             :data="filteredRows" 
             border 
-            height="540" 
+            max-height="540" 
             stripe 
             :show-summary="true" 
             :summary-method="getSummaries" 
@@ -135,6 +136,53 @@
 
     <!-- 항목별 입력 -->
     <div class="content-section" v-if="inputMode === '항목별'">
+      <!-- 필터 및 저장 버튼 영역 -->
+      <el-card class="filter-card">
+        <div class="filter-section">
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>항목명</label>
+              <el-input 
+                v-model="searchItemName" 
+                placeholder="항목명 검색" 
+                style="width: 150px;"
+                clearable
+              />
+            </div>
+            <div class="filter-item">
+              <label>구분</label>
+              <el-select v-model="selectedItemType" placeholder="전체" clearable style="width: 120px;">
+                <el-option label="전체" value="" />
+                <el-option label="지급" value="지급" />
+                <el-option label="공제" value="공제" />
+              </el-select>
+            </div>
+            <div class="filter-item">
+              <label>정렬</label>
+              <el-select v-model="itemSortBy" placeholder="정렬 기준" style="width: 140px;">
+                <el-option label="항목명" value="itemName" />
+                <el-option label="총액" value="totalAmount" />
+                <el-option label="대상인원" value="employeeCount" />
+                <el-option label="최대금액" value="maxAmount" />
+                <el-option label="일괄 적용 금액" value="batchAmount" />
+              </el-select>
+            </div>
+            <div class="filter-item">
+              <label>정렬방향</label>
+              <el-select v-model="itemSortOrder" placeholder="오름차순/내림차순" style="width: 120px;">
+                <el-option label="오름차순" value="asc" />
+                <el-option label="내림차순" value="desc" />
+              </el-select>
+            </div>
+            <div class="filter-actions">
+              <el-button type="primary" @click="saveItemPayrollData" :loading="saving">
+                <i class="el-icon-check"></i> 일괄 저장
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </el-card>
+
       <el-card>
         <!-- 로딩 중일 때 표시 -->
         <div v-if="loading" class="loading-container">
@@ -147,39 +195,59 @@
         <!-- 데이터 표시 -->
         <div v-else class="table-wrap">
           <el-table 
-            :data="itemRows" 
+            ref="itemTable"
+            :data="filteredItemRows" 
             border 
-            height="540" 
+            max-height="540" 
             stripe 
             :show-summary="true" 
             :summary-method="getItemSummaries" 
             class="pay-grid auto-width-table"
           >
-            <el-table-column prop="itemName" label="급여항목" min-width="120" align="center" fixed="left" />
-            <el-table-column prop="itemType" label="구분" width="80" align="center">
+            <el-table-column prop="itemName" label="급여항목" width="140" align="center" header-align="center" />
+            <el-table-column prop="itemType" label="구분" width="70" align="center" header-align="center">
               <template #default="{ row }">
                 <el-tag :type="row.itemType === '지급' ? 'success' : 'danger'" size="small">
                   {{ row.itemType }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="employeeCount" label="대상인원" width="100" align="center">
+            <el-table-column prop="employeeCount" label="대상인원" width="60" align="center" header-align="center">
               <template #default="{ row }">{{ row.employeeCount }}명</template>
             </el-table-column>
-            <el-table-column prop="totalAmount" label="총액" min-width="120" align="right">
+            <el-table-column label="일괄 적용 금액" width="100" align="right" header-align="center">
+              <template #default="{ row }">
+                <el-input
+                  v-model="row.batchAmountDisplay"
+                  size="small"
+                  placeholder="0"
+                  @input="(value) => handleItemBatchInput(row, value)"
+                  style="width: 100%; text-align: right"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column prop="totalAmount" label="총액" width="70" align="right" header-align="center">
               <template #default="{ row }">{{ format(row.totalAmount) }}</template>
             </el-table-column>
-            <el-table-column prop="averageAmount" label="평균금액" min-width="120" align="right">
-              <template #default="{ row }">{{ format(row.averageAmount) }}</template>
-            </el-table-column>
-            <el-table-column prop="maxAmount" label="최대금액" min-width="120" align="right">
+            <el-table-column prop="maxAmount" label="최대금액" width="70" align="right" header-align="center">
               <template #default="{ row }">{{ format(row.maxAmount) }}</template>
             </el-table-column>
-            <el-table-column prop="minAmount" label="최소금액" min-width="120" align="right">
-              <template #default="{ row }">{{ format(row.minAmount) }}</template>
+            <el-table-column prop="effectiveDate" label="적용일자" width="100" align="center" header-align="center">
+              <template #default="{ row }">
+                <el-date-picker
+                  v-model="row.batchEffectiveDate"
+                  type="date"
+                  placeholder="적용일자"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  size="small"
+                  style="width: 100%;"
+                  @change="(value) => handleEffectiveDateChange(row, value)"
+                />
+              </template>
             </el-table-column>
-            <el-table-column prop="description" label="비고" min-width="150" align="center">
-              <template #default="{ row }">{{ row.description }}</template>
+            <el-table-column prop="description" label="비고" width="220" align="center" header-align="center">
+              <template #default="{ row }">{{ row.description || '' }}</template>
             </el-table-column>
             
             <!-- 데이터가 없을 때 표시할 내용 -->
@@ -194,8 +262,8 @@
         </div>
         <div class="footnotes">
           <ul>
-            <li>항목별 입력에서는 각 급여 항목의 총합과 통계 정보를 확인할 수 있습니다.</li>
-            <li>지급 항목은 급여 지급액, 공제 항목은 급여 공제액을 나타냅니다.</li>
+            <li>항목별 입력에서는 각 급여 항목에 일괄 적용 금액을 입력하여 모든 사원에게 동일한 금액을 적용할 수 있습니다.</li>
+            <li>일괄 적용 금액을 입력한 후 "일괄 저장" 버튼을 클릭하면 모든 사원에게 해당 금액이 저장됩니다.</li>
           </ul>
         </div>
       </el-card>  
@@ -206,10 +274,11 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import { Loading } from '@element-plus/icons-vue'
-import axios from 'axios'
+import apiClient from '@/api/http'
+import { getAuthHeadersFromToken } from '@/utils/authUtils'
 
 export default {
-  name: 'PayrollBasicInfo',
+  name: 'PayrollContractInfo',
   components: {
     Loading
   },
@@ -221,17 +290,23 @@ export default {
     return {
       inputMode: '사원별',
       rows: [],
-      filteredRows: [], // 필터링된 데이터
+      filteredRows: [],
       itemRows: [],
-      payrollItems: [], // API에서 가져온 급여 항목 목록
+      payrollItems: [],
       loading: false,
+      saving: false, // 저장 중 상태
       screenWidth: window.innerWidth,
       // 필터링 관련 데이터
       selectedDepartment: '',
       searchEmpNo: '',
       searchName: '',
       departmentList: [], // 부서 목록
-      searchTimeout: null // 디바운싱을 위한 타이머
+      searchTimeout: null, // 디바운싱을 위한 타이머
+      // 항목별 필터링/정렬 관련 데이터
+      searchItemName: '',
+      selectedItemType: '',
+      itemSortBy: 'itemName',
+      itemSortOrder: 'asc'
     }
   },
   computed: {
@@ -250,6 +325,46 @@ export default {
     // 작은 화면 여부 확인
     isSmallScreen() {
       return this.screenWidth <= 1200
+    },
+    // 항목별 필터링 및 정렬된 데이터
+    filteredItemRows() {
+      let filtered = [...this.itemRows]
+
+      // 항목명 검색 필터링
+      if (this.searchItemName) {
+        filtered = filtered.filter(item => 
+          item.itemName.toLowerCase().includes(this.searchItemName.toLowerCase())
+        )
+      }
+
+      // 구분 필터링
+      if (this.selectedItemType) {
+        filtered = filtered.filter(item => item.itemType === this.selectedItemType)
+      }
+
+      // 정렬
+      if (this.itemSortBy) {
+        filtered.sort((a, b) => {
+          let aValue = a[this.itemSortBy]
+          let bValue = b[this.itemSortBy]
+
+          // 문자열 정렬
+          if (this.itemSortBy === 'itemName') {
+            aValue = aValue || ''
+            bValue = bValue || ''
+            const comparison = aValue.localeCompare(bValue)
+            return this.itemSortOrder === 'asc' ? comparison : -comparison
+          }
+
+          // 숫자 정렬
+          aValue = Number(aValue) || 0
+          bValue = Number(bValue) || 0
+          const diff = aValue - bValue
+          return this.itemSortOrder === 'asc' ? diff : -diff
+        })
+      }
+
+      return filtered
     }
   },
   watch: {
@@ -262,6 +377,24 @@ export default {
     },
     searchName() {
       this.debouncedSearch()
+    },
+    // 항목별 테이블 데이터 변경 시 footer 너비 동기화
+    filteredItemRows: {
+      handler() {
+        this.$nextTick(() => {
+          this.syncTableFooterWidths()
+        })
+      },
+      deep: true
+    },
+    // 사원별 테이블 데이터 변경 시 footer 너비 동기화
+    filteredRows: {
+      handler() {
+        this.$nextTick(() => {
+          this.syncTableFooterWidths()
+        })
+      },
+      deep: true
     }
   },
   methods: {
@@ -273,6 +406,70 @@ export default {
     // 화면 크기 변경 핸들러
     handleResize() {
       this.screenWidth = window.innerWidth
+      // 리사이즈 후 footer 너비 동기화
+      this.$nextTick(() => {
+        this.syncTableFooterWidths()
+      })
+    },
+
+    // 테이블 footer 셀 너비를 헤더 셀 너비와 동기화
+    syncTableFooterWidths() {
+      // 약간의 딜레이를 두어 DOM이 완전히 렌더링된 후 실행
+      setTimeout(() => {
+        this.syncTableFooter(this.$refs.itemTable)
+        this.syncTableFooter(this.$refs.employeeTable)
+      }, 50)
+    },
+
+    // 개별 테이블 footer 동기화
+    syncTableFooter(tableRef) {
+      if (!tableRef || !tableRef.$el) return
+      
+      const tableEl = tableRef.$el
+      const headerWrapper = tableEl.querySelector('.el-table__header-wrapper')
+      const footerWrapper = tableEl.querySelector('.el-table__footer-wrapper')
+      
+      if (!headerWrapper || !footerWrapper) return
+      
+      // 헤더 colgroup 가져오기
+      const headerTable = headerWrapper.querySelector('table')
+      const headerColgroup = headerTable?.querySelector('colgroup')
+      
+      // Footer colgroup 가져오기 또는 생성
+      const footerTable = footerWrapper.querySelector('table')
+      if (!footerTable) return
+      
+      // Footer colgroup 제거 후 헤더와 동일하게 복사
+      const existingFooterColgroup = footerTable.querySelector('colgroup')
+      if (existingFooterColgroup) {
+        existingFooterColgroup.remove()
+      }
+      
+      if (headerColgroup) {
+        const newColgroup = headerColgroup.cloneNode(true)
+        footerTable.insertBefore(newColgroup, footerTable.firstChild)
+      }
+      
+      // 개별 셀 너비도 동기화
+      const headerCells = headerWrapper.querySelectorAll('th')
+      const footerCells = footerWrapper.querySelectorAll('th, td')
+      
+      if (headerCells.length === footerCells.length) {
+        headerCells.forEach((headerCell, index) => {
+          if (footerCells[index]) {
+            const headerWidth = headerCell.getBoundingClientRect().width || headerCell.offsetWidth
+            if (headerWidth > 0) {
+              footerCells[index].style.width = `${headerWidth}px`
+              footerCells[index].style.minWidth = `${headerWidth}px`
+              footerCells[index].style.maxWidth = `${headerWidth}px`
+            }
+          }
+        })
+      }
+      
+      // Footer 테이블도 fixed layout 설정
+      footerTable.style.tableLayout = 'fixed'
+      footerTable.style.width = '100%'
     },
     
     // 화폐 포맷팅 함수 (콤마 추가)
@@ -304,8 +501,15 @@ export default {
       try {
         this.loading = true
         
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/payrollItem/fixed-allowance`, {
-          params: { companyId: this.getCompanyId() }
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await apiClient.get(`/workforce-service/payrollItem/fixed-allowance`, {
+          params: { companyId: this.getCompanyId() },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -321,7 +525,7 @@ export default {
         // 백엔드 데이터를 프론트엔드 형식으로 변환
         // 모든 항목을 지급 항목으로 처리
         this.payrollItems = items.map(item => ({
-          id: item.id || this.generateUUID(),
+          id: item.id,
           type: 'ALLOWANCE',
           name: item.allowanceName || item.name,
           description: item.description || '',
@@ -443,13 +647,32 @@ export default {
       const sums = []
       columns.forEach((column, index) => {
         if (index === 0) { sums[index] = '합계'; return }
-        if (['구분', '비고'].includes(column.label)) { sums[index] = ''; return }
-        if (column.label === '대상인원') {
-          const total = data.reduce((acc, cur) => acc + cur.employeeCount, 0)
-          sums[index] = `${total}명`
+        if (['구분', '비고', '일괄 적용 금액', '대상인원', '적용일자'].includes(column.label)) { sums[index] = ''; return }
+        
+        // 컬럼별로 적절한 계산 방식 적용
+        if (column.label === '총액') {
+          // 총액: 모든 총액의 합
+          const values = data.map(item => Number(item.totalAmount) || 0)
+          const total = values.reduce((acc, cur) => acc + (isNaN(cur) ? 0 : cur), 0)
+          sums[index] = this.format(total)
           return
         }
-        const values = data.map(item => Number(item[column.property]))
+        
+        if (column.label === '최대금액') {
+          // 최대금액: 모든 최대금액 중 최대값
+          const values = data.map(item => Number(item.maxAmount) || 0).filter(v => v > 0)
+          if (values.length === 0) {
+            sums[index] = '0'
+            return
+          }
+          const maxValue = Math.max(...values)
+          sums[index] = this.format(maxValue)
+          return
+        }
+        
+        
+        // 기본 처리: property로 직접 계산
+        const values = data.map(item => Number(item[column.property]) || 0)
         const total = values.reduce((acc, cur) => acc + (isNaN(cur) ? 0 : cur), 0)
         sums[index] = this.format(total)
       })
@@ -474,21 +697,38 @@ export default {
         const property = this.getItemProperty(item.name)
         const amounts = this.rows.map(row => row[property] || 0)
 
-        const nonZeroAmounts = amounts.filter(amount => amount > 0)
         const totalAmount = amounts.reduce((sum, amount) => sum + amount, 0)
-        const averageAmount = nonZeroAmounts.length > 0 ? totalAmount / nonZeroAmounts.length : 0
+        const averageAmount = this.rows.length > 0 ? totalAmount / this.rows.length : 0
         const maxAmount = Math.max(...amounts)
-        const minAmount = Math.min(...nonZeroAmounts.length > 0 ? nonZeroAmounts : [0])
 
+        // 기존 itemRows에 이미 해당 항목이 있으면 batchAmount, batchEffectiveDate 유지
+        const existingItem = this.itemRows.find(r => r.itemName === item.name)
+        
+        // 기존 데이터에서 effectiveDate 찾기 (첫 번째 사원의 해당 항목)
+        let existingEffectiveDate = null
+        if (this.rows.length > 0) {
+          const property = this.getItemProperty(item.name)
+          const firstRowWithAllowance = this.rows.find(row => {
+            const allowanceData = row[property + 'EffectiveDate']
+            return allowanceData !== undefined && allowanceData !== null
+          })
+          if (firstRowWithAllowance) {
+            existingEffectiveDate = firstRowWithAllowance[property + 'EffectiveDate']
+          }
+        }
+        
         return {
           itemName: item.name,
           itemType: item.type,
           totalAmount: totalAmount,
-          employeeCount: nonZeroAmounts.length,
+          employeeCount: this.rows.length, // 전체 직원 수
           averageAmount: Math.round(averageAmount),
           maxAmount: maxAmount,
-          minAmount: minAmount,
-          description: item.description
+          description: item.description,
+          batchAmount: existingItem?.batchAmount || 0,
+          batchAmountDisplay: existingItem?.batchAmountDisplay || '',
+          batchEffectiveDate: existingItem?.batchEffectiveDate || existingEffectiveDate || this.getCurrentDate(),
+          originalEffectiveDate: existingEffectiveDate || null
         }
       })
 
@@ -551,10 +791,17 @@ export default {
       this.loading = true
       
       try {
-        const response = await axios.get(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/salary-config/list`,
+        // 인증 헤더 가져오기
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await apiClient.get(
+          `/workforce-service/salary-config/list`,
           {
-            params: { companyId: this.getCompanyId() }
+            params: { companyId: this.getCompanyId() },
+            headers: authHeaders ? {
+              'Authorization': authHeaders['Authorization'],
+              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+            } : {}
           }
         )
 
@@ -601,6 +848,10 @@ export default {
             const property = this.getItemProperty(allowance.allowanceName)
             employee[property] = allowance.amount || 0
             employee[property + 'Display'] = this.formatCurrency(allowance.amount || 0)
+            // effectiveDate도 저장
+            if (allowance.effectiveDate) {
+              employee[property + 'EffectiveDate'] = allowance.effectiveDate
+            }
           })
         }
         
@@ -622,24 +873,225 @@ export default {
       this.rows = employeeData
       this.filteredRows = [...employeeData]
       this.generateDepartmentList()
+      
+      // footer 너비 동기화
+      this.$nextTick(() => {
+        this.syncTableFooterWidths()
+      })
     },
 
-    // 임의 사원 정보 생성
-    createEmployeeInfo(index) {
-      const names = ['김철수', '박민수', '이지은', '최영희', '정민호', '김수진', '박지훈', '이하늘', '최동현', '윤서연', '강태우', '임소영', '한지우', '오민수', '신예린', '조현우', '송지민', '배준호', '류하늘', '문지훈', '권서연', '황민수', '안지우', '노현우', '홍예린']
-      const departments = ['인사팀', '회계팀', '영업팀', '마케팅팀', '개발팀', '디자인팀', '고객지원팀', '구매팀', '생산팀', '품질관리팀']
-      const positions = ['사원', '주임', '대리', '과장', '차장', '부장', '이사', '상무', '전무', '사장']
+    // 급여 데이터 저장
+    async savePayrollData() {
+      if (this.filteredRows.length === 0) {
+        this.warning('저장할 급여 데이터가 없습니다.')
+        return
+      }
 
-      return {
-        empNo: String(221101 + index),
-        name: names[index % names.length],
-        dept: departments[index % departments.length],
-        position: positions[index % positions.length],
-        // 급여 항목들은 기본값 0으로 초기화
-        baseSalary: 0,
-        baseSalaryDisplay: '0',
-        payTotal: 0,
-        deductTotal: 0
+      try {
+        this.saving = true
+        
+        // 프론트엔드 데이터를 백엔드 형식으로 변환
+        const saveData = this.filteredRows.map(row => {
+          const fixedAllowanceList = this.allowanceItems
+            .filter(item => {
+              const property = this.getItemProperty(item.name)
+              return row[property] && row[property] > 0
+            })
+            .map(item => {
+              const property = this.getItemProperty(item.name)
+              return {
+                allowanceName: item.name,
+                amount: row[property] || 0
+              }
+            })
+
+          return {
+            memberId: row.memberId,
+            baseSalary: row.baseSalary || 0,
+            fixedAllowanceList: fixedAllowanceList
+          }
+        })
+
+        await apiClient.post(
+          `/workforce-service/salary-config/save`,
+          {
+            companyId: this.getCompanyId(),
+            salaryConfigList: saveData
+          }
+        )
+
+        this.success('급여 정보를 저장했습니다.')
+        
+        // 저장 후 데이터 재조회
+        await this.fetchPayrollData()
+        this.itemRows = this.generateItemRows()
+        
+        // footer 너비 동기화
+        this.$nextTick(() => {
+          this.syncTableFooterWidths()
+        })
+      } catch (err) {
+        console.error('급여 저장 실패:', err)
+        this.error('급여 정보 저장에 실패했습니다.')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    // 항목별 일괄 적용 금액 입력 핸들러
+    handleItemBatchInput(row, value) {
+      const parsedValue = this.parseCurrency(value)
+      row.batchAmount = parsedValue
+      row.batchAmountDisplay = this.formatCurrency(parsedValue)
+    },
+
+    // 적용일자 변경 핸들러
+    handleEffectiveDateChange(row, value) {
+      row.batchEffectiveDate = value || this.getCurrentDate()
+    },
+
+    // 현재 날짜를 YYYY-MM-DD 형식으로 반환
+    getCurrentDate() {
+      const today = new Date()
+      const yyyy = today.getFullYear()
+      const mm = String(today.getMonth() + 1).padStart(2, '0')
+      const dd = String(today.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    },
+
+    // 항목별 일괄 저장
+    async saveItemPayrollData() {
+      if (this.rows.length === 0) {
+        this.warning('저장할 사원 데이터가 없습니다.')
+        return
+      }
+
+      // 일괄 적용 금액이 입력된 항목 확인
+      const itemsWithBatchAmount = this.itemRows.filter(item => item.batchAmount && item.batchAmount > 0)
+      
+      if (itemsWithBatchAmount.length === 0) {
+        this.warning('일괄 적용할 금액을 입력해주세요.')
+        return
+      }
+
+      try {
+        this.saving = true
+
+        // 인증 헤더 가져오기
+        const authHeaders = getAuthHeadersFromToken()
+        if (!authHeaders || !authHeaders['X-User-MemberPositionId']) {
+          this.error('인증 정보를 찾을 수 없습니다.')
+          return
+        }
+
+        // 변경된 항목만 필터링하여 요청 데이터 생성
+        const requestData = []
+
+        // 각 항목별로 변경 확인 (모든 사원에게 동일하게 적용되므로 한 번만 체크)
+        itemsWithBatchAmount.forEach(item => {
+          // 기본급은 제외
+          if (item.itemName === '기본급') {
+            return
+          }
+
+          // 해당 항목의 기존 데이터 확인 (첫 번째 사원 기준)
+          const property = this.getItemProperty(item.itemName)
+          let hasChanged = false
+          let existingAmount = 0
+          let existingEffectiveDate = null
+
+          if (this.rows.length > 0) {
+            const firstRow = this.rows[0]
+            existingAmount = firstRow[property] || 0
+            existingEffectiveDate = firstRow[property + 'EffectiveDate'] || null
+          }
+
+          const newAmount = item.batchAmount
+          const newEffectiveDate = item.batchEffectiveDate || this.getCurrentDate()
+
+          // amount 또는 effectiveDate가 변경되었는지 확인
+          const amountChanged = existingAmount !== newAmount
+          const dateChanged = existingEffectiveDate !== newEffectiveDate
+
+          if (amountChanged || dateChanged) {
+            // 모든 사원에게 적용하므로 항목당 하나만 추가
+            requestData.push({
+              allowanceName: item.itemName,
+              amount: newAmount, // int 타입으로 전송
+              effectiveDate: newEffectiveDate
+            })
+            hasChanged = true
+          }
+
+          // 만약 기존 데이터가 없고 새로 추가하는 경우도 포함
+          if (!hasChanged && this.rows.length > 0) {
+            // 모든 사원을 확인하여 하나라도 해당 항목이 없는 경우 추가
+            const hasAnyEmployeeWithThisItem = this.rows.some(row => {
+              const rowProperty = this.getItemProperty(item.itemName)
+              return row[rowProperty] && row[rowProperty] > 0
+            })
+            
+            if (!hasAnyEmployeeWithThisItem && newAmount > 0) {
+              requestData.push({
+                allowanceName: item.itemName,
+                amount: newAmount, // int 타입으로 전송
+                effectiveDate: newEffectiveDate
+              })
+            }
+          }
+        })
+
+        // 변경된 항목이 없으면 종료
+        if (requestData.length === 0) {
+          this.info('변경된 항목이 없습니다.')
+          
+          // 일괄 적용 금액 초기화
+          this.itemRows.forEach(item => {
+            item.batchAmount = 0
+            item.batchAmountDisplay = ''
+            item.batchEffectiveDate = item.originalEffectiveDate || this.getCurrentDate()
+          })
+          return
+        }
+
+        // API 요청
+        await apiClient.put(
+          `/workforce-service/fixed-allowance/update-all`,
+          requestData,
+          {
+            headers: {
+              'Authorization': authHeaders['Authorization'],
+              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+            },
+            params: {
+              companyId: this.getCompanyId()
+            }
+          }
+        )
+
+        this.success(`${requestData.length}개 항목을 모든 사원에게 일괄 저장했습니다.`)
+        
+        // 저장 후 데이터 재조회
+        await this.fetchPayrollData()
+        
+        // 일괄 적용 금액 초기화
+        this.itemRows.forEach(item => {
+          item.batchAmount = 0
+          item.batchAmountDisplay = ''
+          item.batchEffectiveDate = item.originalEffectiveDate || this.getCurrentDate()
+        })
+        
+        this.itemRows = this.generateItemRows()
+        
+        // footer 너비 동기화
+        this.$nextTick(() => {
+          this.syncTableFooterWidths()
+        })
+      } catch (err) {
+        console.error('항목별 일괄 저장 실패:', err)
+        this.error('항목별 일괄 저장에 실패했습니다.')
+      } finally {
+        this.saving = false
       }
     }
   },
@@ -656,6 +1108,16 @@ export default {
   mounted() {
     // 화면 크기 변경 감지
     window.addEventListener('resize', this.handleResize)
+    // 테이블 footer 너비 동기화
+    this.$nextTick(() => {
+      this.syncTableFooterWidths()
+    })
+  },
+  updated() {
+    // 데이터 변경 시 footer 너비 동기화
+    this.$nextTick(() => {
+      this.syncTableFooterWidths()
+    })
   },
   beforeUnmount() {
     // 이벤트 리스너 제거
@@ -670,7 +1132,7 @@ export default {
 </script>
 
 <style scoped>
-.payroll-basic-info {
+.payroll-contract-info {
   padding: 20px;
 }
 
@@ -766,15 +1228,35 @@ export default {
 /* 자동 너비 조정 테이블 */
 .auto-width-table {
   width: 100% !important;
-  table-layout: auto !important;
+  table-layout: fixed !important;
+}
+
+/* 항목별 테이블의 일괄 적용 금액 입력 필드 오른쪽 정렬 */
+.auto-width-table :deep(.el-table__body .el-input .el-input__inner) {
+  text-align: right !important;
+  font-size: 12px !important;
+}
+
+.auto-width-table :deep(.el-table__body .el-date-picker .el-input__inner) {
+  font-size: 12px !important;
+}
+
+.auto-width-table :deep(.el-table__body .el-date-editor) {
+  font-size: 12px !important;
+}
+
+.auto-width-table :deep(.el-table__body .el-date-editor .el-input__inner) {
+  font-size: 12px !important;
 }
 
 .auto-width-table :deep(.el-table__body-wrapper) {
   width: 100% !important;
+  overflow-x: hidden !important;
 }
 
 .auto-width-table :deep(.el-table__header-wrapper) {
   width: 100% !important;
+  overflow-x: hidden !important;
 }
 
 .auto-width-table :deep(.el-table__body) {
@@ -919,7 +1401,7 @@ export default {
 }
 
 @media (max-width: 768px) {
-  .payroll-basic-info {
+  .payroll-contract-info {
     padding: 10px;
   }
   
@@ -983,10 +1465,24 @@ export default {
 /* 테이블 footer(tfoot) 스타일 */
 .payroll-employee-table :deep(.el-table__footer-wrapper) {
   width: 100% !important;
+  margin-top: 0 !important;
 }
 
 .payroll-employee-table :deep(.el-table__footer) {
   width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* Footer 셀 너비 강제 고정 */
+.payroll-employee-table :deep(.el-table__footer th),
+.payroll-employee-table :deep(.el-table__footer td) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payroll-employee-table :deep(.el-table__body-wrapper) {
+  margin-bottom: 0 !important;
 }
 
 .payroll-employee-table :deep(.el-table__footer th) {
@@ -996,6 +1492,7 @@ export default {
   padding: 8px 4px;
   border-bottom: 1px solid #ebeef5;
   border-right: none;
+  border-top: 1px solid #ebeef5;
   font-size: 12px;
 }
 
@@ -1003,6 +1500,49 @@ export default {
   border-right: none;
   border-bottom: 1px solid #ebeef5;
 }
+
+/* 항목별 테이블 footer 스타일 - 사원별 테이블과 동일한 스타일 적용 */
+.auto-width-table :deep(.el-table__footer-wrapper) {
+  margin-top: 0 !important;
+  width: 100% !important;
+}
+
+.auto-width-table :deep(.el-table__footer) {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.auto-width-table :deep(.el-table__body-wrapper) {
+  margin-bottom: 0 !important;
+}
+
+.auto-width-table :deep(.el-table__footer th) {
+  background-color: #fafafa;
+  font-weight: 600;
+  color: #606266;
+  padding: 8px 4px;
+  border-bottom: 1px solid #ebeef5;
+  border-right: none;
+  border-top: 1px solid #ebeef5;
+  font-size: 12px;
+}
+
+.auto-width-table :deep(.el-table__footer td) {
+  border-right: none;
+  border-bottom: 1px solid #ebeef5;
+  padding: 8px 4px;
+}
+
+/* footer 셀 너비를 헤더/바디와 일치시키기 */
+.auto-width-table :deep(.el-table__footer th),
+.auto-width-table :deep(.el-table__footer td) {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* footer 셀 너비는 JavaScript로 자동 동기화되므로 고정 너비 제거 */
 
 /* 로딩 컨테이너 스타일 */
 .loading-container {
@@ -1028,3 +1568,4 @@ export default {
   }
 }
 </style>
+
