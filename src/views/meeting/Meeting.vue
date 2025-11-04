@@ -108,6 +108,10 @@
                 @current-change="handleActivePageChange"
               />
             </div>
+            <div v-else class="no-meetings-message">
+              <el-icon><ChatLineSquare /></el-icon>
+              <p>진행 중인 회의가 없습니다.</p>
+            </div>
           </div>
         </el-tab-pane>
         
@@ -124,7 +128,7 @@
                   <div class="meeting-details">
                     <span class="meeting-time">{{ meeting.dateTimeFormatted }}</span>
                     <span class="meeting-host">주최: {{ meeting.host }}</span>
-                    <span class="meeting-participants">{{ meeting.participants }}명 초대</span>
+                    <span class="meeting-participants">참여자 : {{ meeting.participants }}명</span>
                   </div>
                   <div class="meeting-description">{{ meeting.description }}</div>
                 </div>
@@ -153,6 +157,10 @@
                 v-model:current-page="scheduledCurrentPage"
                 @current-change="handleScheduledPageChange"
               />
+            </div>
+            <div v-else class="no-meetings-message">
+              <el-icon><ChatLineSquare /></el-icon>
+              <p>예정된 회의가 없습니다.</p>
             </div>
           </div>
         </el-tab-pane>
@@ -216,6 +224,10 @@
                                 v-model:current-page="historyCurrentPage"
                 @current-change="handleHistoryPageChange"
               />
+            </div>
+            <div v-else class="no-meetings-message">
+              <el-icon><ChatLineSquare /></el-icon>
+              <p>회의 기록이 없습니다.</p>
             </div>
           </div>
         </el-tab-pane>
@@ -963,5 +975,28 @@ export default {
   display: flex;
   justify-content: center;
   margin-top: 20px;
+}
+
+.no-meetings-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  text-align: center;
+  color: #909399;
+}
+
+.no-meetings-message .el-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.no-meetings-message p {
+  margin: 0;
+  font-size: 16px;
 }
 </style>
