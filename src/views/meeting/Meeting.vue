@@ -109,7 +109,7 @@
               />
             </div>
             <div v-else class="no-meetings-message">
-              <el-icon><ChatLineSquare /></el-icon>
+              <el-icon><VideoCamera /></el-icon>
               <p>진행 중인 회의가 없습니다.</p>
             </div>
           </div>
@@ -159,7 +159,7 @@
               />
             </div>
             <div v-else class="no-meetings-message">
-              <el-icon><ChatLineSquare /></el-icon>
+              <el-icon><VideoCamera /></el-icon>
               <p>예정된 회의가 없습니다.</p>
             </div>
           </div>
@@ -226,7 +226,7 @@
               />
             </div>
             <div v-else class="no-meetings-message">
-              <el-icon><ChatLineSquare /></el-icon>
+              <el-icon><VideoCamera /></el-icon>
               <p>회의 기록이 없습니다.</p>
             </div>
           </div>
@@ -422,11 +422,11 @@ export default {
       activePageSize: 5,
       activeTotalPages: 1,
       employees: [
-        { id: 'ed723fc3-4ac9-4510-810a-4e71a7b7d6c9', name: '김민준' },
-        { id: '577bf0f7-447a-49a2-9530-dff78dc4c2a7', name: '이서준' },
-        { id: '9c8b7a6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d', name: '이지은' },
-        { id: '123e4567-e89b-12d3-a456-426614174000', name: '김영희' },
-        { id: '550e8400-e29b-41d4-a716-446655440000', name: '정수진' }
+        { id: '5659b173-2fb2-44f9-9453-17ed16d8e904', name: '김민준' },
+        { id: 'eceb4e2b-4460-47d8-a47f-37bdc8c1d9bf', name: '이서준' },
+        { id: 'ea424852-1ce8-4d60-b776-5409f86b1201', name: '최시우' },
+        { id: '077853c4-1296-489f-9844-5427b24da24e', name: '정하준' },
+        { id: '65d08963-4115-4b8e-a1ce-c8f916069e22', name: '임선우' }
       ]
     }
   },
