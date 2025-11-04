@@ -396,11 +396,14 @@
   }
 
   .main-video {
-    flex: 1;
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 10px;
+    overflow: hidden;
   }
 
   .main-video video {
@@ -418,6 +421,7 @@
     padding: 10px;
     overflow-x: auto;
     background: rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
   }
 
   .video-item {
