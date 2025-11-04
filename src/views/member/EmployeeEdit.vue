@@ -262,6 +262,7 @@
 
     <OrganizationTreeModal :visible="isOrgModalVisible" @update:visible="isOrgModalVisible = $event"
       @select="handleOrgSelect" />
+    <AddressModal v-if="isAddressModalVisible" @close="closeAddressModal" @address-selected="handleAddressSelected" />
   </div>
 </template>
 
@@ -270,6 +271,7 @@ import employeeService from '../../api/employeeService';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Delete } from '@element-plus/icons-vue';
 import OrganizationTreeModal from '@/components/common/OrganizationTreeModal.vue';
+import AddressModal from '@/components/member/AddressModal.vue';
 
 export default {
   name: 'EmployeeEdit',
@@ -277,6 +279,7 @@ export default {
     Plus,
     Delete,
     OrganizationTreeModal,
+    AddressModal,
   },
   data() {
     return {
@@ -307,6 +310,8 @@ export default {
       isOrgModalVisible: false,
       editingPositionIdentifier: null,
       newPositionCounter: 0,
+      showPostcodeModal: false,
+      isAddressModalVisible: false,
       accountStatusMapping: {
         '정상': 'AS001',
         '비활성': 'AS002',
@@ -716,29 +721,28 @@ export default {
       this.isOrgModalVisible = false;
     },
     openAddressSearch() {
-      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
-        ElMessage.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
-        return;
+      this.isAddressModalVisible = true;
+    },
+    closeAddressModal() {
+      this.isAddressModalVisible = false;
+    },
+    handleAddressSelected(data) {
+      let roadAddr = data.roadAddress;
+      let extraRoadAddr = '';
+
+      if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+        extraRoadAddr += data.bname;
       }
-      new daum.Postcode({
-        oncomplete: (data) => {
-          let roadAddr = data.roadAddress;
-          let extraRoadAddr = '';
+      if (data.buildingName !== '' && data.apartment === 'Y') {
+        extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+      }
+      if (extraRoadAddr !== '') {
+        extraRoadAddr = ' (' + extraRoadAddr + ')';
+      }
 
-          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
-            extraRoadAddr += data.bname;
-          }
-          if (data.buildingName !== '' && data.apartment === 'Y') {
-            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
-          }
-          if (extraRoadAddr !== '') {
-            extraRoadAddr = ' (' + extraRoadAddr + ')';
-          }
-
-          this.form.address = roadAddr + extraRoadAddr;
-          this.form.detailAddress = ''; // Clear detail address for new input
-        }
-      }).open();
+      this.form.address = roadAddr + extraRoadAddr;
+      this.form.detailAddress = '';
+      this.isAddressModalVisible = false;
     }
   },
   created() {
