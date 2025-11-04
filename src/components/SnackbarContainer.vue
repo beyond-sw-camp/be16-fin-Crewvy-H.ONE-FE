@@ -9,6 +9,7 @@
       :message="snackbar.message"
       :duration="snackbar.duration"
       :position="snackbar.position"
+      :action="snackbar.action" 
       @close="removeSnackbar(snackbar.id)"
     />
   </div>

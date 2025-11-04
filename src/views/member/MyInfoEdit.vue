@@ -120,24 +120,31 @@
         <el-button type="primary" @click="onSubmit">저장</el-button>
       </div>
     </el-form>
+    <AddressModal 
+      v-if="isAddressModalVisible" 
+      @close="closeAddressModal" 
+      @address-selected="handleAddressSelected" 
+    />
   </div>
 </template>
 
 <script>
 import memberService from '../../api/memberService';
 import { Edit } from '@element-plus/icons-vue';
-
+import AddressModal from '@/components/member/AddressModal.vue';
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 
 export default {
   name: 'MyInfoEdit',
   components: {
-    Edit
+    Edit,
+    AddressModal,
   },
   data() {
     return {
       defaultAvatarSvg, // Expose to template
       memberPositionList: [],
+      isAddressModalVisible: false,
       form: {
         profileUrl: '',
         phoneNumber: '',
@@ -178,29 +185,28 @@ export default {
       this.$router.push('/my-info');
     },
     openAddressSearch() {
-      if (typeof daum === 'undefined' || typeof daum.Postcode === 'undefined') {
-        this.$message.error('주소 검색 API를 불러오는 데 실패했습니다. 페이지를 새로고침 해주세요.');
-        return;
+      this.isAddressModalVisible = true;
+    },
+    closeAddressModal() {
+      this.isAddressModalVisible = false;
+    },
+    handleAddressSelected(data) {
+      let roadAddr = data.roadAddress;
+      let extraRoadAddr = '';
+
+      if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+        extraRoadAddr += data.bname;
       }
-      new daum.Postcode({
-        oncomplete: (data) => {
-          let roadAddr = data.roadAddress;
-          let extraRoadAddr = '';
+      if (data.buildingName !== '' && data.apartment === 'Y') {
+        extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+      }
+      if (extraRoadAddr !== '') {
+        extraRoadAddr = ' (' + extraRoadAddr + ')';
+      }
 
-          if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
-            extraRoadAddr += data.bname;
-          }
-          if (data.buildingName !== '' && data.apartment === 'Y') {
-            extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
-          }
-          if (extraRoadAddr !== '') {
-            extraRoadAddr = ' (' + extraRoadAddr + ')';
-          }
-
-          this.form.address = roadAddr + extraRoadAddr;
-          this.form.detailAddress = '';
-        }
-      }).open();
+      this.form.address = roadAddr + extraRoadAddr;
+      this.form.detailAddress = '';
+      this.isAddressModalVisible = false;
     },
     beforeAvatarUpload(file) {
       const isJPG = file.type === 'image/jpeg';
