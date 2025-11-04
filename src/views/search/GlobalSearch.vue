@@ -54,8 +54,12 @@
                   </div>
                   <div class="employee-list-cell email">
                     <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
-                      <el-button icon="CopyDocument" circle plain @click.stop="copyToClipboard(result.email, '이메일')" />
-                      <span class="cell-content">{{ result.email }}</span>
+                    <span class="cell-content">
+                      <div class="email-content-wrapper">
+                        <el-button icon="CopyDocument" circle plain @click.stop="copyToClipboard(result.email, '이메일')" />
+                        <span>{{ result.email }}</span>
+                      </div>
+                    </span>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell status">
@@ -130,9 +134,13 @@
               </div>
               <div class="employee-list-cell email">
                 <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.email }}
-                    <el-button icon="CopyDocument" circle plain
-                      @click.stop="copyToClipboard(result.email, '이메일')" /></span>
+                  <span class="cell-content">
+                    <div class="email-content-wrapper">
+                      <el-button icon="CopyDocument" circle plain
+                      @click.stop="copyToClipboard(result.email, '이메일')" />
+                      <span>{{ result.email }}</span>
+                    </div>
+                  </span>
                 </el-tooltip>
               </div>
               <div class="employee-list-cell status">
@@ -581,6 +589,21 @@ export default {
 .pagination-container {
   margin-top: 30px;
   text-align: center;
+}
+
+.email-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Added for centering */
+  gap: 5px; /* Adjust as needed */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-content-wrapper > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 768px) {

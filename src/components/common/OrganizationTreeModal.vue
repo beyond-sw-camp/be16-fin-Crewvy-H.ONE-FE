@@ -68,8 +68,12 @@
                     </div>
                     <div class="employee-list-cell email">
                       <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                        <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle
-                            plain @click="copyToClipboard(member.email, '이메일')" /></span>
+                        <span class="cell-content">
+                          <div class="email-content-wrapper">
+                            <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                            <span>{{ member.email || 'N/A' }}</span>
+                          </div>
+                        </span>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
@@ -126,8 +130,12 @@
                   </div>
                   <div class="employee-list-cell email">
                     <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle plain
-                          @click="copyToClipboard(member.email, '이메일')" /></span>
+                      <span class="cell-content">
+                        <div class="email-content-wrapper">
+                          <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                          <span>{{ member.email || 'N/A' }}</span>
+                        </div>
+                      </span>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
@@ -621,4 +629,20 @@ export default {
   overflow-y: hidden;
   margin-top: 15px;
 }
+
+.email-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Added for centering */
+  gap: 5px; /* Adjust as needed */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-content-wrapper > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 </style>
