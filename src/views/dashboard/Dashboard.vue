@@ -398,7 +398,7 @@ export default {
         { name: '휴가 신청', icon: 'Calendar', type: 'primary', route: '/attendance' },
         { name: '결재 요청', icon: 'Document', type: 'success', route: '/approval' },
         { name: '화상회의', icon: 'VideoCamera', type: 'info', route: '/meeting' },
-        { name: '예약', icon: 'Calendar', type: 'warning', route: '/resource' }
+        { name: '예약', icon: 'Calendar', type: 'warning', route: '/resource/reservation' }
       ]
     }
   },
