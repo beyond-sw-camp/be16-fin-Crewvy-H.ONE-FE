@@ -10,7 +10,7 @@
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
-        <el-button @click="goToTemplateList">
+        <el-button @click="goToTemplateList" v-if="hasApprovalReadPermission">
           <el-icon><Document /></el-icon>
           <span style="margin-left: 8px;">템플릿 관리</span>
         </el-button>
@@ -335,8 +335,9 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
 import apiClient from '@/api/http';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
@@ -351,6 +352,7 @@ export default {
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const router = useRouter();
+    const store = useStore();
 
     const activeTab = ref('pending');
     const showTemplateSelector = ref(false);
@@ -359,6 +361,12 @@ export default {
     const selectedStatus = ref('');
     const dateRange = ref([]);
     const showMyRequestsTable = ref(true);
+
+    // 권한 체크
+    const hasApprovalReadPermission = computed(() => {
+      const permissions = store.state.auth.permissions || [];
+      return permissions.includes('approval:READ:COMPANY');
+    });
 
     // Summary card data
     const pendingApprovals = ref(0);
@@ -647,6 +655,7 @@ export default {
       continueWriting,
       deleteTemporary,
       goToTemplateList,
+      hasApprovalReadPermission,
 
       pendingTotalPages,
       pendingCurrentPage,
