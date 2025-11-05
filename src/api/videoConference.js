@@ -70,3 +70,8 @@ export const getVideoConferenceMinutes = async (videoConferenceId) => {
   return data;
 };
 
+export const getVideoConferencePassword = async (videoConferenceId) => {
+  const { data } = await api.post(`${VC_BASE}/${videoConferenceId}/passwords`)
+  return data.data
+}
+

@@ -3,7 +3,7 @@
     <!-- 상단 헤더 -->
     <div class="header">
       <div class="header-left">
-        <div class="title">{{ title || '회의실' }}</div>
+        <div class="title">{{ title || '임시 회의' }}</div>
         <div class="subtitle">참가자 {{ participantCount }}명</div>
       </div>
       <div class="header-right">
@@ -48,9 +48,9 @@
             <el-button circle :type="screenShareActive ? 'primary' : 'default'" @click="toggleScreenShare"
               :icon="icons.Monitor" />
           </el-tooltip>
-          <!-- <el-tooltip content="설정" placement="top">
-            <el-button circle :icon="icons.Setting" @click="openSettings" />
-          </el-tooltip> -->
+          <el-tooltip content="비밀번호 발급/조회" placement="top">
+            <el-button circle :icon="icons.Key" @click="getPassword" />
+          </el-tooltip>
           <el-tooltip content="참가자" placement="top">
             <el-button circle :type="isParticipantListOpen ? 'primary' : 'default'" :icon="icons.User" @click="toggleParticipantList" />
           </el-tooltip>
@@ -85,6 +85,20 @@
           </el-input>
         </div>
       </div>
+
+      <!-- 비밀번호 모달 -->
+      <el-dialog
+        v-model="showPasswordModal"
+        title="회의 비밀번호"
+        width="400px"
+      >
+        <p>회의 ID: <strong>{{ meetingCredentials.id }}</strong></p>
+        <p>비밀번호: <strong>{{ meetingCredentials.password }}</strong></p>
+        <template #footer>
+          <el-button @click="copyAllCredentials">모두 복사</el-button>
+          <el-button type="primary" @click="showPasswordModal = false">닫기</el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -93,7 +107,7 @@
 
   import { Room, RoomEvent, Track, TrackEvent, createLocalVideoTrack, createLocalAudioTrack, createLocalScreenTracks } from 'livekit-client'
   import * as icons from '@element-plus/icons-vue'
-  import { getChatMessages, sendChatMessage } from '@/api/videoConference'
+  import { getChatMessages, sendChatMessage, getVideoConferencePassword } from '@/api/videoConference'
   import ParticipantList from '@/components/meeting/ParticipantList.vue'
 
   export default {
@@ -122,6 +136,8 @@
         mainVideoTrack: null,
         videoTracks: [],
         chatText: '',
+        showPasswordModal: false,
+        meetingCredentials: { id: '', password: '' },
         Track,
         icons,
         userInfo: {
@@ -346,6 +362,34 @@
       },
       openSettings() {
         this.$message?.info?.('설정은 추후 제공됩니다.')
+      },
+      async getPassword() {
+        if (!this.videoConferenceId) {
+          this.$message?.error?.('회의 ID를 찾을 수 없습니다.');
+          return;
+        }
+        try {
+          const res = await getVideoConferencePassword(this.videoConferenceId);
+          this.meetingCredentials = res;
+          this.showPasswordModal = true;
+        } catch (error) {
+          this.$message?.error?.('비밀번호를 가져오는데 실패했습니다.');
+          console.error(error);
+        }
+      },
+      async copyAllCredentials() {
+        const textToCopy = `회의 ID: ${this.meetingCredentials.id}\n비밀번호: ${this.meetingCredentials.password}`;
+        if (!this.meetingCredentials.id || !this.meetingCredentials.password) {
+          this.$message?.error?.('ID 또는 비밀번호를 찾을 수 없습니다.');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          this.$message?.success?.('ID와 비밀번호가 클립보드에 복사되었습니다.');
+        } catch (err) {
+          this.$message?.error?.('ID와 비밀번호 복사에 실패했습니다.');
+          console.error('Failed to copy: ', err);
+        }
       }
     }
   }

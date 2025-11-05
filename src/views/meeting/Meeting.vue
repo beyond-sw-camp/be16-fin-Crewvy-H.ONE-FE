@@ -351,7 +351,7 @@
           <el-input v-model="joinForm.meetingId" placeholder="회의 ID를 입력하세요" />
         </el-form-item>
         <el-form-item label="비밀번호">
-          <el-input v-model="joinForm.password" placeholder="비밀번호 (선택사항)" />
+          <el-input v-model="joinForm.password" placeholder="비밀번호를 입력하세요" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -706,7 +706,7 @@ export default {
         }
         const res = await joinVideoConferenceWithPassword(payload)
         this.success('회의에 참여합니다.')
-        this.openMeetingWindow(res, '', this.joinForm.meetingId)
+        this.openMeetingWindow(res, res.title, this.joinForm.meetingId)
         this.showJoinMeeting = false
         this.joinForm = { meetingId: '', password: '' }
       } catch (e) {
