@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="isModalVisible" title="직원 찾기" width="70%" @close="closeModal" top="5vh"
-    custom-class="org-employee-modal" height="70%">
+  <el-dialog ref="dialog" v-model="isModalVisible" title="직원 찾기" width="70%" @close="closeModal" top="5vh"
+    custom-class="org-employee-modal">
     <el-tabs v-model="activeTab" class="main-tabs">
       <!-- Organization Tree Tab -->
       <el-tab-pane label="조직도" name="orgTree">
@@ -194,8 +194,7 @@
 <script>
 import searchService from '@/api/searchService';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { Search, CopyDocument } from '@element-plus/icons-vue';
-import { ElSpinner } from 'element-plus';
+import { CopyDocument } from '@element-plus/icons-vue';
 
 export default {
   name: 'OrganizationTreeModal',
@@ -206,7 +205,6 @@ export default {
     },
   },
   emits: ['update:visible', 'select'],
-  components: { Search, ElSpinner },
   setup() {
     const { success, error } = useSnackbar();
     return { success, error, CopyDocument };
@@ -413,7 +411,6 @@ export default {
 
 <style>
 .el-dialog.org-employee-modal {
-  min-height: 70% !important;
   display: flex !important;
   flex-direction: column !important;
 }
@@ -455,7 +452,6 @@ export default {
 
 <style scoped>
 :deep(.org-employee-modal) {
-  min-height: 70vh !important;
   display: flex;
   flex-direction: column;
 }

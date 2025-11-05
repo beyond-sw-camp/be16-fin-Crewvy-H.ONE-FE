@@ -48,11 +48,23 @@
             </div>
           </template>
           <el-table :data="filteredEmployees" :height="tableHeight" style="width: 100%" class="employee-table">
-            <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="titleName" label="직책" width="120" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="memberStatus" label="재직상태" width="150" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="email" label="이메일" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="titleName" label="직책" width="120" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="memberStatus" label="재직상태" width="150" show-overflow-tooltip align="center">
+              <template #default="scope">
+                <el-tag
+                  :type="scope.row.memberStatus === 'WORKING' ? 'success' : (scope.row.memberStatus === 'LEAVE' ? 'warning' : (scope.row.memberStatus === 'DETACHMENT' ? 'info' : (scope.row.memberStatus === 'DELETED' ? 'danger' : 'primary')))"
+                  size="small"
+                >
+                  {{ formatMemberStatus(scope.row.memberStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="email" label="이메일" show-overflow-tooltip align="center"></el-table-column>
           </el-table>
         </el-card>
       </el-col>
@@ -134,6 +146,23 @@ watch(orgSearch, (val) => {
   orgTreeRef.value.filter(val);
 });
 
+const memberStatusEnumMapping = {
+  '재직': 'WORKING',
+  '휴직': 'LEAVE',
+  '파견': 'DETACHMENT',
+  '삭제': 'DELETED',
+};
+
+const formatMemberStatus = (status) => {
+  switch (status) {
+    case 'WORKING': return '재직';
+    case 'LEAVE': return '휴직';
+    case 'DETACHMENT': return '파견';
+    case 'DELETED': return '삭제';
+    default: return status;
+  }
+};
+
 const fetchOrganizations = async () => {
   try {
     const token = localStorage.getItem('accessToken');
@@ -163,7 +192,13 @@ const fetchAllEmployees = async () => {
         'X-User-MemberPositionId': localStorage.getItem('memberPositionId')
       }
     });
-    employees.value = response.data.data;
+    if (response.data && response.data.success) {
+      employees.value = response.data.data.map(emp => ({
+        ...emp,
+        memberStatus: memberStatusEnumMapping[emp.memberStatusName] || emp.memberStatusName, // Map to enum value
+        displayMemberStatus: emp.memberStatusName // Store original for display if needed
+      }));
+    }
   } catch (error) {
     ElMessage.error('직원 목록을 불러오는 데 실패했습니다.');
     console.error(error);
@@ -298,6 +333,8 @@ const handleNodeCollapse = (data) => {
     expandedKeys.value.splice(index, 1);
   }
 };
+
+
 
 onMounted(() => {
   fetchOrganizations();
