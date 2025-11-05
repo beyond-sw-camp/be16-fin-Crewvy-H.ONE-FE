@@ -93,6 +93,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollInsuranceDeduction',
@@ -159,25 +160,9 @@ export default {
     // 공제 항목명 목록 조회
     async fetchDeductionItems() {
       try {
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-        
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/payrollItem/deduction', {
-          params: {
-            companyId: companyId
-          },
-          headers: headers
+          headers: userHeaders
         })
         
         // API 응답에서 항목명 목록 추출
@@ -202,7 +187,6 @@ export default {
       try {
         this.loading = true
         
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
         let yearMonth = ''
         
         // inquiryPeriod를 yyyy-MM 형식으로 변환
@@ -226,24 +210,12 @@ export default {
           this.inquiryPeriod = yearMonth
         }
         
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/salary/deduction', {
           params: {
-            companyId: companyId,
             yearMonth: yearMonth
           },
-          headers: headers
+          headers: userHeaders
         })
         
         // API 응답 데이터를 컴포넌트 형식으로 변환
