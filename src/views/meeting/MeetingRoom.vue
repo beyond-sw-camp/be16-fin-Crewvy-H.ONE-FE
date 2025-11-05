@@ -22,9 +22,10 @@
           <div class="participant-name">{{ mainVideoTrack.isLocal ? '나' : (mainVideoTrack.participant ?
             mainVideoTrack.participant.identity : '') }}</div>
         </div>
-        <div class="screen-share-preview" v-if="screenShareActive && localScreenTrack">
+        <div class="screen-share-preview" v-if="screenShareActive && localScreenTrack" @mouseenter="showScreenShareCloseButton = true" @mouseleave="showScreenShareCloseButton = false">
           <video :ref="el => { if (el) localScreenTrack.attach(el) }" autoplay playsinline muted></video>
           <div class="preview-label">내 화면 공유 중</div>
+          <el-button v-if="showScreenShareCloseButton" circle :icon="icons.Close" class="screen-share-close-button" @click.stop="stopScreenShare" />
         </div>
         <div class="thumbnail-videos">
           <div v-for="track in thumbnailVideoTracks" :key="track.sid" class="video-item"
@@ -142,6 +143,7 @@
         chatPageSize: 20,
         chatHasMore: true,
         chatLoading: false,
+        showScreenShareCloseButton: false,
         Track,
         icons,
         userInfo: {
@@ -574,7 +576,6 @@
     height: 135px;
     border: 2px solid #4f46e5;
     border-radius: 8px;
-    overflow: hidden;
     background: #000;
     z-index: 100;
   }
@@ -583,6 +584,7 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+    border-radius: 6px;
   }
 
   .preview-label {
@@ -595,6 +597,28 @@
     padding: 4px;
     text-align: center;
     font-size: 12px;
+  }
+
+  .screen-share-close-button {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    padding: 0;
+    font-size: 10px;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: none;
+    border-radius: 50%;
+    z-index: 101;
+    width: 24px;
+    max-width: 24px;
+    height: 24px;
+    max-height: 24px;
+    color: #e0e0e0;
+  }
+
+  .screen-share-close-button:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #000000;
   }
 
   .controls {
