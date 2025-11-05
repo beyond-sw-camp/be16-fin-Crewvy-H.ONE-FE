@@ -64,6 +64,7 @@
           class="employee-card" 
           v-for="employee in filteredEmployees" 
           :key="employee.id"
+          @click="openEmployeeDetail(employee)"
         >
           <div class="card-header">
             <el-avatar :src="employee.avatar || defaultAvatarSvg" :size="60" />
@@ -113,7 +114,7 @@
 
       <!-- 테이블 뷰 -->
       <div v-else class="employee-table">
-        <el-table :data="filteredEmployees" style="width: 100%">
+        <el-table :data="filteredEmployees" style="width: 100%" @row-click="openEmployeeDetail">
           <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip>
             <template #default="scope">
               <div class="table-employee">
@@ -138,7 +139,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="액션" width="120">
+          <el-table-column label="수정/삭제" width="120">
             <template #default="scope">
               <div>
                 <el-button v-if="canUpdate" type="text" size="small" @click="editEmployee(scope.row)">
@@ -378,11 +379,8 @@ const fetchEmployees = async () => {
         avatar: null,
         employmentType: emp.employmentTypeName,
       }));
-    } else {
-      error(response.data.message || '직원 목록을 불러오는 데 실패했습니다.');
     }
   } catch (err) {
-    console.error(err);
     const errorMessage = err.response?.data?.message || '서버 오류가 발생했습니다.';
     error(errorMessage);
   }
@@ -429,6 +427,26 @@ const activeEmployees = computed(() => {
 });
 
 // Methods
+const openEmployeeDetail = async (employee) => {
+  await fetchEmployeeDetails(employee.id);
+};
+
+const fetchEmployeeDetails = async (employeeId) => {
+  try {
+    const response = await employeeService.getEmployeeDetails(employeeId);
+    if (response.data && response.data.success) {
+      selectedEmployee.value = response.data.data;
+      showEmployeeDetail.value = true;
+    } else {
+      error(response.data.message || '직원 상세 정보를 불러오는 데 실패했습니다.');
+    }
+  } catch (err) {
+    console.error(err);
+    const errorMessage = err.response?.data?.message || '서버 오류가 발생했습니다.';
+    error(errorMessage);
+  }
+};
+
 const goToAddEmployee = () => {
   router.push('/employee/add');
 };
@@ -525,7 +543,6 @@ const formatAccountStatus = (status) => {
 };
 
 const goToEmployeeDetailPage = (employeeId) => {
-  console.log('goToEmployeeDetailPage 호출, employeeId:', employeeId); // Add this log
   router.push(`/employee/detail/${employeeId}`);
   showEmployeeDetail.value = false; // Close the modal
 };
