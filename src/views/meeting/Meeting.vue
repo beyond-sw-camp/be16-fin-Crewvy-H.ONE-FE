@@ -256,14 +256,18 @@
           <el-select
             v-model="meetingForm.participants"
             multiple
-            placeholder="참여자를 선택하세요"
+            filterable
+            remote
+            :remote-method="searchEmployees"
+            :loading="employeeSearchLoading"
+            placeholder="참여자를 검색하여 추가하세요"
             style="width: 100%"
           >
             <el-option
-              v-for="employee in employees"
-              :key="employee.id"
+              v-for="employee in searchedEmployees"
+              :key="employee.memberId"
               :label="employee.name"
-              :value="employee.id"
+              :value="employee.memberId"
             />
           </el-select>
         </el-form-item>
@@ -300,14 +304,18 @@
           <el-select
             v-model="scheduleForm.participants"
             multiple
-            placeholder="참여자를 선택하세요"
+            filterable
+            remote
+            :remote-method="searchEmployees"
+            :loading="employeeSearchLoading"
+            placeholder="참여자를 검색하여 추가하세요"
             style="width: 100%"
           >
             <el-option
-              v-for="employee in employees"
-              :key="employee.id"
+              v-for="employee in searchedEmployees"
+              :key="employee.memberId"
               :label="employee.name"
-              :value="employee.id"
+              :value="employee.memberId"
             />
           </el-select>
         </el-form-item>
@@ -365,6 +373,7 @@ import {
   deleteVideoConference,
   joinVideoConferenceWithPassword
 } from '@/api/videoConference'
+import employeeService from '@/api/employeeService'
 
 export default {
   name: 'MeetingPage',
@@ -422,13 +431,8 @@ export default {
       activeCurrentPage: 1,
       activePageSize: 5,
       activeTotalPages: 1,
-      employees: [
-        { id: '5659b173-2fb2-44f9-9453-17ed16d8e904', name: '김민준' },
-        { id: 'eceb4e2b-4460-47d8-a47f-37bdc8c1d9bf', name: '이서준' },
-        { id: 'ea424852-1ce8-4d60-b776-5409f86b1201', name: '최시우' },
-        { id: '077853c4-1296-489f-9844-5427b24da24e', name: '정하준' },
-        { id: '65d08963-4115-4b8e-a1ce-c8f916069e22', name: '임선우' }
-      ]
+      searchedEmployees: [],
+      employeeSearchLoading: false
     }
   },
   created() {
@@ -481,10 +485,10 @@ export default {
           dateTimeFormatted: datetimeStr,
           host: m.hostName || '주최자',
           hostId: m.hostId || null, // hostId 추가
-          participants: Array.isArray(m.inviteeIdList) ? m.inviteeIdList.length : (m.inviteeCount || 0),
+          participants: m.inviteeList.length || 0,
           description: m.description || '',
           isRecording: m.isRecording === true,
-          inviteeIdList: Array.isArray(m.inviteeIdList) ? m.inviteeIdList : []
+          inviteeList: m.inviteeList
         }
       })
     },
@@ -602,10 +606,7 @@ export default {
       // 기대 포맷: YYYY-MM-DD HH:mm:ss (Element Plus value-format)
       this.scheduleForm.dateTime = dt.length === 16 ? `${dt}:00` : dt
       this.scheduleForm.recording = meet.isRecording
-      this.scheduleForm.participants = Array.isArray(meet.inviteeIdList) ? [...meet.inviteeIdList] : []
-      if (this.scheduleForm.inviteeIdList !== undefined) {
-        this.scheduleForm.inviteeIdList = Array.isArray(meet.inviteeIdList) ? [...meet.inviteeIdList] : []
-      }
+      this.scheduleForm.participants = meet.inviteeList.filter(invitee => invitee.memberId !== this.memberId) || []
       this.showScheduleMeeting = true
     },
     cancelMeeting(meet) {
@@ -780,6 +781,22 @@ export default {
     handleActivePageChange(page) {
       this.activeCurrentPage = page;
       this.loadActiveMeetings();
+    },
+    async searchEmployees(query) {
+      if (query) {
+        this.employeeSearchLoading = true;
+        try {
+          const response = await employeeService.searchEmployees(query);
+          this.searchedEmployees = response.data.data.filter(emp => emp.memberId !== this.memberId);
+        } catch (e) {
+          this.error('직원 검색에 실패했습니다.');
+          this.searchedEmployees = [];
+        } finally {
+          this.employeeSearchLoading = false;
+        }
+      } else {
+        this.searchedEmployees = [];
+      }
     }
   }
 }
