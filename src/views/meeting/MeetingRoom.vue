@@ -79,11 +79,8 @@
           </div>
         </div>
         <div class="chat-input">
-          <el-input v-model="chatText" placeholder="메시지를 입력하세요..." @keydown.enter="handleEnter">
-            <template #append>
-              <el-button type="primary" @click="sendMessage">전송</el-button>
-            </template>
-          </el-input>
+          <el-input v-model="chatText" placeholder="메시지를 입력하세요..." @keydown.enter="handleEnter" />
+          <el-button type="primary" @click="sendMessage" :icon="icons.Promotion" circle />
         </div>
       </div>
 
@@ -731,8 +728,36 @@
   }
 
   .chat-input {
+    display: flex;
+    align-items: center;
     padding: 10px;
     border-top: 1px solid #1e1f24;
+  }
+
+  .chat-input :deep(.el-input) {
+    flex: 1;
+    margin-right: 10px;
+  }
+
+  .chat-input :deep(.el-input__wrapper) {
+    background-color: #2c2c34;
+    border: 1px solid #444;
+    border-radius: 20px;
+    box-shadow: none;
+  }
+
+  .chat-input :deep(.el-input__inner) {
+    color: #e5e7eb;
+  }
+
+  .chat-input :deep(.el-button) {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+  }
+
+  .chat-input :deep(.el-button:hover) {
+    background-color: #6366f1;
+    border-color: #6366f1;
   }
 
   .password-modal .info-container {
