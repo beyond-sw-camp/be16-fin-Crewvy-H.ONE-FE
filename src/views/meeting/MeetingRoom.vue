@@ -721,6 +721,7 @@
 
   .msg .content {
     font-size: 13px;
+    word-break: break-all;
   }
 
   .msg .createdAt {
