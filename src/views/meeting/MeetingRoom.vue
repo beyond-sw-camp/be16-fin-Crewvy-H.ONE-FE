@@ -138,6 +138,10 @@
         chatText: '',
         showPasswordModal: false,
         meetingCredentials: { id: '', password: '' },
+        chatPage: 0,
+        chatPageSize: 20,
+        chatHasMore: true,
+        chatLoading: false,
         Track,
         icons,
         userInfo: {
@@ -164,8 +168,19 @@
       this.title = q.get('title') || ''
       this.videoConferenceId = q.get('vcid')
       this.join(this.videoConferenceId, token)
+
+      this.$nextTick(() => {
+        const chatBody = this.$refs.chatBody;
+        if (chatBody) {
+          chatBody.addEventListener('scroll', this.handleChatScroll);
+        }
+      });
     },
     beforeUnmount() {
+      const chatBody = this.$refs.chatBody;
+      if (chatBody) {
+        chatBody.removeEventListener('scroll', this.handleChatScroll);
+      }
       this.leaveSession()
     },
     methods: {
@@ -226,21 +241,7 @@
           this.setMainVideoTrack(this.localVideoTrack) // 내 비디오를 메인으로 설정
 
           if (this.videoConferenceId) {
-            getChatMessages(this.videoConferenceId)
-              .then((messages) => {
-                this.messages = messages
-                  .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
-                  .sort((a, b) => a.createdAt - b.createdAt)
-                  .map(m => ({ ...m, createdAt: m.createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) }));
-                this.$nextTick(() => {
-                  const el = this.$refs.chatBody;
-                  if (el) el.scrollTop = el.scrollHeight;
-                });
-              })
-              .catch((err) => {
-                console.error('채팅 기록을 불러오는데 실패했습니다.', err)
-                this.$message?.error?.('채팅 기록을 불러오지 못했습니다.')
-              })
+            this.loadInitialMessages();
           }
         } catch (e) {
           this.$message?.error?.('회의 연결에 실패했습니다.')
@@ -397,6 +398,67 @@
         } catch (err) {
           this.$message?.error?.('ID와 비밀번호 복사에 실패했습니다.');
           console.error('Failed to copy: ', err);
+        }
+      },
+      processMessages(messages) {
+        return messages
+          .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
+          .sort((a, b) => a.createdAt - b.createdAt)
+          .map(m => {
+            const isMe = m.senderId === this.userInfo.id;
+            return {
+              ...m,
+              name: isMe ? '나' : m.name,
+              createdAt: m.createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+            };
+          });
+      },
+      handleChatScroll(e) {
+        if (e.target.scrollTop === 0 && this.chatHasMore && !this.chatLoading) {
+          this.loadMoreMessages();
+        }
+      },
+      async loadInitialMessages() {
+        if (!this.videoConferenceId) return;
+        this.chatLoading = true;
+        try {
+          const res = await getChatMessages(this.videoConferenceId, 0, this.chatPageSize);
+          this.messages = this.processMessages(res.content);
+          this.chatHasMore = !res.last;
+          this.chatPage = 0;
+          this.$nextTick(() => {
+            const el = this.$refs.chatBody;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        } catch (err) {
+          console.error('채팅 기록을 불러오는데 실패했습니다.', err);
+          this.$message?.error?.('채팅 기록을 불러오지 못했습니다.');
+        } finally {
+          this.chatLoading = false;
+        }
+      },
+      async loadMoreMessages() {
+        if (!this.chatHasMore || this.chatLoading) return;
+        this.chatLoading = true;
+        this.chatPage++;
+        try {
+          const el = this.$refs.chatBody;
+          const oldScrollHeight = el.scrollHeight;
+
+          const res = await getChatMessages(this.videoConferenceId, this.chatPage, this.chatPageSize);
+          const newMessages = this.processMessages(res.content);
+          
+          this.messages = [...newMessages, ...this.messages];
+          this.chatHasMore = !res.last;
+
+          this.$nextTick(() => {
+            el.scrollTop = el.scrollHeight - oldScrollHeight;
+          });
+        } catch (err) {
+          console.error('이전 채팅 기록을 불러오는데 실패했습니다.', err);
+          this.$message?.error?.('이전 채팅 기록을 불러오지 못했습니다.');
+        } finally {
+          this.chatLoading = false;
         }
       }
     }

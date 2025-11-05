@@ -60,9 +60,10 @@ export const sendChatMessage = async (videoConferenceId, message) => {
   await api.post(`${VC_BASE}/${videoConferenceId}/messages`, message)
 }
 
-export const getChatMessages = async (videoConferenceId) => {
-  const { data } = await api.get(`${VC_BASE}/${videoConferenceId}/messages`)
-  return data.data.content
+export const getChatMessages = async (videoConferenceId, page = 0, size = 20) => {
+  const params = { page, size, sort: 'createdAt,desc' };
+  const { data } = await api.get(`${VC_BASE}/${videoConferenceId}/messages`, { params });
+  return data.data;
 }
 
 export const getVideoConferenceMinutes = async (videoConferenceId) => {
