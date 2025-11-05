@@ -751,15 +751,9 @@
   }
 
   .chat-input :deep(.el-button) {
-    background-color: #4f46e5;
-    border-color: #4f46e5;
+    background-color: primary;
+    border-color: primary;
   }
-
-  .chat-input :deep(.el-button:hover) {
-    background-color: #6366f1;
-    border-color: #6366f1;
-  }
-
   .password-modal .info-container {
     display: flex;
     flex-direction: column;
