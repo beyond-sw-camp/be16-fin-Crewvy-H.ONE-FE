@@ -10,7 +10,7 @@
     </div>
 
     <el-row :gutter="24" class="layout-row">
-      <el-col :span="8">
+      <el-col :lg="8" :md="24">
         <el-card class="org-tree-card">
           <template #header>
             <div class="card-header">
@@ -18,36 +18,29 @@
             </div>
           </template>
           <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
-          <el-tree
-            ref="orgTreeRef"
-            :data="orgTree"
-            :props="defaultProps"
-            node-key="id"
-            :default-expanded-keys="expandedKeys"
-            :expand-on-click-node="false"
-            :filter-node-method="filterNode"
-            draggable
-            :allow-drop="allowDrop"
-            @node-drop="handleNodeDrop"
-            @node-expand="handleNodeExpand"
-            @node-collapse="handleNodeCollapse"
-            @node-click="handleNodeClick"
-            class="org-tree"
-          >
+          <el-tree ref="orgTreeRef" :data="orgTree" :props="defaultProps" node-key="id"
+            :default-expanded-keys="expandedKeys" :expand-on-click-node="false" :filter-node-method="filterNode"
+            draggable :allow-drop="allowDrop" @node-drop="handleNodeDrop" @node-expand="handleNodeExpand"
+            @node-collapse="handleNodeCollapse" @node-click="handleNodeClick" class="org-tree">
             <template #default="{ node, data }">
               <div class="custom-tree-node">
                 <span>{{ node.label }}</span>
-                <span class="node-actions">
-                  <el-button size="small" type="success" plain @click.stop="openAddModal(data)">추가</el-button>
-                  <el-button size="small" plain @click.stop="openEditModal(data)">수정</el-button>
-                  <el-button size="small" type="danger" plain @click.stop="deleteNode(data)">삭제</el-button>
-                </span>
+                <el-dropdown trigger="click" @click.stop>
+                  <el-button size="small" type="text" :icon="MoreFilled" />
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="openAddModal(data)">추가</el-dropdown-item>
+                      <el-dropdown-item @click="openEditModal(data)">수정</el-dropdown-item>
+                      <el-dropdown-item @click="deleteNode(data)" divided class="delete-item">삭제</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </template>
           </el-tree>
         </el-card>
       </el-col>
-      <el-col :span="16">
+      <el-col :lg="16" :md="24">
         <el-card class="employee-list-card" ref="employeeCardRef">
           <template #header>
             <div class="card-header">
@@ -68,7 +61,8 @@
     <el-dialog v-model="dialogVisible" :title="modalTitle" width="400px" @opened="handleDialogOpened">
       <el-form :model="currentOrg" label-position="top" @submit.prevent="saveOrganization">
         <el-form-item label="조직명">
-          <el-input ref="orgNameInput" v-model="currentOrg.name" placeholder="조직의 이름을 입력하세요"></el-input> <!-- @keyup.enter 제거 -->
+          <el-input ref="orgNameInput" v-model="currentOrg.name" placeholder="조직의 이름을 입력하세요"></el-input>
+          <!-- @keyup.enter 제거 -->
         </el-form-item>
       </el-form>
       <template #footer>
@@ -85,6 +79,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { MoreFilled } from '@element-plus/icons-vue';
 
 const tableHeight = ref('400px'); // Default height
 const employeeCardRef = ref(null);
@@ -238,16 +233,19 @@ const deleteNode = (data) => {
   }).then(async () => {
     try {
       const token = localStorage.getItem('accessToken');
+      const memberId = localStorage.getItem('memberId');
+      const memberPositionId = localStorage.getItem('memberPositionId');
+
       await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/${data.id}`, {
         headers: {
-          'Authorization': token ? `Bearer ${token}` : null
+          'Authorization': token ? `Bearer ${token}` : null,
+          'X-User-UUID': memberId,
+          'X-User-MemberPositionId': memberPositionId
         }
       });
       ElMessage.success('삭제되었습니다.');
       fetchOrganizations();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || '삭제에 실패했습니다.';
-      ElMessage.error(errorMessage);
       console.error(error);
     }
   }).catch(() => {
@@ -317,9 +315,11 @@ onUnmounted(() => {
 .layout-row {
   display: flex;
 }
+
 .layout-row .el-col {
   display: flex;
 }
+
 .layout-row .el-card {
   width: 100%;
 }
@@ -364,7 +364,8 @@ onUnmounted(() => {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   background: white;
-  padding: 20px 24px; /* 내부 패딩 추가 */
+  padding: 20px 24px;
+  /* 내부 패딩 추가 */
 }
 
 .card-header {
@@ -386,21 +387,30 @@ onUnmounted(() => {
   background: transparent;
 }
 
+:deep(.org-tree-card .el-card__body) {
+  overflow-x: auto;
+}
+
+.tree-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
 .custom-tree-node {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 14px;
-  padding: 10px 8px;
+  padding-right: 8px;
 }
 
-.node-actions {
-  display: none; /* Hidden by default */
+.custom-tree-node:hover .el-dropdown {
+  opacity: 1;
 }
 
-.custom-tree-node:hover .node-actions {
-  display: inline-block; /* Show on hover */
+:deep(.el-dropdown-menu__item.delete-item) {
+  color: #f56c6c;
 }
 
 .dialog-footer {

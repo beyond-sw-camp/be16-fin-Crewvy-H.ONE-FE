@@ -261,7 +261,7 @@ export default {
     },
     orgEmployeePage(newPage) {
       if (this.currentSelectedOrgNode) {
-        this.handleOrgNodeClick(this.currentSelectedOrgNode, newPage);
+        this.handleOrgNodeClick(this.currentSelectedOrgNode, newPage, true);
       }
     },
     searchPage(newPage) {
@@ -289,9 +289,9 @@ export default {
       return data.label.indexOf(value) !== -1;
     },
 
-    async handleOrgNodeClick(data, page = 1) {
+    async handleOrgNodeClick(data, page = 1, isPageChange = false) {
       // If the same node is clicked, do nothing unless the page changes.
-      if (this.currentSelectedOrgNode && this.currentSelectedOrgNode.id === data.id && this.orgEmployeePage === page) {
+      if (!isPageChange && this.currentSelectedOrgNode && this.currentSelectedOrgNode.id === data.id && this.orgEmployeePage === page) {
         return;
       }
       this.currentSelectedOrgNode = data; // Save current node
@@ -319,6 +319,9 @@ export default {
     },
 
     async searchEmployees(page = 1) {
+      if (typeof page !== 'number') {
+        page = 1;
+      }
       if (!this.employeeSearchQuery) {
         this.employeeSearchResults = [];
         this.searchTotal = 0;
@@ -410,18 +413,14 @@ export default {
 
 <style>
 .el-dialog.org-employee-modal {
-  height: 70vh !important;
+  min-height: 70% !important;
   display: flex !important;
   flex-direction: column !important;
 }
 
-.el-dialog.org-employee-modal .el-dialog__header {
-  flex-shrink: 0 !important;
-}
-
 .el-dialog.org-employee-modal .el-dialog__body {
   flex-grow: 1 !important;
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
   padding: 0 !important;
 }
 
@@ -456,14 +455,14 @@ export default {
 
 <style scoped>
 :deep(.org-employee-modal) {
-  height: 70vh !important;
+  min-height: 70vh !important;
   display: flex;
   flex-direction: column;
 }
 
 :deep(.org-employee-modal .el-dialog__body) {
   flex-grow: 1;
-  overflow-y: hidden;
+  overflow-y: auto;
   padding: 0;
 }
 
