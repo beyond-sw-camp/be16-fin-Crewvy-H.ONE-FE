@@ -90,13 +90,32 @@
       <!-- 비밀번호 모달 -->
       <el-dialog
         v-model="showPasswordModal"
-        title="회의 비밀번호"
+        title="회의 참여 정보"
         width="400px"
+        class="password-modal"
       >
-        <p>회의 ID: <strong>{{ meetingCredentials.id }}</strong></p>
-        <p>비밀번호: <strong>{{ meetingCredentials.password }}</strong></p>
+        <div class="info-container">
+          <div class="info-item">
+            <div class="label-wrapper">
+              <label>회의 ID</label>
+              <el-button :icon="icons.CopyDocument" @click="copyId" link />
+            </div>
+            <div class="info-value-wrapper">
+              <span class="info-value">{{ meetingCredentials.id }}</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="label-wrapper">
+              <label>비밀번호</label>
+              <el-button :icon="icons.CopyDocument" @click="copyPassword" link />
+            </div>
+            <div class="info-value-wrapper">
+              <span class="info-value">{{ meetingCredentials.password }}</span>
+            </div>
+          </div>
+        </div>
         <template #footer>
-          <el-button @click="copyAllCredentials">모두 복사</el-button>
+          <el-button @click="copyAllCredentials">전체 복사</el-button>
           <el-button type="primary" @click="showPasswordModal = false">닫기</el-button>
         </template>
       </el-dialog>
@@ -402,6 +421,32 @@
           console.error('Failed to copy: ', err);
         }
       },
+      async copyId() {
+        if (!this.meetingCredentials.id) {
+          this.$message?.error?.('ID를 찾을 수 없습니다.');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(this.meetingCredentials.id);
+          this.$message?.success?.('ID가 클립보드에 복사되었습니다.');
+        } catch (err) {
+          this.$message?.error?.('ID 복사에 실패했습니다.');
+          console.error('Failed to copy ID: ', err);
+        }
+      },
+      async copyPassword() {
+        if (!this.meetingCredentials.password) {
+          this.$message?.error?.('비밀번호를 찾을 수 없습니다.');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(this.meetingCredentials.password);
+          this.$message?.success?.('비밀번호가 클립보드에 복사되었습니다.');
+        } catch (err) {
+          this.$message?.error?.('비밀번호 복사에 실패했습니다.');
+          console.error('Failed to copy password: ', err);
+        }
+      },
       processMessages(messages) {
         return messages
           .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
@@ -688,4 +733,49 @@
     padding: 10px;
     border-top: 1px solid #1e1f24;
   }
+
+  .password-modal .info-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .password-modal .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .password-modal .info-value-wrapper {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #1a1b20;
+    border: 1px solid #23242a;
+    border-radius: 6px;
+  }
+
+  .password-modal .info-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e5e7eb;
+    word-break: break-all;
+  }
+
+  .password-modal .info-item .label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .password-modal .info-item .label-wrapper label {
+    font-size: 14px;
+    color: #a3a3a3;
+    line-height: 24px;
+    width: 50px;
+  }
+
+
+
+
 </style>
