@@ -1,6 +1,6 @@
-import Meeting from '../../views/meeting/Meeting.vue'
-import MeetingRoom from '../../views/meeting/MeetingRoom.vue'
-import MeetingMinutes from '../../views/meeting/MeetingMinutes.vue'
+const Meeting = () => import('../../views/meeting/Meeting.vue')
+const MeetingRoom = () => import('../../views/meeting/MeetingRoom.vue')
+const MeetingMinutes = () => import('../../views/meeting/MeetingMinutes.vue')
 
 const routes = [
   {
