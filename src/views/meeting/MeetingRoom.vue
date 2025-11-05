@@ -232,6 +232,10 @@
                   .map(m => ({ ...m, createdAt: new Date(m.createdAt) }))
                   .sort((a, b) => a.createdAt - b.createdAt)
                   .map(m => ({ ...m, createdAt: m.createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) }));
+                this.$nextTick(() => {
+                  const el = this.$refs.chatBody;
+                  if (el) el.scrollTop = el.scrollHeight;
+                });
               })
               .catch((err) => {
                 console.error('채팅 기록을 불러오는데 실패했습니다.', err)
@@ -551,6 +555,7 @@
     background: #141519;
     color: #e5e7eb;
     width: 360px;
+    overflow: hidden;
   }
 
   .chat-header {
@@ -564,7 +569,7 @@
 
   .chat-body {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
     padding: 12px;
     display: flex;
     flex-direction: column;
