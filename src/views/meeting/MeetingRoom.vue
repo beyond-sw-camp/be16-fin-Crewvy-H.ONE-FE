@@ -38,15 +38,15 @@
         <div class="controls">
           <el-tooltip content="마이크" placement="top">
             <el-button circle :type="audioEnabled ? 'primary' : 'default'" @click="toggleAudio"
-              :icon="icons.Microphone" />
+              :icon="audioEnabled ? icons.Microphone : icons.Mute" />
           </el-tooltip>
           <el-tooltip content="카메라" placement="top">
             <el-button circle :type="videoEnabled ? 'primary' : 'default'" @click="toggleVideo"
-              :icon="icons.VideoCameraFilled" />
+              :icon="videoEnabled ? icons.VideoCameraFilled : icons.VideoPause" />
           </el-tooltip>
           <el-tooltip content="화면 공유" placement="top">
             <el-button circle :type="screenShareActive ? 'primary' : 'default'" @click="toggleScreenShare"
-              :icon="icons.Monitor" />
+              :icon="screenShareActive ? icons.Monitor : icons.VideoPause" />
           </el-tooltip>
           <el-tooltip content="비밀번호 발급/조회" placement="top">
             <el-button circle :icon="icons.Key" @click="getPassword" />
@@ -293,8 +293,12 @@
             })
             this.screenShareActive = true
           } catch (e) {
-            this.$message?.error?.('화면 공유를 시작하지 못했습니다.')
-            console.error(e)
+            if (e.name === 'NotAllowedError') {
+              console.log('Screen share cancelled by user');
+            } else {
+              this.$message?.error?.('화면 공유를 시작하지 못했습니다.');
+              console.error(e);
+            }
           }
         } else {
           this.stopScreenShare()
