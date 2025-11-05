@@ -282,7 +282,7 @@
       </template>
     </el-dialog>
 
-    <!-- 회의 일정 등록 모달 -->
+    <!-- 회의 일정 등록, 수정 모달 -->
     <el-dialog
       v-model="showScheduleMeeting"
       :title="isEditingSchedule ? '회의 일정 수정' : '회의 일정 등록'"
@@ -606,7 +606,8 @@ export default {
       // 기대 포맷: YYYY-MM-DD HH:mm:ss (Element Plus value-format)
       this.scheduleForm.dateTime = dt.length === 16 ? `${dt}:00` : dt
       this.scheduleForm.recording = meet.isRecording
-      this.scheduleForm.participants = meet.inviteeList.filter(invitee => invitee.memberId !== this.memberId) || []
+      this.scheduleForm.participants = meet.inviteeList.filter(invitee => invitee.memberId !== this.memberId).map(invitee => invitee.memberId)
+      this.searchedEmployees = meet.inviteeList
       this.showScheduleMeeting = true
     },
     cancelMeeting(meet) {
