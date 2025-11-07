@@ -76,7 +76,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import apiClient from '@/api/http';
 import draggable from 'vuedraggable';
 import { ElMessageBox, ElMessage } from 'element-plus';
@@ -106,6 +106,40 @@ export default {
     };
 
     const approvalLine = ref([]);
+
+    // 정책 데이터 가져오기
+    const fetchPolicies = async (documentId) => {
+      if (!documentId) return;
+      
+      try {
+        const response = await apiClient.get(`/workforce-service/approval/get-policies/${documentId}`);
+        const policies = response.data.data || [];
+        
+        // lineIndex 순서대로 정렬
+        const sortedPolicies = policies.sort((a, b) => a.lineIndex - b.lineIndex);
+        
+        // approvalLine에 설정
+        approvalLine.value = sortedPolicies.map(policy => ({
+          requirementType: policy.requirementType,
+          requirementId: policy.requirementId,
+          name: policy.name,
+          lineIndex: policy.lineIndex
+        }));
+      } catch (error) {
+        console.error('Failed to fetch policies:', error);
+        ElMessage({ type: 'error', message: '정책 데이터를 불러오는 데 실패했습니다.' });
+      }
+    };
+
+    // 모달이 열릴 때 정책 데이터 가져오기
+    watch([() => props.visible, () => props.documentId], ([visible, documentId]) => {
+      if (visible && documentId) {
+        fetchPolicies(documentId);
+      } else if (!visible) {
+        // 모달이 닫힐 때 approvalLine 초기화
+        approvalLine.value = [];
+      }
+    }, { immediate: true });
 
     const transformOrgData = (nodes) => {
       if (!nodes) return [];

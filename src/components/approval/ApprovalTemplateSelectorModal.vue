@@ -56,7 +56,7 @@ export default {
 
     const fetchTemplates = async () => {
       try {
-        const response = await apiClient.get('/workforce-service/approval/get-document-list');
+        const response = await apiClient.get('/workforce-service/approval/get-document-direct-list');
         templates.value = response.data.data.map(item => ({
           id: item.documentId,
           title: item.documentName,

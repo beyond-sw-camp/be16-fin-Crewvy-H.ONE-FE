@@ -16,16 +16,49 @@
               </el-form-item>
 
               <el-row v-for="(row, rowIndex) in formSchema.rows" :key="rowIndex" :gutter="20">
-                <el-col v-for="field in row" :key="field.id" :span="24 / row.length">
-                  <el-form-item :label="field.label" :required="field.required">
+                <el-col v-for="field in row" :key="field.id" :span="field.type === 'grid' ? 24 : 24 / row.length">
+                  <el-form-item v-if="field.type !== 'grid'" :label="field.label" :required="field.required">
+                    <!-- Text Input -->
                     <el-input v-if="field.type === 'text'" v-model="formData[field.id]" :placeholder="field.placeholder" readonly />
+                    <!-- Textarea -->
                     <el-input v-if="field.type === 'textarea'" type="textarea" v-model="formData[field.id]" :placeholder="field.placeholder" :rows="4" readonly />
+                    <!-- Date Picker -->
                     <el-date-picker v-if="field.type === 'date'" v-model="formData[field.id]" type="date" :placeholder="field.placeholder" style="width: 100%;" readonly />
+                    <!-- DateTime Picker -->
+                    <el-date-picker v-if="field.type === 'datetime'" v-model="formData[field.id]" type="datetime" :placeholder="field.placeholder" style="width: 100%;" readonly format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" />
+                    <!-- Number Input -->
                     <el-input-number v-if="field.type === 'number'" v-model="formData[field.id]" :placeholder="field.placeholder" style="width: 100%;" readonly />
+                    <!-- Tel Input -->
                     <el-input v-if="field.type === 'tel'" v-model="formData[field.id]" type="tel" :placeholder="field.placeholder" readonly />
+                    <!-- Select Input -->
                     <el-select v-if="field.type === 'select'" v-model="formData[field.id]" :placeholder="field.label" style="width: 100%;" disabled>
                       <el-option v-for="option in field.options" :key="option" :label="option" :value="option" />
                     </el-select>
+                  </el-form-item>
+                  <!-- Grid 필드는 별도 처리 -->
+                  <el-form-item v-if="field.type === 'grid'" :label="field.label" :required="field.required">
+                    <div class="grid-field-container">
+                      <el-table
+                        :data="formData[field.id] || []"
+                        border
+                        style="width: 100%"
+                      >
+                        <el-table-column
+                          v-for="column in field.columns"
+                          :key="column.id"
+                          :prop="column.id"
+                          :label="column.label"
+                          :width="column.type === 'number' ? '120' : column.type === 'date' ? '150' : undefined"
+                        >
+                          <template #default="scope">
+                            <span>{{ scope.row[column.id] || '-' }}</span>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                      <div v-if="!formData[field.id] || formData[field.id].length === 0" class="empty-grid">
+                        데이터가 없습니다.
+                      </div>
+                    </div>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -195,7 +228,11 @@ export default {
         if (details.document) {
             formTitle.value = details.document.documentName;
             if (details.document.metadata) {
-                formSchema.value = details.document.metadata.schema;
+                // metadata.metadata.schema 구조 확인
+                const schema = details.document.metadata.metadata?.schema || details.document.metadata.schema;
+                if (schema) {
+                    formSchema.value = schema;
+                }
             }
         }
 
@@ -452,4 +489,18 @@ export default {
 .comment-form { margin-top: 20px; }
 .comment-form-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
 .pagination-container { margin-top: 20px; display: flex; justify-content: center; }
+
+.grid-field-container {
+  width: 100%;
+}
+
+.grid-field-container .el-table {
+  margin-bottom: 10px;
+}
+
+.empty-grid {
+  text-align: center;
+  padding: 20px;
+  color: #909399;
+}
 </style>
