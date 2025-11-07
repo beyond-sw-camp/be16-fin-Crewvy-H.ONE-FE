@@ -241,7 +241,33 @@ export default {
 
     const addBlock = (blockName) => {
         if (blockName === 'leaveRule' && !policy.value.ruleDetails.leaveRule) {
-            policy.value.ruleDetails.leaveRule = { defaultDays: 0 };
+            // PTC001 (연차유급휴가)의 경우 더 상세한 초기값 설정
+            if (policy.value.typeCode === 'PTC001') {
+                policy.value.ruleDetails.leaveRule = {
+                    defaultDays: 15,
+                    accrualType: 'ACCRUAL',
+                    standardType: 'FISCAL_YEAR',
+                    baseAnnualLeaveForOverOneYear: 15,
+                    additionalAnnualLeaveRules: [],
+                    maximumAnnualLeaveLimit: 25,
+                    firstYearRule: {
+                        monthlyAccrualEnabled: true,
+                        monthlyAccrualDays: 1.0,
+                        maxAccrualFirstYear: 11
+                    },
+                    overOneYearRule: {
+                        carryOverEnabled: false,
+                        carryOverLimitDays: 0,
+                        carryOverExpirationMonths: 3
+                    },
+                    minimumRequestUnit: 'DAY',
+                    requestDeadlineDays: 1,
+                    allowRetrospectiveRequest: false
+                };
+            } else {
+                // 다른 휴가 유형은 기본 초기값
+                policy.value.ruleDetails.leaveRule = { defaultDays: 0 };
+            }
         } else if (blockName === 'workTimeRule' && !policy.value.ruleDetails.workTimeRule) {
             policy.value.ruleDetails.workTimeRule = {
                 type: 'FIXED',

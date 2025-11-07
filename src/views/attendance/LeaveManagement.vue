@@ -58,7 +58,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import * as XLSX from 'xlsx';
 import { useSnackbar } from '@/composables/useSnackbar';
 import { getLeaveBalanceStatus } from '@/api/attendance';
@@ -133,6 +133,11 @@ export default {
 
     // 컴포넌트 마운트 시 데이터 조회
     onMounted(() => {
+      fetchLeaveData();
+    });
+
+    // 다른 페이지에서 돌아왔을 때 데이터 갱신
+    onActivated(() => {
       fetchLeaveData();
     });
 

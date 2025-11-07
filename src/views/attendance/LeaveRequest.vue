@@ -91,8 +91,14 @@
                 <el-radio-button label="HALF_DAY_PM" :disabled="!isRequestUnitAllowed('HALF_DAY_PM')">오후 반차</el-radio-button>
                 <el-radio-button label="TIME_OFF" :disabled="!isRequestUnitAllowed('TIME_OFF')">시간 단위</el-radio-button>
               </el-radio-group>
-              <span v-if="selectedPolicy && selectedPolicy.allowedRequestUnits" class="form-description">
+              <span v-if="selectedPolicy && selectedPolicy.allowedRequestUnits && selectedPolicy.allowedRequestUnits.length > 0" class="form-description">
                 * 이 정책은 {{ formatAllowedUnits(selectedPolicy.allowedRequestUnits) }} 신청만 가능합니다.
+              </span>
+              <span v-else-if="selectedPolicy && (!selectedPolicy.allowedRequestUnits || selectedPolicy.allowedRequestUnits.length === 0)" class="form-description">
+                * 모든 신청 단위가 허용됩니다.
+              </span>
+              <span v-else class="form-description form-help">
+                * 휴가 종류를 먼저 선택하세요.
               </span>
             </el-form-item>
 
@@ -106,6 +112,15 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
               />
+              <el-alert
+                v-if="balanceShortageWarning"
+                :type="balanceShortageWarning.type"
+                :closable="false"
+                style="margin-top: 8px;"
+                :title="balanceShortageWarning.title"
+              >
+                {{ balanceShortageWarning.message }}
+              </el-alert>
             </el-form-item>
 
             <el-form-item v-if="requestType === 'leave' && form.requestUnit === 'TIME_OFF'" label="시간" prop="dateTimeRange" :rules="{ required: true, message: '시간을 선택하세요', trigger: 'change' }">
@@ -118,6 +133,15 @@
                 format="YYYY-MM-DD HH:mm"
                 value-format="YYYY-MM-DDTHH:mm:ss"
               />
+              <el-alert
+                v-if="balanceShortageWarning"
+                :type="balanceShortageWarning.type"
+                :closable="false"
+                style="margin-top: 8px;"
+                :title="balanceShortageWarning.title"
+              >
+                {{ balanceShortageWarning.message }}
+              </el-alert>
             </el-form-item>
 
             <el-form-item v-if="requestType === 'overtime' || requestType === 'night' || requestType === 'holiday'"
@@ -234,7 +258,7 @@ export default {
 
     const leavePolicies = computed(() =>
       allPolicies.value.filter(p =>
-        p && p.typeCode &&
+        p && p.typeCode && p.isActive &&
         (p.typeCode.includes('LEAVE') || p.typeCode.startsWith('PTC00')) &&
         p.typeCode !== 'PTC004' &&  // 육아휴직 제외
         p.typeCode !== 'PTC005'     // 가족돌봄휴가 제외
@@ -242,21 +266,22 @@ export default {
     );
     const childcarePolicies = computed(() => {
       return allPolicies.value.filter(p =>
-        p.typeCode === 'PTC004' ||  // 육아휴직
-        p.typeCode === 'PTC005'     // 가족돌봄휴가
+        p && p.isActive &&
+        (p.typeCode === 'PTC004' ||  // 육아휴직
+        p.typeCode === 'PTC005')     // 가족돌봄휴가
       );
     });
     const tripPolicies = computed(() =>
-      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC102')
+      allPolicies.value.filter(p => p && p.typeCode && p.isActive && p.typeCode === 'PTC102')
     );
     const overtimePolicies = computed(() =>
-      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC103')
+      allPolicies.value.filter(p => p && p.typeCode && p.isActive && p.typeCode === 'PTC103')
     );
     const nightWorkPolicies = computed(() =>
-      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC104')
+      allPolicies.value.filter(p => p && p.typeCode && p.isActive && p.typeCode === 'PTC104')
     );
     const holidayWorkPolicies = computed(() =>
-      allPolicies.value.filter(p => p && p.typeCode && p.typeCode === 'PTC105')
+      allPolicies.value.filter(p => p && p.typeCode && p.isActive && p.typeCode === 'PTC105')
     );
 
     // 선택된 정책 정보
@@ -389,6 +414,75 @@ export default {
       return null;
     });
 
+    // 잔액 부족 경고
+    const balanceShortageWarning = computed(() => {
+      if (!selectedPolicy.value || !form.value.policyId) return null;
+      if (requestType.value !== 'leave' && requestType.value !== 'childcare') return null;
+
+      // 선택된 정책의 잔액 정보 찾기
+      const balance = allBalances.value.find(b =>
+        b.balanceTypeCode?.codeValue === selectedPolicy.value.typeCode
+      );
+
+      if (!balance) return null;
+
+      const remaining = balance.remaining || 0;
+
+      // 예상 차감 일수 계산
+      let estimatedDays = 0;
+
+      if (form.value.requestUnit === 'TIME_OFF' && form.value.dateTimeRange?.length === 2) {
+        // 시간 단위: 시간을 일수로 환산 (8시간 = 1일)
+        const start = new Date(form.value.dateTimeRange[0]);
+        const end = new Date(form.value.dateTimeRange[1]);
+        const hours = (end - start) / (1000 * 60 * 60);
+        estimatedDays = hours / 8;
+      } else if (form.value.requestUnit === 'HALF_DAY_AM' || form.value.requestUnit === 'HALF_DAY_PM') {
+        // 반차는 0.5일
+        if (form.value.dateRange?.length === 2) {
+          const start = new Date(form.value.dateRange[0]);
+          const end = new Date(form.value.dateRange[1]);
+          const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+          estimatedDays = days * 0.5;
+        }
+      } else if (form.value.requestUnit === 'DAY' && form.value.dateRange?.length === 2) {
+        // 종일: 날짜 차이 계산
+        const start = new Date(form.value.dateRange[0]);
+        const end = new Date(form.value.dateRange[1]);
+        estimatedDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      }
+
+      // 예상 차감이 없으면 경고 없음
+      if (estimatedDays === 0) return null;
+
+      // 잔액 부족 체크
+      if (estimatedDays > remaining) {
+        return {
+          type: 'error',
+          title: '❌ 잔액 부족',
+          message: `예상 차감: ${estimatedDays.toFixed(1)}일 / 잔여: ${remaining.toFixed(1)}일 (부족: ${(estimatedDays - remaining).toFixed(1)}일)`
+        };
+      } else if (estimatedDays === remaining) {
+        return {
+          type: 'warning',
+          title: '⚠️ 잔액 전부 사용',
+          message: `예상 차감: ${estimatedDays.toFixed(1)}일 / 잔여: ${remaining.toFixed(1)}일 (신청 후 잔액: 0일)`
+        };
+      } else if (remaining - estimatedDays < 1) {
+        return {
+          type: 'warning',
+          title: '잔액 거의 소진',
+          message: `예상 차감: ${estimatedDays.toFixed(1)}일 / 잔여: ${remaining.toFixed(1)}일 (신청 후 잔액: ${(remaining - estimatedDays).toFixed(1)}일)`
+        };
+      } else {
+        return {
+          type: 'info',
+          title: '잔액 확인',
+          message: `예상 차감: ${estimatedDays.toFixed(1)}일 / 잔여: ${remaining.toFixed(1)}일 (신청 후 잔액: ${(remaining - estimatedDays).toFixed(1)}일)`
+        };
+      }
+    });
+
     watch(requestType, (newType) => {
       if (newType === 'trip' || newType === 'childcare') {
         form.value.requestUnit = 'DAY';
@@ -403,6 +497,38 @@ export default {
         // 현재 선택된 신청 단위가 허용되지 않으면 첫 번째 허용된 단위로 변경
         if (!isRequestUnitAllowed(form.value.requestUnit)) {
           form.value.requestUnit = selectedPolicy.value.allowedRequestUnits[0] || 'DAY';
+        }
+      }
+    });
+
+    // 날짜 범위 검증 (시작일 > 종료일 체크)
+    watch(() => form.value.dateRange, (newRange) => {
+      if (newRange && newRange.length === 2 && newRange[0] && newRange[1]) {
+        if (new Date(newRange[0]) > new Date(newRange[1])) {
+          error('시작일은 종료일보다 이후일 수 없습니다.');
+          form.value.dateRange = [];
+        }
+      }
+    });
+
+    // 시간 범위 검증 (시작 시각 > 종료 시각 체크 및 같은 날짜 검증)
+    watch(() => form.value.dateTimeRange, (newRange) => {
+      if (newRange && newRange.length === 2 && newRange[0] && newRange[1]) {
+        const startDateTime = new Date(newRange[0]);
+        const endDateTime = new Date(newRange[1]);
+
+        if (startDateTime >= endDateTime) {
+          error('시작 시각은 종료 시각보다 이전이어야 합니다.');
+          form.value.dateTimeRange = [];
+          return;
+        }
+
+        // 시간 단위 휴가는 같은 날짜 내에서만 가능
+        if (requestType.value === 'leave' && form.value.requestUnit === 'TIME_OFF') {
+          if (startDateTime.toDateString() !== endDateTime.toDateString()) {
+            error('시간 단위 휴가는 같은 날짜 내에서만 신청 가능합니다.');
+            form.value.dateTimeRange = [];
+          }
         }
       }
     });
@@ -592,6 +718,7 @@ export default {
       formatAllowedUnits,
       weeklyOvertimeWarning,
       splitUsageWarning,
+      balanceShortageWarning,
       childcarePolicies,
     };
   },
@@ -618,5 +745,9 @@ export default {
   margin-left: 10px;
   display: block;
   margin-top: 5px;
+}
+.form-help {
+  color: #409EFF;
+  font-style: italic;
 }
 </style>

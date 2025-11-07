@@ -81,9 +81,6 @@
           <el-menu-item index="/leave-request">
             <span>휴가/출장 신청</span>
           </el-menu-item>
-          <el-menu-item index="/shared-calendar">
-            <span>공유 캘린더</span>
-          </el-menu-item>
           <el-sub-menu index="attendance-admin">
             <template #title>
               <span>관리자 메뉴</span>
@@ -102,9 +99,6 @@
             </el-menu-item>
             <el-menu-item index="/admin/work-location-management">
               <span>근무지 관리</span>
-            </el-menu-item>
-            <el-menu-item index="/admin/audit-log">
-              <span>감사 로그</span>
             </el-menu-item>
           </el-sub-menu>
         </el-sub-menu>

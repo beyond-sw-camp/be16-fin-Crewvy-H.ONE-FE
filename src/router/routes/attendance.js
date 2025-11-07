@@ -15,12 +15,6 @@ const attendanceRoutes = [
     meta: { requiresAuth: true, title: '휴가/출장 신청' }
   },
   {
-    path: '/shared-calendar',
-    name: 'SharedCalendar',
-    component: () => import('@/views/SharedCalendar.vue'),
-    meta: { requiresAuth: true, title: '공유 캘린더' }
-  },
-  {
     path: '/admin/attendance',
     name: 'AdminAttendance',
     component: () => import('@/views/attendance/AdminAttendance.vue'),
@@ -66,12 +60,6 @@ const attendanceRoutes = [
     name: 'WorkLocationManagement',
     component: () => import('@/views/attendance/WorkLocationManagement.vue'),
     meta: { requiresAuth: true, title: '근무지 관리' }
-  },
-  {
-    path: '/admin/audit-log',
-    name: 'AuditLog',
-    component: () => import('@/views/AuditLog.vue'),
-    meta: { requiresAuth: true, title: '감사 로그' }
   }
 ];
 
