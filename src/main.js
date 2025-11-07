@@ -17,4 +17,23 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
+// Fix for ResizeObserver loop completed with undelivered notifications
+// This is a common workaround for issues with UI libraries like Element Plus
+// that use ResizeObserver, especially when elements are dynamically resized or removed.
+const debounce = (fn, delay) => {
+  let timeout = null;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(context, args), delay);
+  };
+};
+
+const _ResizeObserver = window.ResizeObserver;
+window.ResizeObserver = class ResizeObserver extends _ResizeObserver {
+  constructor(callback) {
+    super(debounce(callback, 16)); // Debounce with a delay of 16ms (approx. 1 frame at 60fps)
+  }
+};
+
 app.mount('#app')

@@ -6,9 +6,13 @@
         <p>직원 급여 계산과 관리 시스템입니다.</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="calculatePayroll">
+        <el-button type="primary" @click="goToActualCalculation">
           <el-icon><Calculator /></el-icon>
           급여 계산
+        </el-button>
+        <el-button @click="goToMockCalculation">
+          <el-icon><Setting /></el-icon>
+          급여 모의 계산
         </el-button>
         <el-button @click="exportPayroll">
           <el-icon><Download /></el-icon>
@@ -224,7 +228,7 @@ export default {
           employee: '김철수',
           department: '개발팀',
           position: '팀장',
-          avatar: 'https://via.placeholder.com/32',
+          avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%2F%3E%3C/svg%3E',
           basicSalary: 5000000,
           allowance: 500000,
           deduction: 400000,
@@ -239,7 +243,7 @@ export default {
           employee: '박민수',
           department: '개발팀',
           position: '주임',
-          avatar: 'https://via.placeholder.com/32',
+          avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%2F%3E%3C/svg%3E',
           basicSalary: 4000000,
           allowance: 300000,
           deduction: 320000,
@@ -254,7 +258,7 @@ export default {
           employee: '이지은',
           department: '개발팀',
           position: '대리',
-          avatar: 'https://via.placeholder.com/32',
+          avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%2F%3E%3C/svg%3E',
           basicSalary: 3500000,
           allowance: 200000,
           deduction: 280000,
@@ -269,7 +273,7 @@ export default {
           employee: '김영희',
           department: '디자인팀',
           position: '팀장',
-          avatar: 'https://via.placeholder.com/32',
+          avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%2F%3E%3C/svg%3E',
           basicSalary: 4500000,
           allowance: 400000,
           deduction: 360000,
@@ -284,7 +288,7 @@ export default {
           employee: '정수진',
           department: '디자인팀',
           position: '주임',
-          avatar: 'https://via.placeholder.com/32',
+          avatar: 'data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%201%201\'%20fill=\'%23ccc\'%3E%3Crect%20width=\'1\'%20height=\'1\'%2F%3E%3C/svg%3E',
           basicSalary: 3800000,
           allowance: 250000,
           deduction: 304000,
@@ -324,11 +328,11 @@ export default {
     editPayroll(payroll) {
       this.info(`${payroll.employee}님의 급여 정보를 수정합니다.`)
     },
-    calculatePayroll() {
-      this.success('급여 계산이 완료되었습니다.', {
-        title: '계산 완료',
-        duration: 3000
-      })
+    goToActualCalculation() {
+      this.$router.push('/payroll/actual-calculation')
+    },
+    goToMockCalculation() {
+      this.$router.push('/payroll/calculation')
     },
     exportPayroll() {
       this.success('급여 내보내기가 완료되었습니다.', {

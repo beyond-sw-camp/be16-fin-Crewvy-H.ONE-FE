@@ -1,9 +1,9 @@
 <template>
   <div class="dashboard">
     <!-- 환영 메시지 -->
-    <div class="welcome-section">
+    <div v-if="user" class="welcome-section">
       <div class="welcome-content">
-        <h2>안녕하세요, {{ user.name }}님!</h2>
+        <h2>안녕하세요, {{ userName }}님!</h2>
         <p>오늘도 좋은 하루 되세요. H.ONE에서 효율적인 업무를 시작해보세요.</p>
       </div>
       <div class="welcome-actions">
@@ -15,49 +15,6 @@
           <el-icon><ChatDotRound /></el-icon>
           <span style="margin-left: 8px;">채팅 시작</span>
         </el-button>
-      </div>
-    </div>
-
-    <!-- 통계 카드 -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">
-          <el-icon><User /></el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-number">156</div>
-          <div class="stat-label">전체 직원</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">
-          <el-icon><Clock /></el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-number">142</div>
-          <div class="stat-label">출근 중</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">
-          <el-icon><Calendar /></el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-number">23</div>
-          <div class="stat-label">휴가 신청</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">
-          <el-icon><Document /></el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-number">8</div>
-          <div class="stat-label">대기 결재</div>
-        </div>
       </div>
     </div>
 
@@ -104,10 +61,15 @@
             </div>
             <div class="day-events">
               <div v-if="day.events.length === 0" class="no-events">일정 없음</div>
-              <div v-else class="event-item" v-for="event in day.events" :key="event.id">
-                <div class="event-time">{{ event.time }}</div>
-                <div class="event-title">{{ event.title }}</div>
-              </div>
+              <template v-else>
+                <div class="event-item" v-for="event in day.events.slice(0, 4)" :key="event.id">
+                  <div class="event-time">{{ event.time }}</div>
+                  <div class="event-title">{{ event.title }}</div>
+                </div>
+                <div v-if="day.events.length > 4" class="more-events-indicator">
+                  +{{ day.events.length - 4 }}개 더
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -120,7 +82,10 @@
           <el-button type="text" @click="$router.push('/approval')">전체보기</el-button>
         </div>
         <div class="approval-list">
-          <div class="approval-item" v-for="approval in pendingApprovals" :key="approval.id">
+          <div v-if="pendingApprovals.length === 0" class="no-approval">
+            대기 중인 결재가 없습니다.
+          </div>
+          <div v-else class="approval-item" v-for="approval in pendingApprovals" :key="approval.id" @click="viewApprovalDetail(approval)" style="cursor: pointer;">
             <div class="approval-content">
               <div class="approval-title">{{ approval.title }}</div>
               <div class="approval-requester">{{ approval.requester }} • {{ approval.time }}</div>
@@ -136,18 +101,217 @@
       <div class="content-card">
         <div class="card-header">
           <h3>오늘의 일정</h3>
-          <el-button type="text">전체보기</el-button>
+          <el-button 
+            type="text" 
+            @click="showTodayScheduleModal = true"
+            v-if="todaySchedule.length > 0"
+          >
+            전체보기 ({{ todaySchedule.length }}개)
+          </el-button>
         </div>
         <div class="schedule-list">
-          <div class="schedule-item" v-for="schedule in todaySchedule" :key="schedule.id">
+          <div v-if="todaySchedule.length === 0" class="no-schedule">
+            오늘 예정된 일정이 없습니다.
+          </div>
+        <div 
+          v-for="schedule in todaySchedule.slice(0, 4)" 
+          :key="schedule.id" 
+          class="schedule-item"
+          :class="schedule.type"
+          @click="viewEvent(schedule)"
+          style="cursor: pointer;"
+        >
             <div class="schedule-time">{{ schedule.time }}</div>
             <div class="schedule-content">
-              <div class="schedule-title">{{ schedule.title }}</div>
-              <div class="schedule-location">{{ schedule.location }}</div>
+              <div class="schedule-title-wrapper">
+                <span class="schedule-title">{{ schedule.title }}</span>
+                <el-tag 
+                  v-if="schedule.typeName" 
+                  :type="getTagType(schedule.typeName)"
+                  size="small"
+                  class="schedule-type-tag"
+                >
+                  {{ schedule.typeName }}
+                </el-tag>
+              </div>
+              <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
             </div>
           </div>
         </div>
       </div>
+
+    <!-- 오늘의 일정 전체보기 모달 -->
+    <el-dialog 
+      v-model="showTodayScheduleModal" 
+      title="오늘의 일정"
+      width="600px"
+      class="today-schedule-modal"
+    >
+      <div class="today-schedule-list">
+        <div v-if="todaySchedule.length === 0" class="no-schedule">
+          <p>오늘 예정된 일정이 없습니다.</p>
+        </div>
+        <div 
+          v-for="schedule in todaySchedule" 
+          :key="schedule.id" 
+          class="schedule-item-full"
+          :class="schedule.type"
+          @click="viewEvent(schedule)"
+          style="cursor: pointer;"
+        >
+          <div class="schedule-time">{{ schedule.time }}</div>
+          <div class="schedule-content">
+            <div class="schedule-title-wrapper">
+              <span class="schedule-title">{{ schedule.title }}</span>
+              <el-tag 
+                v-if="schedule.typeName" 
+                :type="getTagType(schedule.typeName)"
+                size="small"
+                class="schedule-type-tag"
+              >
+                {{ schedule.typeName }}
+              </el-tag>
+            </div>
+            <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showTodayScheduleModal = false" size="large">닫기</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 일정 상세 보기 다이얼로그 -->
+    <el-dialog 
+      v-model="showEventDetailDialog" 
+      :title="eventDetailTitle" 
+      width="520px"
+      class="event-dialog"
+      :append-to-body="true"
+    >
+      <div v-if="!isEditingEvent" class="event-detail-view">
+        <div class="detail-section" v-if="selectedEvent.typeName">
+          <label class="detail-label">
+            <el-icon><Notebook /></el-icon>
+            유형
+          </label>
+          <div class="detail-content">
+            <el-tag :type="getEventTagType(selectedEvent.typeName)" size="large">
+              {{ selectedEvent.typeName }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="detail-section">
+          <label class="detail-label">
+            <el-icon><Document /></el-icon>
+            제목
+          </label>
+          <div class="detail-content">{{ selectedEvent.title }}</div>
+        </div>
+        <div class="detail-section" v-if="selectedEvent.contents">
+          <label class="detail-label">
+            <el-icon><Tickets /></el-icon>
+            상세내용
+          </label>
+          <div class="detail-content">{{ selectedEvent.contents }}</div>
+        </div>
+        <div class="detail-section">
+          <label class="detail-label">
+            <el-icon><Clock /></el-icon>
+            일정 기간
+          </label>
+          <div class="detail-content datetime-content">
+            {{ formatDateTime(selectedEvent.startDate) }} <span class="datetime-separator">~</span> {{ formatDateTime(selectedEvent.endDate) }}
+          </div>
+        </div>
+      </div>
+      <el-form v-else label-width="100px" class="event-form">
+        <el-form-item label="제목" required>
+          <el-input 
+            v-model="editEventForm.title" 
+            placeholder="일정 제목을 입력하세요"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="상세내용">
+          <el-input 
+            v-model="editEventForm.contents" 
+            type="textarea" 
+            :rows="4"
+            placeholder="일정에 대한 상세 내용을 입력하세요"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="시작 날짜" required>
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="editEventForm.startDate" 
+              type="date" 
+              placeholder="시작 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="editEventForm.startTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item label="종료 날짜" required>
+          <div style="display: flex; gap: 24px;">
+            <el-date-picker 
+              v-model="editEventForm.endDate" 
+              type="date" 
+              placeholder="종료 날짜 선택" 
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="flex: 1;"
+              :teleported="false"
+            />
+            <el-time-picker 
+              v-model="editEventForm.endTime" 
+              placeholder="시간" 
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 140px;"
+              :teleported="false"
+            />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div v-if="!isEditingEvent" class="detail-footer">
+          <div v-if="canEditEvent">
+            <el-button type="danger" @click="deleteEvent" size="large">
+              <el-icon style="margin-right: 6px;"><Delete /></el-icon>
+              삭제
+            </el-button>
+          </div>
+          <div v-else></div>
+          <div>
+            <el-button @click="showEventDetailDialog = false" size="large">닫기</el-button>
+            <el-button v-if="canEditEvent" type="primary" @click="startEditEvent" size="large">
+              <el-icon style="margin-right: 6px;"><Edit /></el-icon>
+              수정
+            </el-button>
+          </div>
+        </div>
+        <div v-else>
+          <el-button @click="cancelEditEvent" size="large">취소</el-button>
+          <el-button type="primary" @click="updateEvent" size="large">
+            <el-icon style="margin-right: 6px;"><CircleCheck /></el-icon>
+            저장
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
 
       <!-- 팀 현황 -->
       <div class="content-card">
@@ -190,60 +354,41 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapState, mapGetters } from 'vuex'
 import AttendanceChart from '@/components/AttendanceChart.vue'
+import apiClient from '@/api/http'
+import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck } from '@element-plus/icons-vue'
 
 export default {
   name: 'DashboardPage',
   components: {
-    AttendanceChart
+    AttendanceChart,
+    Notebook,
+    Document,
+    Tickets,
+    Clock,
+    Delete,
+    Edit,
+    CircleCheck
   },
   data() {
     return {
-      weeklySchedule: [
-        { date: '25', dayName: '월', events: [{ id: 1, time: '10:00', title: '주간 회의' }] },
-        { date: '26', dayName: '화', events: [] },
-        { date: '27', dayName: '수', events: [{ id: 2, time: '14:00', title: '프로젝트 A 리뷰' }, { id: 3, time: '16:00', title: '인사팀 미팅' }] },
-        { date: '28', dayName: '목', events: [] },
-        { date: '29', dayName: '금', events: [{ id: 4, time: '11:00', title: '외부 미팅' }] },
-      ],
-      pendingApprovals: [
-        {
-          id: 1,
-          title: '월간 보고서',
-          requester: '김영희',
-          time: '2시간 전',
-          priority: 'high'
-        },
-        {
-          id: 2,
-          title: '휴가 신청',
-          requester: '박민수',
-          time: '4시간 전',
-          priority: 'normal'
-        },
-        {
-          id: 3,
-          title: '비용 정산',
-          requester: '이지은',
-          time: '1일 전',
-          priority: 'normal'
-        }
-      ],
-      todaySchedule: [
-        {
-          id: 1,
-          time: '14:00',
-          title: '팀 미팅',
-          location: '회의실 A'
-        },
-        {
-          id: 2,
-          time: '16:00',
-          title: '프로젝트 리뷰',
-          location: '온라인'
-        }
-      ],
+      weeklySchedule: [],
+      pendingApprovals: [],
+      todaySchedule: [],
+      showTodayScheduleModal: false,
+      showEventDetailDialog: false,
+      selectedEvent: {},
+      isEditingEvent: false,
+      editEventForm: {
+        id: null,
+        title: '',
+        contents: '',
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: ''
+      },
       teamStats: [
         { name: '개발팀', members: 12, attendanceRate: 95 },
         { name: '디자인팀', members: 8, attendanceRate: 88 },
@@ -253,17 +398,437 @@ export default {
         { name: '휴가 신청', icon: 'Calendar', type: 'primary', route: '/attendance' },
         { name: '결재 요청', icon: 'Document', type: 'success', route: '/approval' },
         { name: '화상회의', icon: 'VideoCamera', type: 'info', route: '/meeting' },
-        { name: '예약', icon: 'Calendar', type: 'warning', route: '/resource' }
+        { name: '예약', icon: 'Calendar', type: 'warning', route: '/resource/reservation' }
       ]
     }
   },
   computed: {
-    ...mapState(['user'])
+    ...mapState(['user']),
+    ...mapGetters(['userName']),
+    eventDetailTitle() {
+      return this.isEditingEvent ? '일정 수정' : '일정 상세';
+    },
+    canEditEvent() {
+      // 개인일정만 수정/삭제 가능
+      return this.selectedEvent.typeName === '개인일정' || this.selectedEvent.type === 'personal';
+    }
   },
   methods: {
     handleQuickAction(route) {
       this.$router.push(route)
+    },
+    async fetchTodaySchedule() {
+      try {
+        const response = await apiClient.get('/workspace-service/calendar/find-my-schedule', {
+          params: {
+            searchType: 'Day'
+          }
+        })
+        
+        // 응답 구조 처리 (캘린더와 동일한 방식)
+        let scheduleData = []
+        
+        if (response.data) {
+          // 응답 구조가 { data: [...] } 형식인 경우
+          if (response.data.data && Array.isArray(response.data.data)) {
+            scheduleData = response.data.data
+          }
+          // 응답 구조가 직접 배열인 경우
+          else if (Array.isArray(response.data)) {
+            scheduleData = response.data
+          }
+        }
+        
+        // typeName을 타입으로 매핑하는 함수 (캘린더와 동일)
+        const mapTypeNameToCalendarType = (typeName) => {
+          const typeMapping = {
+            '화상회의': 'meeting',
+            '회의': 'meeting',
+            '예약': 'reservation',
+            '휴가': 'vacation',
+            '출장': 'businessTrip',
+            '개인일정': 'personal',
+            '개인': 'personal'
+          };
+          return typeMapping[typeName] || 'personal';
+        };
+        
+        this.todaySchedule = scheduleData.map((item, index) => {
+          // LocalDateTime 파싱
+          const startDateTime = item.startDate ? new Date(item.startDate) : null
+          
+          if (!startDateTime) return null
+          
+          // 시간 형식 (HH:mm)
+          const timeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
+          
+          // typeName 매핑
+          const calendarType = mapTypeNameToCalendarType(item.typeName)
+          
+          return {
+            id: item.scheduleId || index,
+            scheduleId: item.scheduleId,
+            time: timeStr,
+            title: item.title || '제목 없음',
+            contents: item.contents || '',
+            typeName: item.typeName || '',
+            type: calendarType,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            timeValue: startDateTime.getTime() // 정렬을 위한 타임스탬프
+          }
+        }).filter(item => item !== null)
+        // 시간 순서대로 정렬
+        .sort((a, b) => a.timeValue - b.timeValue)
+      } catch (error) {
+        console.error('오늘의 일정 조회 실패:', error)
+        this.todaySchedule = []
+      }
+    },
+    async fetchPendingApprovals() {
+      try {
+        // 1페이지 데이터만 요청 (page=0)
+        const response = await apiClient.get('/workforce-service/approval/find-pending-list', {
+          params: {
+            page: 0
+          }
+        })
+        
+        console.log('대기 중인 결재 API 응답:', response.data)
+        
+        let approvalData = []
+        
+        if (response.data) {
+          // 페이지네이션 구조 (결재 대기함과 동일한 구조)
+          if (response.data.data && response.data.data.content && Array.isArray(response.data.data.content)) {
+            approvalData = response.data.data.content
+          }
+          // 배열인 경우
+          else if (response.data.data && Array.isArray(response.data.data)) {
+            approvalData = response.data.data
+          }
+          else if (Array.isArray(response.data)) {
+            approvalData = response.data
+          }
+        }
+        
+        console.log('추출된 결재 데이터:', approvalData)
+        
+        // 결재 대기함 데이터 구조 참고하여 매핑 (최대 5개만 표시)
+        this.pendingApprovals = approvalData.slice(0, 5).map((item, index) => {
+          // requesterName과 requesterPosition 결합
+          let requesterText = item.requesterName || '알 수 없음'
+          if (item.requesterPosition) {
+            requesterText += ` (${item.requesterPosition})`
+          }
+          
+          return {
+            id: item.approvalId || item.id || index,
+            approvalId: item.approvalId || item.id,
+            title: item.title || '제목 없음',
+            requester: requesterText,
+            time: this.formatTimeAgo(item.createAt || item.createdAt),
+            priority: item.priority === 'high' || item.priority === '긴급' ? 'high' : 'normal'
+          }
+        })
+        
+        console.log('매핑된 결재 목록:', this.pendingApprovals)
+      } catch (error) {
+        console.error('대기 중인 결재 조회 실패:', error)
+        console.error('에러 상세:', error.response || error.message)
+        this.pendingApprovals = []
+      }
+    },
+    viewApprovalDetail(approval) {
+      if (approval.approvalId) {
+        this.$router.push(`/approval/detail/${approval.approvalId}`)
+      }
+    },
+    formatTimeAgo(dateString) {
+      if (!dateString) return '알 수 없음'
+      
+      try {
+        const now = new Date()
+        const date = new Date(dateString)
+        const diffMs = now - date
+        const diffMins = Math.floor(diffMs / 60000)
+        const diffHours = Math.floor(diffMs / 3600000)
+        const diffDays = Math.floor(diffMs / 86400000)
+        
+        if (diffMins < 1) {
+          return '방금 전'
+        } else if (diffMins < 60) {
+          return `${diffMins}분 전`
+        } else if (diffHours < 24) {
+          return `${diffHours}시간 전`
+        } else {
+          return `${diffDays}일 전`
+        }
+      } catch (error) {
+        return '알 수 없음'
+      }
+    },
+    async fetchWeeklySchedule() {
+      try {
+        const response = await apiClient.get('/workspace-service/calendar/find-my-schedule', {
+          params: {
+            searchType: 'Week'
+          }
+        })
+        
+        // 응답 구조 처리 (오늘의 일정과 동일한 방식)
+        let scheduleData = []
+        
+        if (response.data) {
+          if (response.data.data && Array.isArray(response.data.data)) {
+            scheduleData = response.data.data
+          } else if (Array.isArray(response.data)) {
+            scheduleData = response.data
+          }
+        }
+        
+        // 이번 주의 월요일부터 금요일까지 날짜 구하기
+        const today = new Date()
+        const dayOfWeek = today.getDay() // 0(일요일) ~ 6(토요일)
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // 월요일까지의 offset
+        const monday = new Date(today)
+        monday.setDate(today.getDate() + mondayOffset)
+        
+        const weekDays = ['월', '화', '수', '목', '금']
+        const weeklyData = []
+        
+        // 월~금 날짜 구조 생성
+        for (let i = 0; i < 5; i++) {
+          const currentDay = new Date(monday)
+          currentDay.setDate(monday.getDate() + i)
+          
+          const dateStr = String(currentDay.getDate()).padStart(2, '0')
+          const dateKey = `${currentDay.getFullYear()}-${String(currentDay.getMonth() + 1).padStart(2, '0')}-${String(currentDay.getDate()).padStart(2, '0')}`
+          
+          weeklyData.push({
+            date: dateStr,
+            dayName: weekDays[i],
+            dateKey: dateKey,
+            events: []
+          })
+        }
+        
+        // 일정을 날짜별로 그룹화 (startDate부터 endDate까지 모든 날짜에 표시)
+        scheduleData.forEach((item, index) => {
+          if (!item.startDate || !item.endDate) return
+          
+          const startDateTime = new Date(item.startDate)
+          const endDateTime = new Date(item.endDate)
+          
+          // 시작일과 종료일의 날짜 키 생성
+          const startDateKey = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`
+          const endDateKey = `${endDateTime.getFullYear()}-${String(endDateTime.getMonth() + 1).padStart(2, '0')}-${String(endDateTime.getDate()).padStart(2, '0')}`
+          
+          // 시작일부터 종료일까지 반복하여 각 날짜에 일정 추가
+          const currentDate = new Date(startDateTime)
+          currentDate.setHours(0, 0, 0, 0) // 시간 초기화
+          const endDate = new Date(endDateTime)
+          endDate.setHours(0, 0, 0, 0) // 시간 초기화
+          
+          while (currentDate <= endDate) {
+            const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+            
+            // 해당 날짜의 weeklyData 항목 찾기
+            const dayData = weeklyData.find(day => day.dateKey === dateKey)
+            
+            if (dayData) {
+              // 시간 표시 로직
+              let timeStr = ''
+              
+              if (dateKey === startDateKey) {
+                // 시작일인 경우: startDateTime의 시간 표시
+                timeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
+              } else {
+                // 여러 날짜에 걸쳐있고 시작일이 아닌 경우: 00:00으로 표시
+                timeStr = '00:00'
+              }
+              
+              dayData.events.push({
+                id: `${item.scheduleId || index}-${dateKey}`, // 날짜별로 고유 ID 생성
+                scheduleId: item.scheduleId,
+                time: timeStr,
+                title: item.title || '제목 없음',
+                typeName: item.typeName || '',
+                startDate: item.startDate,
+                endDate: item.endDate,
+                isMultiDay: dateKey !== startDateKey && dateKey !== endDateKey, // 중간 날짜 체크
+                isStartDate: dateKey === startDateKey,
+                isEndDate: dateKey === endDateKey
+              })
+            }
+            
+            // 다음 날로 이동
+            currentDate.setDate(currentDate.getDate() + 1)
+          }
+        })
+        
+        // 각 날짜별로 시간 순서대로 정렬
+        weeklyData.forEach(day => {
+          day.events.sort((a, b) => {
+            const timeA = new Date(a.startDate).getTime()
+            const timeB = new Date(b.startDate).getTime()
+            return timeA - timeB
+          })
+        })
+        
+        this.weeklySchedule = weeklyData
+      } catch (error) {
+        console.error('이번주 일정 조회 실패:', error)
+        // 에러 발생 시 빈 주간 구조 반환
+        const today = new Date()
+        const dayOfWeek = today.getDay()
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+        const monday = new Date(today)
+        monday.setDate(today.getDate() + mondayOffset)
+        
+        const weekDays = ['월', '화', '수', '목', '금']
+        this.weeklySchedule = []
+        
+        for (let i = 0; i < 5; i++) {
+          const currentDay = new Date(monday)
+          currentDay.setDate(monday.getDate() + i)
+          const dateStr = String(currentDay.getDate()).padStart(2, '0')
+          
+          this.weeklySchedule.push({
+            date: dateStr,
+            dayName: weekDays[i],
+            events: []
+          })
+        }
+      }
+    },
+    getEventTypeName(typeName) {
+      return typeName || '일정'
+    },
+    getTagType(typeName) {
+      const tagTypes = {
+        '화상회의': 'primary',
+        '회의': 'primary',
+        '예약': 'success',
+        '휴가': 'warning',
+        '출장': 'danger',
+        '개인일정': ''
+      };
+      return tagTypes[typeName] || '';
+    },
+    viewEvent(event) {
+      this.selectedEvent = { ...event };
+      this.isEditingEvent = false;
+      // 오늘의 일정 모달이 열려있으면 닫기
+      if (this.showTodayScheduleModal) {
+        this.showTodayScheduleModal = false;
+      }
+      this.showEventDetailDialog = true;
+    },
+    startEditEvent() {
+      // selectedEvent의 startDate, endDate는 "YYYY-MM-DDTHH:mm:ss" 형식
+      const startParts = this.selectedEvent.startDate.split('T');
+      const endParts = this.selectedEvent.endDate.split('T');
+      
+      this.editEventForm = {
+        id: this.selectedEvent.scheduleId,
+        title: this.selectedEvent.title,
+        contents: this.selectedEvent.contents || '',
+        startDate: startParts[0], // YYYY-MM-DD
+        startTime: startParts[1].substring(0, 5), // HH:mm
+        endDate: endParts[0], // YYYY-MM-DD
+        endTime: endParts[1].substring(0, 5) // HH:mm
+      };
+      this.isEditingEvent = true;
+    },
+    cancelEditEvent() {
+      this.isEditingEvent = false;
+    },
+    async updateEvent() {
+      const { id, title, contents, startDate, startTime, endDate, endTime } = this.editEventForm;
+      if (!title || !startDate || !startTime || !endDate || !endTime) {
+        this.$message.warning('필수 항목을 입력해주세요.');
+        return;
+      }
+      
+      // 날짜와 시간을 합쳐서 LocalDateTime 형식으로 변환
+      const startDateTime = `${startDate}T${startTime}:00`;
+      const endDateTime = `${endDate}T${endTime}:00`;
+      
+      if (new Date(startDateTime) > new Date(endDateTime)) {
+        this.$message.warning('종료 날짜는 시작 날짜보다 이후여야 합니다.');
+        return;
+      }
+      
+      try {
+        // PATCH 요청으로 수정
+        await apiClient.patch(`/workspace-service/calendar/update-my-schedule/${id}`, {
+          title: title,
+          contents: contents || '',
+          startDate: startDateTime,
+          endDate: endDateTime
+        });
+        
+        this.$message.success('일정이 수정되었습니다.');
+        this.showEventDetailDialog = false;
+        this.isEditingEvent = false;
+        
+        // 일정 목록 새로고침
+        await this.fetchTodaySchedule();
+      } catch (error) {
+        console.error('일정 수정 실패:', error);
+        this.$message.error('일정 수정에 실패했습니다.');
+      }
+    },
+    async deleteEvent() {
+      try {
+        await this.$confirm('정말로 이 일정을 삭제하시겠습니까?', '일정 삭제', {
+          confirmButtonText: '삭제',
+          cancelButtonText: '취소',
+          type: 'warning'
+        });
+        
+        // DELETE 요청으로 삭제
+        await apiClient.delete(`/workspace-service/calendar/delete-my-schedule/${this.selectedEvent.scheduleId}`);
+        
+        this.$message.success('일정이 삭제되었습니다.');
+        this.showEventDetailDialog = false;
+        
+        // 일정 목록 새로고침
+        await this.fetchTodaySchedule();
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('일정 삭제 실패:', error);
+          this.$message.error('일정 삭제에 실패했습니다.');
+        }
+      }
+    },
+    formatDateTime(dateTimeStr) {
+      if (!dateTimeStr) return '';
+      const date = new Date(dateTimeStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    },
+    getEventTagType(typeName) {
+      const tagTypes = {
+        '화상회의': 'primary',
+        '회의': 'primary',
+        '예약': 'success',
+        '휴가': 'warning',
+        '출장': 'danger',
+        '개인일정': ''
+      };
+      return tagTypes[typeName] || '';
     }
+  },
+  mounted() {
+    this.fetchTodaySchedule()
+    this.fetchWeeklySchedule()
+    this.fetchPendingApprovals()
   }
 }
 </script>
@@ -311,56 +876,6 @@ export default {
 
 .welcome-actions .el-button.el-button--primary:hover {
   filter: brightness(0.95);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: transform 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  color: white;
-  background: #4f46e5;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-number {
-  font-size: 24px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #606266;
 }
 
 .content-grid {
@@ -467,6 +982,10 @@ export default {
   margin-left: 4px;
 }
 
+.day-events {
+  min-height: 60px;
+}
+
 .no-events {
   text-align: center;
   color: #909399;
@@ -488,12 +1007,34 @@ export default {
   margin-right: 4px;
 }
 
+.more-events-indicator {
+  text-align: center;
+  color: #667eea;
+  font-size: 11px;
+  padding: 4px 0;
+  margin-top: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.more-events-indicator:hover {
+  color: #5568d3;
+}
+
 .chat-item, .approval-item, .schedule-item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.approval-item:hover {
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0 -12px;
 }
 
 .chat-item:last-child, .approval-item:last-child, .schedule-item:last-child {
@@ -536,24 +1077,51 @@ export default {
 }
 
 .schedule-time {
-  font-weight: 500;
+  font-weight: 600;
   color: #667eea;
   min-width: 60px;
+  font-size: 14px;
 }
 
 .schedule-content {
   flex: 1;
 }
 
-.schedule-title {
-  font-weight: 500;
-  color: #2c3e50;
+.schedule-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 4px;
 }
 
-.schedule-location {
-  font-size: 12px;
+.schedule-title {
+  font-weight: 500;
+  color: #2c3e50;
+  flex: 1;
+}
+
+.schedule-type-tag {
+  flex-shrink: 0;
+}
+
+.schedule-contents {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.4;
+}
+
+.no-schedule {
+  text-align: center;
+  padding: 40px 20px;
   color: #909399;
+  font-size: 14px;
+}
+
+.no-approval {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+  font-size: 14px;
 }
 
 .team-stats {
@@ -624,5 +1192,171 @@ export default {
 
 .action-button .el-icon {
   margin-right: 8px;
+}
+
+/* 오늘의 일정 모달 스타일 */
+.today-schedule-modal :deep(.el-dialog__header) {
+  padding: 24px 32px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.today-schedule-modal :deep(.el-dialog__title) {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.today-schedule-modal :deep(.el-dialog__body) {
+  padding: 0;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.today-schedule-list {
+  padding: 24px 32px;
+}
+
+.today-schedule-list .schedule-item-full {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.today-schedule-list .schedule-item-full:hover {
+  background: #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.today-schedule-list .schedule-time {
+  font-weight: 600;
+  color: #667eea;
+  min-width: 60px;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.today-schedule-list .schedule-content {
+  flex: 1;
+}
+
+.today-schedule-list .schedule-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.today-schedule-list .schedule-title {
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 15px;
+  flex: 1;
+}
+
+.today-schedule-list .schedule-contents {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.today-schedule-modal :deep(.el-dialog__footer) {
+  padding: 16px 32px;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+/* 일정 상세보기 모달 스타일 */
+.event-dialog :deep(.el-dialog) {
+  overflow: visible;
+}
+
+.event-dialog :deep(.el-dialog__body) {
+  padding: 24px 40px 24px 24px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.event-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.event-detail-view {
+  padding: 4px 0;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.detail-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-label .el-icon {
+  font-size: 16px;
+  color: #4f46e5;
+}
+
+.detail-content {
+  font-size: 15px;
+  color: #303133;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-left: 24px;
+}
+
+.detail-content.datetime-content {
+  font-weight: 500;
+}
+
+.datetime-separator {
+  margin: 0 8px;
+  color: #909399;
+}
+
+.detail-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.event-form {
+  padding: 4px 0;
+  overflow: visible !important;
+}
+
+.event-form :deep(.el-form-item) {
+  margin-bottom: 22px;
+  overflow: visible !important;
+}
+
+.event-form :deep(.el-dialog__body) {
+  overflow: visible !important;
 }
 </style>

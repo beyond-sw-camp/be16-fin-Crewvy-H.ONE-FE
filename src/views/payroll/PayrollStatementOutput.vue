@@ -33,9 +33,12 @@
               <el-form-item label="직원 선택">
                 <el-select v-model="selectedEmployee" placeholder="직원 선택">
                   <el-option label="전체" value="" />
-                  <el-option label="김철수" value="kim" />
-                  <el-option label="이영희" value="lee" />
-                  <el-option label="박민수" value="park" />
+                  <el-option
+                    v-for="employee in employeeList"
+                    :key="employee"
+                    :label="employee"
+                    :value="employee"
+                  />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -51,7 +54,7 @@
           </el-row>
         </div>
         
-        <el-table :data="statementData" style="width: 100%" class="statement-table">
+        <el-table :data="filteredStatementData" style="width: 100%" class="statement-table" v-loading="loading">
           <el-table-column prop="employeeName" label="직원명" min-width="120" align="center" />
           <el-table-column prop="period" label="급여 기간" min-width="120" align="center" />
           <el-table-column prop="basicSalary" label="기본급" min-width="100" align="center">
@@ -99,6 +102,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollStatementOutput',
@@ -107,76 +112,119 @@ export default {
     return { success, error, warning, info }
   },
   created() {
-    // 목업 데이터 늘리기 (총 60행)
-    const base = [...this.statementData]
-    const targetCount = 60
-    const mockNames = ['김민준','이서연','박도윤','최지우','정하준','한유진','조준서','윤예린','장수아','임시우','오태윤','서연우','신아윤','권승현','황재민','문서윤','홍지안','강유나','배민서','류하린']
-    let i = 0
-    while (this.statementData.length < targetCount) {
-      const src = base[i % base.length]
-      const idx = this.statementData.length + 1
-      const varied = {
-        employeeName: mockNames[idx % mockNames.length],
-        period: src.period,
-        basicSalary: src.basicSalary + (idx % 10) * 10000,
-        allowance: src.allowance + (idx % 6) * 5000,
-        totalIncome: src.totalIncome + (idx % 8) * 12000,
-        tax: src.tax + (idx % 7) * 3000,
-        insurance: src.insurance + (idx % 5) * 2000,
-        netPay: src.netPay + (idx % 9) * 8000,
-        status: src.status
-      }
-      this.statementData.push(varied)
-      i++
-    }
+    // 초기 데이터 로드
+    this.loadStatementData()
   },
   data() {
+    // 초기값: 당월 설정
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
     return {
-      statementPeriod: new Date(),
+      statementPeriod: currentYearMonth,
       selectedEmployee: '',
       outputFormat: 'pdf',
-      statementData: [
-        {
-          employeeName: '김철수',
-          period: '2024-09',
-          basicSalary: 3000000,
-          allowance: 200000,
-          totalIncome: 3350000,
-          tax: 335000,
-          insurance: 268000,
-          netPay: 2747000,
-          status: '완료'
-        },
-        {
-          employeeName: '이영희',
-          period: '2024-09',
-          basicSalary: 2800000,
-          allowance: 300000,
-          totalIncome: 3200000,
-          tax: 320000,
-          insurance: 256000,
-          netPay: 2624000,
-          status: '완료'
-        },
-        {
-          employeeName: '박민수',
-          period: '2024-09',
-          basicSalary: 2500000,
-          allowance: 150000,
-          totalIncome: 2700000,
-          tax: 270000,
-          insurance: 216000,
-          netPay: 2214000,
-          status: '완료'
-        }
-      ]
+      statementData: [],
+      loading: false
+    }
+  },
+  computed: {
+    // 필터링된 데이터
+    filteredStatementData() {
+      let filtered = [...this.statementData]
+      
+      // 직원 필터링
+      if (this.selectedEmployee && this.selectedEmployee !== '') {
+        filtered = filtered.filter(item => item.employeeName === this.selectedEmployee)
+      }
+      
+      return filtered
+    },
+    
+    // 직원 목록 (동적으로 생성)
+    employeeList() {
+      const employees = [...new Set(this.statementData.map(item => item.employeeName).filter(Boolean))]
+      return employees.sort()
     }
   },
   methods: {
-    generateStatement() {
-      this.success('급여 명세서가 생성되었습니다.')
+    // 급여 명세서 데이터 로드
+    async loadStatementData() {
+      try {
+        this.loading = true
+        
+        let yearMonth = ''
+        
+        // 조회기간을 yyyy-MM 형식으로 변환
+        if (this.statementPeriod && this.statementPeriod !== null && this.statementPeriod !== '') {
+          if (typeof this.statementPeriod === 'string') {
+            yearMonth = this.statementPeriod
+          } else {
+            const date = new Date(this.statementPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+          this.statementPeriod = yearMonth
+        }
+        
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get('/workforce-service/salary/statement', {
+          params: {
+            yearMonth: yearMonth
+          },
+          headers: userHeaders
+        })
+        
+        const apiData = response.data?.data || response.data || []
+        
+        // API 응답을 컴포넌트 형식으로 변환
+        this.statementData = apiData.map(item => {
+          // salaryPeriod가 YearMonth 객체인 경우 처리
+          let period = ''
+          if (item.salaryPeriod) {
+            if (typeof item.salaryPeriod === 'string') {
+              period = item.salaryPeriod
+            } else if (item.salaryPeriod.year && item.salaryPeriod.month) {
+              const year = item.salaryPeriod.year
+              const month = String(item.salaryPeriod.month).padStart(2, '0')
+              period = `${year}-${month}`
+            } else {
+              period = item.salaryPeriod.toString()
+            }
+          }
+          
+          return {
+            employeeName: item.memberName || '',
+            period: period,
+            basicSalary: item.basePay || 0,
+            allowance: item.allowance || 0,
+            totalIncome: item.totalPayment || 0,
+            tax: item.incomeTax || 0,
+            insurance: item.fourInsurances || 0,
+            netPay: item.netPay || 0,
+            status: item.status || '완료'
+          }
+        })
+        
+        this.success('급여 명세서 데이터를 조회했습니다.')
+      } catch (err) {
+        console.error('급여 명세서 데이터 조회 실패:', err)
+        this.error('급여 명세서 데이터를 불러오는데 실패했습니다.')
+        this.statementData = []
+      } finally {
+        this.loading = false
+      }
     },
+    
     printStatement() {
+      this.loadStatementData()
       this.success('명세서 인쇄가 시작되었습니다.')
     },
     // PDF 명세서 생성
@@ -204,7 +252,7 @@ export default {
           
           <div style="margin-bottom: 20px;">
             <p style="margin: 5px 0; font-size: 14px;">명세서 생성일: ${new Date().toLocaleDateString()}</p>
-            <p style="margin: 5px 0; font-size: 14px;">총 직원 수: ${this.statementData.length}명</p>
+            <p style="margin: 5px 0; font-size: 14px;">총 직원 수: ${this.filteredStatementData.length}명</p>
           </div>
           
           <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
@@ -222,7 +270,7 @@ export default {
               </tr>
             </thead>
             <tbody>
-              ${this.statementData.map((item, index) => `
+              ${this.filteredStatementData.map((item, index) => `
                 <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
                   <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.employeeName}</td>
                   <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.period}</td>
@@ -297,7 +345,7 @@ export default {
         ]
         
         // 데이터 행 추가
-        this.statementData.forEach(item => {
+        this.filteredStatementData.forEach(item => {
           worksheetData.push([
             item.employeeName,
             item.period,
@@ -376,6 +424,23 @@ export default {
   padding: 20px;
   background: #f8f9fa;
   border-radius: 8px;
+}
+
+.statement-filters :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.statement-filters :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.statement-filters :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 8px;
+}
+
+.statement-filters :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .statement-table {

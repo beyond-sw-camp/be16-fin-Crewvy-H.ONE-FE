@@ -1,0 +1,456 @@
+<template>
+  <div class="organizationView-page">
+    <div class="page-header">
+      <div class="header-content">
+        <h1>조직 관리</h1>
+      </div>
+      <div class="header-actions">
+        <!-- 필요한 경우 여기에 버튼을 추가할 수 있습니다. -->
+      </div>
+    </div>
+
+    <el-row :gutter="24" class="layout-row">
+      <el-col :lg="8" :md="24">
+        <el-card class="org-tree-card">
+          <template #header>
+            <div class="card-header">
+              <span>조직도</span>
+            </div>
+          </template>
+          <el-input v-model="orgSearch" placeholder="조직 검색" clearable class="search-input" />
+          <el-tree ref="orgTreeRef" :data="orgTree" :props="defaultProps" node-key="id"
+            :default-expanded-keys="expandedKeys" :expand-on-click-node="false" :filter-node-method="filterNode"
+            draggable :allow-drop="allowDrop" @node-drop="handleNodeDrop" @node-expand="handleNodeExpand"
+            @node-collapse="handleNodeCollapse" @node-click="handleNodeClick" class="org-tree">
+            <template #default="{ node, data }">
+              <div class="custom-tree-node">
+                <span>{{ node.label }}</span>
+                <el-dropdown trigger="click" @click.stop>
+                  <el-button size="small" type="text" :icon="MoreFilled" />
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="openAddModal(data)">추가</el-dropdown-item>
+                      <el-dropdown-item @click="openEditModal(data)">수정</el-dropdown-item>
+                      <el-dropdown-item @click="deleteNode(data)" divided class="delete-item">삭제</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
+            </template>
+          </el-tree>
+        </el-card>
+      </el-col>
+      <el-col :lg="16" :md="24">
+        <el-card class="employee-list-card" ref="employeeCardRef">
+          <template #header>
+            <div class="card-header">
+              <span>{{ selectedOrganization ? selectedOrganization.name : '전체 직원' }}</span>
+            </div>
+          </template>
+          <el-table :data="filteredEmployees" :height="tableHeight" style="width: 100%" class="employee-table">
+            <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="titleName" label="직책" width="120" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="phoneNumber" label="연락처" width="150" show-overflow-tooltip
+              align="center"></el-table-column>
+            <el-table-column prop="memberStatus" label="재직상태" width="150" show-overflow-tooltip align="center">
+              <template #default="scope">
+                <el-tag
+                  :type="scope.row.memberStatus === 'WORKING' ? 'success' : (scope.row.memberStatus === 'LEAVE' ? 'warning' : (scope.row.memberStatus === 'DETACHMENT' ? 'info' : (scope.row.memberStatus === 'DELETED' ? 'danger' : 'primary')))"
+                  size="small"
+                >
+                  {{ formatMemberStatus(scope.row.memberStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="email" label="이메일" show-overflow-tooltip align="center"></el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-dialog v-model="dialogVisible" :title="modalTitle" width="400px" @opened="handleDialogOpened">
+      <el-form :model="currentOrg" label-position="top" @submit.prevent="saveOrganization">
+        <el-form-item label="조직명">
+          <el-input ref="orgNameInput" v-model="currentOrg.name" placeholder="조직의 이름을 입력하세요"></el-input>
+          <!-- @keyup.enter 제거 -->
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">취소</el-button>
+          <el-button type="primary" @click="saveOrganization">저장</el-button>
+        </span>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import axios from 'axios';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { MoreFilled } from '@element-plus/icons-vue';
+
+const tableHeight = ref('400px'); // Default height
+const employeeCardRef = ref(null);
+
+const updateTableHeight = async () => {
+  await nextTick(); // Wait for DOM to be updated
+  if (employeeCardRef.value) {
+    const cardElement = employeeCardRef.value.$el;
+    const headerElement = cardElement.querySelector('.el-card__header');
+    const headerHeight = headerElement ? headerElement.offsetHeight : 0;
+    const cardPadding = 40; // el-card__body has 20px padding top/bottom
+    const calculatedHeight = cardElement.clientHeight - headerHeight - cardPadding;
+    tableHeight.value = calculatedHeight > 0 ? `${calculatedHeight}px` : '400px';
+  }
+};
+
+const orgSearch = ref('');
+const orgTree = ref([]);
+const defaultProps = { children: 'children', label: 'name' };
+const dialogVisible = ref(false);
+const isEdit = ref(false);
+const currentOrg = reactive({ id: null, name: '' });
+const parentNode = ref(null);
+const expandedKeys = ref([]);
+const orgTreeRef = ref(null);
+const orgNameInput = ref(null);
+const selectedOrganization = ref(null);
+const employees = ref([]);
+
+const filteredEmployees = computed(() => {
+  if (!selectedOrganization.value) {
+    return employees.value;
+  }
+  return employees.value.filter(emp => emp.organizationName === selectedOrganization.value.name);
+});
+
+const filterNode = (value, data) => {
+  if (!value) return true;
+  return data.name.toLowerCase().includes(value.toLowerCase());
+};
+
+const modalTitle = computed(() => (isEdit.value ? '조직 수정' : '조직 추가'));
+
+// 모달이 열릴 때 입력 필드에 포커스
+const handleDialogOpened = () => {
+  if (orgNameInput.value) {
+    orgNameInput.value.focus();
+  }
+};
+
+watch(orgSearch, (val) => {
+  orgTreeRef.value.filter(val);
+});
+
+const memberStatusEnumMapping = {
+  '재직': 'WORKING',
+  '휴직': 'LEAVE',
+  '파견': 'DETACHMENT',
+  '삭제': 'DELETED',
+};
+
+const formatMemberStatus = (status) => {
+  switch (status) {
+    case 'WORKING': return '재직';
+    case 'LEAVE': return '휴직';
+    case 'DETACHMENT': return '파견';
+    case 'DELETED': return '삭제';
+    default: return status;
+  }
+};
+
+const fetchOrganizations = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/list`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : null
+      }
+    });
+    orgTree.value = response.data.data;
+
+    if (orgTree.value.length > 0 && expandedKeys.value.length === 0) {
+      expandedKeys.value = [orgTree.value[0].id];
+    }
+  } catch (error) {
+    ElMessage.error('조직도 데이터를 불러오는 데 실패했습니다.');
+    console.error(error);
+  }
+};
+
+const fetchAllEmployees = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/list`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : null,
+        'X-User-UUID': localStorage.getItem('memberId'),
+        'X-User-MemberPositionId': localStorage.getItem('memberPositionId')
+      }
+    });
+    if (response.data && response.data.success) {
+      employees.value = response.data.data.map(emp => ({
+        ...emp,
+        memberStatus: memberStatusEnumMapping[emp.memberStatusName] || emp.memberStatusName, // Map to enum value
+        displayMemberStatus: emp.memberStatusName // Store original for display if needed
+      }));
+    }
+  } catch (error) {
+    ElMessage.error('직원 목록을 불러오는 데 실패했습니다.');
+    console.error(error);
+  }
+};
+
+const handleNodeClick = (data) => {
+  selectedOrganization.value = data;
+};
+
+const openAddModal = (data) => {
+  isEdit.value = false;
+  parentNode.value = data;
+  currentOrg.id = null;
+  currentOrg.name = '';
+  dialogVisible.value = true;
+};
+
+const openEditModal = (data) => {
+  isEdit.value = true;
+  parentNode.value = null;
+  Object.assign(currentOrg, data);
+  dialogVisible.value = true;
+};
+
+const saveOrganization = async () => {
+  if (!currentOrg.name) {
+    ElMessage.error('조직명을 입력해주세요.');
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('accessToken');
+    const headers = { 'Authorization': token ? `Bearer ${token}` : null };
+
+    if (isEdit.value) {
+      await axios.put(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/${currentOrg.id}`,
+        { name: currentOrg.name },
+        { headers }
+      );
+      ElMessage.success('조직이 수정되었습니다.');
+    } else {
+      const parentId = parentNode.value ? parentNode.value.id : null;
+      if (!parentId) {
+        ElMessage.error('최상위 조직은 하나만 존재할 수 있습니다.');
+        return;
+      }
+      await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/create`,
+        { parentId: parentId, name: currentOrg.name },
+        { headers }
+      );
+      ElMessage.success('새로운 조직이 추가되었습니다.');
+    }
+    dialogVisible.value = false;
+    fetchOrganizations();
+  } catch (error) {
+    ElMessage.error('작업에 실패했습니다.');
+    console.error(error);
+  }
+};
+
+const deleteNode = (data) => {
+  ElMessageBox.confirm(`'${data.name}' 을 삭제하시겠습니까?`, '경고', {
+    confirmButtonText: '삭제',
+    cancelButtonText: '취소',
+    type: 'warning',
+  }).then(async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const memberId = localStorage.getItem('memberId');
+      const memberPositionId = localStorage.getItem('memberPositionId');
+
+      await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/${data.id}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : null,
+          'X-User-UUID': memberId,
+          'X-User-MemberPositionId': memberPositionId
+        }
+      });
+      ElMessage.success('삭제되었습니다.');
+      fetchOrganizations();
+    } catch (error) {
+      console.error(error);
+    }
+  }).catch(() => {
+    ElMessage.info('삭제가 취소되었습니다.');
+  });
+};
+
+const allowDrop = (draggingNode, dropNode, type) => {
+  if (dropNode.data.parent === null) {
+    return type !== 'inner';
+  }
+  if (draggingNode.data.parent === null) {
+    return false;
+  }
+  return true;
+};
+
+const handleNodeDrop = async (draggingNode, dropNode, dropType) => {
+  let parent = dropNode.parent;
+  if (dropType === 'inner') {
+    parent = dropNode;
+  }
+
+  const children = parent.childNodes.map(node => node.data.id);
+
+  try {
+    const token = localStorage.getItem('accessToken');
+    await axios.put(`${process.env.VUE_APP_API_BASE_URL}/member-service/organization/reorder`, { idList: children }, { // ReorderReq DTO 형식에 맞춰 변경
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : null
+      }
+    });
+    ElMessage.success('조직 순서가 변경되었습니다.');
+    fetchOrganizations(); // 성공 시에도 데이터를 다시 불러와서 동기화
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || '조직 순서 변경에 실패했습니다.';
+    ElMessage.error(errorMessage);
+    console.error(error);
+    fetchOrganizations(); // 실패 시 드래그-드롭된 노드를 원위치로 되돌리기 위해 다시 불러옴
+  }
+};
+
+const handleNodeExpand = (data) => {
+  expandedKeys.value.push(data.id);
+};
+
+const handleNodeCollapse = (data) => {
+  const index = expandedKeys.value.indexOf(data.id);
+  if (index > -1) {
+    expandedKeys.value.splice(index, 1);
+  }
+};
+
+
+
+onMounted(() => {
+  fetchOrganizations();
+  fetchAllEmployees();
+  updateTableHeight();
+  window.addEventListener('resize', updateTableHeight);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateTableHeight);
+});
+</script>
+
+<style scoped>
+.layout-row {
+  display: flex;
+}
+
+.layout-row .el-col {
+  display: flex;
+}
+
+.layout-row .el-card {
+  width: 100%;
+}
+
+.organizationView-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.header-content h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.org-tree-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: white;
+  padding: 20px 24px;
+  /* 내부 패딩 추가 */
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.search-input {
+  margin-bottom: 16px;
+}
+
+.org-tree {
+  background: transparent;
+}
+
+:deep(.org-tree-card .el-card__body) {
+  overflow-x: auto;
+}
+
+.tree-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.custom-tree-node {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  padding-right: 8px;
+}
+
+.custom-tree-node:hover .el-dropdown {
+  opacity: 1;
+}
+
+:deep(.el-dropdown-menu__item.delete-item) {
+  color: #f56c6c;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+</style>

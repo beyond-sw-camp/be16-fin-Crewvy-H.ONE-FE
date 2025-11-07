@@ -8,41 +8,54 @@
       <template #header>
         <div class="card-header">
           <span>직급 목록</span>
-          <el-button type="primary" @click="openAddModal">
-            <el-icon style="margin-right: 8px"><Plus /></el-icon> 새로운 직급 추가
-          </el-button>
+          <div>
+            <el-switch v-if="canDeleteGrade" v-model="showDeleted" inline-prompt active-text="삭제 포함" inactive-text="삭제 제외" style="margin-right: 16px;"/>
+            <el-button type="primary" @click="openAddModal" v-if="canCreateGrade">
+              <el-icon style="margin-right: 8px">
+                <Plus />
+              </el-icon> 새로운 직급 추가
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="grades" style="width: 100%" v-loading="loading">
-        <el-table-column prop="name" label="직급명" width="180" />
-        <el-table-column prop="description" label="설명" />
-        <el-table-column prop="employeeCount" label="인원" width="100">
+      <el-table :data="filteredGrade" style="width: 100%" row-key="id" v-loading="loading" ref="tableRef" class="grade-table">
+        <el-table-column label="" width="50">
+          <template #default>
+            <div class="drag-handle">
+              <el-icon>
+                <Grid />
+              </el-icon>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="순서" width="80">
           <template #default="scope">
-            <span>{{ scope.row.employeeCount }}명</span>
+            <span>{{ scope.$index + 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="직급명"></el-table-column>
+        <el-table-column label="상태" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.ynDel === true ? 'danger' : 'success'" disable-transitions>
+              {{ scope.row.ynDel === true ? '삭제됨' : '사용중' }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="액션" width="150">
           <template #default="scope">
-            <el-button size="small" @click="openEditModal(scope.row)">수정</el-button>
-            <el-button size="small" type="danger" @click="deleteGrade(scope.row)">삭제</el-button>
+            <el-button size="small" @click="openEditModal(scope.row)" v-if="canUpdateGrade && !scope.row.ynDel">수정</el-button>
+            <el-button size="small" type="danger" @click="deleteGrade(scope.row)" v-if="canDeleteGrade && !scope.row.ynDel">삭제</el-button>
+            <el-button size="small" @click="restoreGrade(scope.row)" v-if="canDeleteGrade && scope.row.ynDel">복원</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="modalTitle" width="500px">
-      <el-form :model="currentGrade" label-position="top">
+    <el-dialog v-model="dialogVisible" :title="modalTitle" width="500px" @opened="handleDialogOpened">
+      <el-form :model="currentGrade" label-position="top" @submit.prevent="saveGrade">
         <el-form-item label="직급명">
-          <el-input v-model="currentGrade.name" placeholder="예: 사원, 대리, 과장"></el-input>
-        </el-form-item>
-        <el-form-item label="설명">
-          <el-input 
-            type="textarea"
-            :rows="3"
-            v-model="currentGrade.description"
-            placeholder="직급에 대한 설명을 입력하세요."
-          ></el-input>
+          <el-input ref="gradeNameInput" v-model="currentGrade.name" placeholder="예: 사원, 대리, 과장"></el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -55,98 +68,211 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'GradeManagement',
-  data() {
-    return {
-      loading: false,
-      grades: [
-        { id: 1, name: '사원', description: '회사의 기본 구성원입니다.', employeeCount: 8 },
-        { id: 2, name: '주임', description: '실무 경험을 갖춘 구성원입니다.', employeeCount: 5 },
-        { id: 3, name: '대리', description: '중간 관리자 역할을 수행합니다.', employeeCount: 4 },
-        { id: 4, name: '과장', description: '팀의 핵심 실무를 담당합니다.', employeeCount: 3 },
-        { id: 5, name: '차장', description: '부서의 주요 의사결정에 참여합니다.', employeeCount: 2 },
-        { id: 6, name: '부장', description: '부서를 총괄하는 책임자입니다.', employeeCount: 1 },
-      ],
-      dialogVisible: false,
-      isEdit: false,
-      currentGrade: {
-        id: null,
-        name: '',
-        description: '',
-        employeeCount: 0
-      }
-    };
-  },
-  computed: {
-    modalTitle() {
-      return this.isEdit ? '직급 수정' : '직급 추가';
-    }
-  },
-  methods: {
-    openAddModal() {
-      this.isEdit = false;
-      this.currentGrade = { id: null, name: '', description: '', employeeCount: 0 };
-      this.dialogVisible = true;
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { ElMessageBox } from 'element-plus';
+import gradeService from '@/api/gradeService';
+import { usePermissions } from '@/composables/usePermissions';
+import { useSnackbar } from '@/composables/useSnackbar';
+import { Plus, Grid } from '@element-plus/icons-vue';
+import Sortable from 'sortablejs';
+
+const { checkPermission } = usePermissions();
+const { success, error, info } = useSnackbar();
+const isEdit = ref(false);
+const loading = ref(false);
+const grade = ref([]);
+const dialogVisible = ref(false);
+const gradeNameInput = ref(null);
+const currentGrade = ref({ id: null, name: '' });
+const tableRef = ref(null);
+const showDeleted = ref(false);
+
+const filteredGrade = computed(() => {
+  if (showDeleted.value) {
+    return grade.value;
+  }
+  return grade.value.filter(g => !g.ynDel);
+});
+
+const initSortable = () => {
+  const tbody = tableRef.value.$el.querySelector('.el-table__body-wrapper tbody');
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    onEnd: (evt) => {
+      const { oldIndex, newIndex } = evt;
+      const movedItem = grade.value.splice(oldIndex, 1)[0];
+      grade.value.splice(newIndex, 0, movedItem);
+      handleGradeReorder();
     },
-    openEditModal(grade) {
-      this.isEdit = true;
-      this.currentGrade = { ...grade };
-      this.dialogVisible = true;
-    },
-    saveGrade() {
-      if (this.isEdit) {
-        const index = this.grades.findIndex(g => g.id === this.currentGrade.id);
-        if (index !== -1) {
-          this.grades.splice(index, 1, this.currentGrade);
-        }
-        this.$message.success('직급이 수정되었습니다.');
-      } else {
-        this.currentGrade.id = Date.now(); // Simple ID generation
-        this.grades.push(this.currentGrade);
-        this.$message.success('새로운 직급이 추가되었습니다.');
-      }
-      this.dialogVisible = false;
-    },
-    deleteGrade(grade) {
-      this.$confirm(`'${grade.name}' 직급을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`, '경고', {
-        confirmButtonText: '삭제',
-        cancelButtonText: '취소',
-        type: 'warning'
-      }).then(() => {
-        this.loading = true;
-        setTimeout(() => { // Simulate API call
-          const index = this.grades.findIndex(g => g.id === grade.id);
-          if (index !== -1) {
-            this.grades.splice(index, 1);
-          }
-          this.loading = false;
-          this.$message.success('삭제되었습니다.');
-        }, 500);
-      }).catch(() => {
-        this.$message.info('삭제가 취소되었습니다.');
-      });
-    }
+  });
+};
+
+const handleDialogOpened = () => {
+  if (gradeNameInput.value) {
+    gradeNameInput.value.focus();
   }
 };
+const canCreateGrade = ref(false);
+const canUpdateGrade = ref(false);
+const canDeleteGrade = ref(false);
+
+const modalTitle = computed(() => {
+  return isEdit.value ? '직급 수정' : '직급 추가';
+});
+
+const checkPermissions = async () => {
+  canCreateGrade.value = await checkPermission('member', 'CREATE', 'COMPANY');
+  canUpdateGrade.value = await checkPermission('member', 'UPDATE', 'COMPANY');
+  canDeleteGrade.value = await checkPermission('member', 'DELETE', 'COMPANY');
+};
+
+const fetchGrade = async () => {
+  loading.value = true;
+  try {
+    grade.value = await gradeService.getGrade();
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || '직급 목록을 불러오는 데 실패했습니다.';
+    error(errorMessage);
+    console.error(err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const openAddModal = () => {
+  isEdit.value = false;
+  currentGrade.value = { id: null, name: '' };
+  dialogVisible.value = true;
+};
+
+const openEditModal = (grade) => {
+  isEdit.value = true;
+  currentGrade.value = { ...grade };
+  dialogVisible.value = true;
+};
+
+const saveGrade = async () => {
+  loading.value = true;
+  try {
+    if (isEdit.value) {
+      await gradeService.updateGrade(currentGrade.value.id, { name: currentGrade.value.name });
+      success('직급이 수정되었습니다.');
+    } else {
+      const newDisplayOrder = grade.value.length > 0 ? Math.max(...grade.value.map(g => g.displayOrder)) + 1 : 0;
+      await gradeService.createGrade({ name: currentGrade.value.name, displayOrder: newDisplayOrder });
+      success('새로운 직급이 추가되었습니다.');
+    }
+    dialogVisible.value = false;
+    await fetchGrade();
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || '직급 저장에 실패했습니다.';
+    error(errorMessage);
+    console.error("Error saving grade:", error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const deleteGrade = async (grade) => {
+  ElMessageBox.confirm(`'${grade.name}' 직급을 삭제하시겠습니까?`, '경고', {
+    confirmButtonText: '삭제',
+    cancelButtonText: '취소',
+    type: 'warning'
+  }).then(async () => {
+    loading.value = true;
+    try {
+      await gradeService.deleteGrade(grade.id);
+      success('삭제되었습니다.');
+      await fetchGrade();
+    } catch (error) {
+      console.error("Error deleting grade:", error);
+    } finally {
+      loading.value = false;
+    }
+  }).catch(() => {
+    info('삭제가 취소되었습니다.');
+  });
+};
+
+const restoreGrade = async (grade) => {
+  ElMessageBox.confirm(`'${grade.name}' 직급을 복원하시겠습니까?`, '확인', {
+    confirmButtonText: '복원',
+    cancelButtonText: '취소',
+    type: 'info'
+  }).then(async () => {
+    loading.value = true;
+    try {
+      await gradeService.restoreGrade(grade.id);
+      success('복원되었습니다.');
+      await fetchGrade();
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || '직급 복원에 실패했습니다.';
+      error(errorMessage);
+      console.error("Error restoring grade:", error);
+    } finally {
+      loading.value = false;
+    }
+  }).catch(() => {
+    info('복원이 취소되었습니다.');
+  });
+};
+
+const handleGradeReorder = async () => {
+  loading.value = true;
+  try {
+    const gradeIds = grade.value.map(g => g.id);
+    const memberPositionId = localStorage.getItem('memberPositionId');
+    if (!memberPositionId) {
+      throw new Error("MemberPositionId not found.");
+    }
+
+    await gradeService.reorderGrade(memberPositionId, gradeIds);
+    success('직급 순서가 변경되었습니다.');
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || '직급 순서 변경에 실패했습니다.';
+    error(errorMessage);
+    console.error(err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  checkPermissions();
+  fetchGrade();
+  initSortable();
+});
 </script>
 
 <style scoped>
 .grade-management-page {
-  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
+.drag-handle {
+  cursor: grab;
+}
+
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin: 0;
 }
 
 .box-card {
@@ -162,6 +288,10 @@ export default {
 .card-header span {
   font-size: 18px;
   font-weight: 600;
+}
+
+.grade-table {
+  font-size: 16px;
 }
 
 .el-table th {

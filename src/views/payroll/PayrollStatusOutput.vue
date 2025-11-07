@@ -26,6 +26,9 @@
                   v-model="statusPeriod"
                   type="month"
                   placeholder="조회 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="fetchPayrollStatus"
                 />
               </el-form-item>
             </el-col>
@@ -33,9 +36,12 @@
               <el-form-item label="부서">
                 <el-select v-model="selectedDepartment" placeholder="부서 선택">
                   <el-option label="전체" value="" />
-                  <el-option label="개발팀" value="dev" />
-                  <el-option label="영업팀" value="sales" />
-                  <el-option label="인사팀" value="hr" />
+                  <el-option 
+                    v-for="dept in departmentList" 
+                    :key="dept" 
+                    :label="dept" 
+                    :value="dept" 
+                  />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -43,16 +49,15 @@
               <el-form-item label="급여 상태">
                 <el-select v-model="selectedStatus" placeholder="상태 선택">
                   <el-option label="전체" value="" />
-                  <el-option label="지급완료" value="completed" />
-                  <el-option label="지급대기" value="pending" />
-                  <el-option label="지급보류" value="hold" />
+                  <el-option label="지급완료" value="PAID" />
+                  <el-option label="지급대기" value="PENDING" />
                 </el-select>
               </el-form-item>
             </el-col>
           </el-row>
         </div>
         
-        <el-table :data="statusData" style="width: 100%" class="status-table">
+        <el-table :data="filteredStatusData" style="width: 100%" class="status-table" v-loading="loading">
           <el-table-column prop="employeeName" label="직원명" min-width="120" align="center" />
           <el-table-column prop="department" label="부서" min-width="100" align="center" />
           <el-table-column prop="position" label="직급" min-width="100" align="center" />
@@ -92,6 +97,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollStatusOutput',
@@ -100,72 +107,122 @@ export default {
     return { success, error, warning, info }
   },
   created() {
-    // 목업 데이터 늘리기 (총 70행)
-    const base = [...this.statusData]
-    const targetCount = 70
-    const mockNames = ['김민준','이서연','박도윤','최지우','정하준','한유진','조준서','윤예린','장수아','임시우','오태윤','서연우','신아윤','권승현','황재민','문서윤','홍지안','강유나','배민서','류하린']
-    let i = 0
-    while (this.statusData.length < targetCount) {
-      const src = base[i % base.length]
-      const idx = this.statusData.length + 1
-      const varied = {
-        employeeName: mockNames[idx % mockNames.length],
-        department: src.department,
-        position: src.position,
-        basicSalary: src.basicSalary + (idx % 12) * 10000,
-        totalIncome: src.totalIncome + (idx % 9) * 12000,
-        totalDeduction: src.totalDeduction + (idx % 6) * 5000,
-        netPay: src.netPay + (idx % 10) * 8000,
-        payDate: src.payDate,
-        status: src.status
-      }
-      this.statusData.push(varied)
-      i++
-    }
+    // 초기 데이터 로드
+    this.fetchPayrollStatus()
   },
   data() {
+    // 초기값: 당월 설정
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
     return {
-      statusPeriod: new Date(),
+      statusPeriod: currentYearMonth,
       selectedDepartment: '',
       selectedStatus: '',
-      statusData: [
-        {
-          employeeName: '김철수',
-          department: '개발팀',
-          position: '대리',
-          basicSalary: 3000000,
-          totalIncome: 3350000,
-          totalDeduction: 603000,
-          netPay: 2747000,
-          payDate: '2024-09-25',
-          status: '지급완료'
-        },
-        {
-          employeeName: '이영희',
-          department: '영업팀',
-          position: '과장',
-          basicSalary: 2800000,
-          totalIncome: 3200000,
-          totalDeduction: 576000,
-          netPay: 2624000,
-          payDate: '2024-09-25',
-          status: '지급완료'
-        },
-        {
-          employeeName: '박민수',
-          department: '인사팀',
-          position: '사원',
-          basicSalary: 2500000,
-          totalIncome: 2700000,
-          totalDeduction: 486000,
-          netPay: 2214000,
-          payDate: '2024-09-25',
-          status: '지급완료'
+      statusData: [],
+      allStatusData: [], // 원본 데이터 (필터링 전)
+      loading: false
+    }
+  },
+  computed: {
+    // 필터링된 데이터
+    filteredStatusData() {
+      let filtered = [...this.allStatusData]
+      
+      // 부서 필터링
+      if (this.selectedDepartment && this.selectedDepartment !== '') {
+        filtered = filtered.filter(item => item.department === this.selectedDepartment)
+      }
+      
+      // 급여 상태 필터링
+      if (this.selectedStatus && this.selectedStatus !== '') {
+        const statusMap = {
+          'PAID': '지급완료',
+          'PENDING': '지급대기'
         }
-      ]
+        const statusText = statusMap[this.selectedStatus] || this.selectedStatus
+        filtered = filtered.filter(item => item.status === statusText)
+      }
+      
+      return filtered
+    },
+    // 부서 목록 (동적으로 생성)
+    departmentList() {
+      const departments = [...new Set(this.allStatusData.map(item => item.department).filter(Boolean))]
+      return departments.sort()
     }
   },
   methods: {
+    // 급여 현황 데이터 조회
+    async fetchPayrollStatus() {
+      try {
+        this.loading = true
+        
+        let yearMonth = ''
+        
+        // statusPeriod를 yyyy-MM 형식으로 변환
+        // 조회기간이 선택되지 않았거나 null인 경우 당월로 설정
+        if (this.statusPeriod && this.statusPeriod !== null && this.statusPeriod !== '') {
+          if (typeof this.statusPeriod === 'string') {
+            yearMonth = this.statusPeriod
+          } else {
+            const date = new Date(this.statusPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+          // statusPeriod도 당월로 업데이트
+          this.statusPeriod = yearMonth
+        }
+        
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get('/workforce-service/salary/list', {
+          params: {
+            yearMonth: yearMonth
+          },
+          headers: userHeaders
+        })
+        
+        // API 응답 데이터를 컴포넌트 형식으로 변환
+        const apiData = response.data?.data || response.data || []
+        this.allStatusData = apiData.map(item => ({
+          employeeName: item.memberName || '',
+          department: item.department || '',
+          position: item.role || '',
+          basicSalary: item.baseSalary || 0,
+          totalIncome: item.totalAllowance || 0,
+          totalDeduction: item.totalDeduction || 0,
+          netPay: item.netPay || 0,
+          payDate: item.paymentDate || '',
+          status: this.convertStatus(item.status || '')
+        }))
+        
+        // statusData는 computed의 filteredStatusData를 사용하므로 업데이트 불필요
+        this.success('급여 현황을 조회했습니다.')
+      } catch (err) {
+        console.error('급여 현황 조회 실패:', err)
+        this.error('급여 현황을 불러오는데 실패했습니다.')
+        this.allStatusData = []
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // API status를 한글 상태로 변환
+    convertStatus(status) {
+      const statusMap = {
+        'PENDING': '지급대기',
+        'PAID': '지급완료'
+      }
+      return statusMap[status] || status
+    },
+    
     getStatusType(status) {
       switch (status) {
         case '지급완료':
@@ -181,410 +238,620 @@ export default {
     generateReport() {
       this.success('급여 현황 보고서가 생성되었습니다.')
     },
+    // 인쇄 기능
     printReport() {
-      // 인쇄용 스타일과 함께 새 창 열기
-      const printWindow = window.open('', '_blank')
-      
-      // 인쇄용 HTML 생성
-      const printContent = this.generatePrintContent()
-      
-      printWindow.document.write(printContent)
-      printWindow.document.close()
-      
-      // 인쇄 대화상자 열기
-      printWindow.focus()
-      printWindow.print()
-      
-      // 인쇄 후 창 닫기
-      printWindow.onafterprint = () => {
-        printWindow.close()
+      try {
+        const htmlContent = this.generatePrintHTMLFixed()
+        const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes')
+        printWindow.document.write(htmlContent)
+        printWindow.document.close()
+        
+        // CSS 추가
+        const style = printWindow.document.createElement('style')
+        style.textContent = `
+          @media print {
+            body { margin: 0; }
+            @page { margin: 0.5in; }
+          }
+          @media screen {
+            body { margin: 20px; }
+            .print-instructions {
+              background: #f0f8ff;
+              border: 1px solid #0066cc;
+              border-radius: 5px;
+              padding: 15px;
+              margin-bottom: 20px;
+              font-family: 'Malgun Gothic', sans-serif;
+            }
+            .print-instructions h3 {
+              margin: 0 0 10px 0;
+              color: #0066cc;
+            }
+            .print-instructions ol {
+              margin: 0;
+              padding-left: 20px;
+            }
+            .print-instructions li {
+              margin-bottom: 5px;
+            }
+            .print-button {
+              background: #0066cc;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 14px;
+              margin-right: 10px;
+            }
+            .print-button:hover {
+              background: #0052a3;
+            }
+          }
+        `
+        printWindow.document.head.appendChild(style)
+        
+        // 인쇄 안내 메시지 추가
+        const instructionsDiv = printWindow.document.createElement('div')
+        instructionsDiv.className = 'print-instructions'
+        instructionsDiv.innerHTML = `
+          <h3>🖨️ 급여 현황 보고서 인쇄 안내</h3>
+          <ol>
+            <li><strong>인쇄 버튼</strong>을 클릭하거나 <strong>Ctrl+P</strong>를 눌러주세요</li>
+            <li>인쇄 설정을 확인하고 <strong>"인쇄"</strong>를 클릭하세요</li>
+            <li>또는 <strong>"PDF로 저장"</strong>을 선택하여 파일로 저장할 수 있습니다</li>
+          </ol>
+          <button class="print-button" onclick="window.print()">🖨️ 인쇄하기</button>
+          <button class="print-button" onclick="window.close()">❌ 창 닫기</button>
+        `
+        printWindow.document.body.insertBefore(instructionsDiv, printWindow.document.body.firstChild)
+        
+        this.success('인쇄 창이 열렸습니다. 인쇄 버튼을 클릭하여 인쇄하세요.')
+      } catch (error) {
+        this.error('인쇄 중 오류가 발생했습니다.')
+        console.error('인쇄 오류:', error)
       }
-      
-      this.success('인쇄 대화상자가 열렸습니다.')
     },
     
-    generatePrintContent() {
+    // PDF/인쇄용 HTML 생성
+    generatePrintHTMLFixed() {
+      const groupedData = this.groupDataByDepartment()
       const currentDate = new Date().toLocaleDateString()
-      const totalEmployees = this.statusData.length
-      const totalIncome = this.statusData.reduce((sum, item) => sum + item.totalIncome, 0)
-      const totalDeduction = this.statusData.reduce((sum, item) => sum + item.totalDeduction, 0)
-      const totalNetPay = this.statusData.reduce((sum, item) => sum + item.netPay, 0)
+      const displayData = this.filteredStatusData // 필터링된 데이터 사용
+      const totalEmployees = displayData.length
+      const totalIncome = displayData.reduce((sum, item) => sum + item.totalIncome, 0)
+      const totalDeduction = displayData.reduce((sum, item) => sum + item.totalDeduction, 0)
+      const totalNetPay = displayData.reduce((sum, item) => sum + item.netPay, 0)
       
-      return `
+      const monthStr = this.statusPeriod ? 
+        (typeof this.statusPeriod === 'string' ? this.statusPeriod.replace('-', '년 ').replace('-', '월') : 
+         new Date(this.statusPeriod).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }) + '분') :
+        new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }) + '분'
+      
+      let html = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="UTF-8">
           <title>급여 현황 보고서</title>
           <style>
-            @page {
-              size: A4;
-              margin: 20mm;
-            }
-            
-            body {
-              font-family: 'Malgun Gothic', Arial, sans-serif;
+            body { 
+              font-family: 'Malgun Gothic', sans-serif; 
+              margin: 20px; 
               font-size: 12px;
-              line-height: 1.4;
-              color: #333;
-              margin: 0;
-              padding: 0;
             }
-            
-            .print-header {
-              text-align: center;
-              margin-bottom: 30px;
-              border-bottom: 2px solid #333;
-              padding-bottom: 15px;
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
             }
-            
-            .print-title {
-              font-size: 24px;
-              font-weight: bold;
-              margin-bottom: 10px;
-              color: #2c3e50;
+            .title { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin-bottom: 10px; 
             }
-            
-            .print-subtitle {
-              font-size: 14px;
-              color: #666;
+            .date { 
+              font-size: 12px; 
+              color: #666; 
             }
-            
-            .print-info {
+            .info-section {
               margin-bottom: 20px;
               background: #f8f9fa;
               padding: 15px;
               border-radius: 5px;
             }
-            
-            .print-info-row {
+            .info-row {
               display: flex;
               justify-content: space-between;
               margin-bottom: 5px;
             }
-            
-            .print-info-label {
+            .info-label {
               font-weight: bold;
               color: #2c3e50;
             }
-            
-            .print-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 20px;
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px; 
+              table-layout: fixed;
+            }
+            th, td { 
+              border: 1px solid #000; 
+              padding: 8px 6px; 
+              text-align: center; 
+              vertical-align: middle;
               font-size: 11px;
             }
-            
-            .print-table th,
-            .print-table td {
-              border: 1px solid #ddd;
-              padding: 8px;
-              text-align: center;
+            th { 
+              background-color: #E6E6FA; 
+              font-weight: bold; 
             }
-            
-            .print-table th {
-              background-color: #f5f5f5;
-              font-weight: bold;
-              color: #2c3e50;
+            .amount { 
+              text-align: right; 
             }
-            
-            .print-table tr:nth-child(even) {
-              background-color: #f9f9f9;
+            .summary { 
+              background-color: #E6F7E6; 
+              font-weight: bold; 
+              border-top: 2px solid #000;
+              border-bottom: 2px solid #000;
             }
-            
-            .print-total {
-              margin-top: 20px;
-              padding: 15px;
-              background-color: #f0f8ff;
-              border: 2px solid #4a90e2;
-              border-radius: 5px;
+            .dept-summary { 
+              background-color: #F0F8FF; 
+              font-weight: bold; 
             }
-            
-            .print-total-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 5px;
-              font-weight: bold;
+            .col-name { width: 12%; }
+            .col-dept { width: 12%; }
+            .col-position { width: 10%; }
+            .col-basic { width: 12%; }
+            .col-income { width: 12%; }
+            .col-deduction { width: 12%; }
+            .col-net { width: 12%; }
+            .col-date { width: 10%; }
+            .col-status { width: 10%; }
+            @media screen {
+              * { 
+                -webkit-print-color-adjust: exact !important; 
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
             }
-            
-            .print-total-label {
-              color: #2c3e50;
-            }
-            
-            .print-total-value {
-              color: #e74c3c;
-              font-size: 14px;
-            }
-            
-            .print-footer {
-              margin-top: 30px;
-              text-align: center;
-              font-size: 10px;
-              color: #666;
-              border-top: 1px solid #ddd;
-              padding-top: 10px;
-            }
-            
             @media print {
               body { margin: 0; }
-              .print-header { page-break-after: avoid; }
-              .print-table { page-break-inside: avoid; }
-              .print-total { page-break-before: avoid; }
+              @page { margin: 0.5in; }
+              .no-print { display: none; }
+              * { 
+                -webkit-print-color-adjust: exact !important; 
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              th { 
+                background-color: #E6E6FA !important;
+                color: #000 !important;
+              }
+              .summary { 
+                background-color: #E6F7E6 !important;
+                color: #000 !important;
+              }
+              .dept-summary { 
+                background-color: #F0F8FF !important;
+                color: #000 !important;
+              }
+              td, th {
+                border: 1px solid #000 !important;
+                vertical-align: middle !important;
+              }
             }
           </style>
         </head>
         <body>
-          <div class="print-header">
-            <div class="print-title">급여 현황 보고서</div>
-            <div class="print-subtitle">Payroll Status Report</div>
+          <div class="header">
+            <div class="title">${monthStr} 급여 현황 보고서</div>
+            <div class="date">생성일: ${currentDate} ${new Date().toLocaleTimeString()}</div>
           </div>
           
-          <div class="print-info">
-            <div class="print-info-row">
-              <span class="print-info-label">보고서 생성일:</span>
-              <span>${currentDate}</span>
+          <div class="info-section">
+            <div class="info-row">
+              <span class="info-label">조회 기간:</span>
+              <span>${this.statusPeriod ? (typeof this.statusPeriod === 'string' ? this.statusPeriod : new Date(this.statusPeriod).toLocaleDateString()) : '전체'}</span>
             </div>
-            <div class="print-info-row">
-              <span class="print-info-label">조회 기간:</span>
-              <span>${this.statusPeriod ? new Date(this.statusPeriod).toLocaleDateString() : '전체'}</span>
-            </div>
-            <div class="print-info-row">
-              <span class="print-info-label">부서:</span>
+            <div class="info-row">
+              <span class="info-label">부서:</span>
               <span>${this.selectedDepartment || '전체'}</span>
             </div>
-            <div class="print-info-row">
-              <span class="print-info-label">급여 상태:</span>
-              <span>${this.selectedStatus || '전체'}</span>
+            <div class="info-row">
+              <span class="info-label">급여 상태:</span>
+              <span>${this.selectedStatus ? (this.selectedStatus === 'PAID' ? '지급완료' : '지급대기') : '전체'}</span>
             </div>
           </div>
           
-          <table class="print-table">
+          <table>
             <thead>
               <tr>
-                <th>직원명</th>
-                <th>부서</th>
-                <th>직급</th>
-                <th>기본급</th>
-                <th>총 지급액</th>
-                <th>총 공제액</th>
-                <th>실수령액</th>
-                <th>지급일</th>
-                <th>상태</th>
+                <th class="col-name">직원명</th>
+                <th class="col-dept">부서</th>
+                <th class="col-position">직급</th>
+                <th class="col-basic">기본급</th>
+                <th class="col-income">총 지급액</th>
+                <th class="col-deduction">총 공제액</th>
+                <th class="col-net">실수령액</th>
+                <th class="col-date">지급일</th>
+                <th class="col-status">상태</th>
               </tr>
             </thead>
             <tbody>
-              ${this.statusData.map(item => `
-                <tr>
-                  <td>${item.employeeName}</td>
-                  <td>${item.department}</td>
-                  <td>${item.position}</td>
-                  <td>${item.basicSalary.toLocaleString()}원</td>
-                  <td>${item.totalIncome.toLocaleString()}원</td>
-                  <td>${item.totalDeduction.toLocaleString()}원</td>
-                  <td>${item.netPay.toLocaleString()}원</td>
-                  <td>${item.payDate}</td>
-                  <td>${item.status}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="print-total">
-            <div class="print-total-row">
-              <span class="print-total-label">총 직원 수:</span>
-              <span class="print-total-value">${totalEmployees}명</span>
-            </div>
-            <div class="print-total-row">
-              <span class="print-total-label">총 지급액:</span>
-              <span class="print-total-value">${totalIncome.toLocaleString()}원</span>
-            </div>
-            <div class="print-total-row">
-              <span class="print-total-label">총 공제액:</span>
-              <span class="print-total-value">${totalDeduction.toLocaleString()}원</span>
-            </div>
-            <div class="print-total-row">
-              <span class="print-total-label">총 실수령액:</span>
-              <span class="print-total-value">${totalNetPay.toLocaleString()}원</span>
-            </div>
-          </div>
-          
-          <div class="print-footer">
-            <p>본 보고서는 시스템에서 자동 생성되었습니다.</p>
-            <p>생성일시: ${new Date().toLocaleString()}</p>
-          </div>
+      `
+      
+      // 각 부서별로 처리
+      Object.keys(groupedData).forEach(department => {
+        const deptData = groupedData[department]
+        let deptTotalIncome = 0
+        let deptTotalDeduction = 0
+        let deptTotalNetPay = 0
+        let deptCount = 0
+        
+        // 개별 직원 데이터 추가
+        deptData.forEach(employee => {
+          html += `
+            <tr>
+              <td class="col-name">${employee.employeeName}</td>
+              <td class="col-dept">${employee.department}</td>
+              <td class="col-position">${employee.position}</td>
+              <td class="col-basic amount">${employee.basicSalary.toLocaleString()}</td>
+              <td class="col-income amount">${employee.totalIncome.toLocaleString()}</td>
+              <td class="col-deduction amount">${employee.totalDeduction.toLocaleString()}</td>
+              <td class="col-net amount">${employee.netPay.toLocaleString()}</td>
+              <td class="col-date">${employee.payDate}</td>
+              <td class="col-status">${employee.status}</td>
+            </tr>
+          `
+          deptTotalIncome += employee.totalIncome
+          deptTotalDeduction += employee.totalDeduction
+          deptTotalNetPay += employee.netPay
+          deptCount++
+        })
+        
+        // 부서계 추가
+        html += `
+          <tr class="dept-summary" style="background-color: #F0F8FF;">
+            <td class="col-name" colspan="3" style="background-color: #F0F8FF; font-weight: bold;">${department}계</td>
+            <td class="col-basic" style="background-color: #F0F8FF;"></td>
+            <td class="col-income amount" style="background-color: #F0F8FF; font-weight: bold;">${deptTotalIncome.toLocaleString()}</td>
+            <td class="col-deduction amount" style="background-color: #F0F8FF; font-weight: bold;">${deptTotalDeduction.toLocaleString()}</td>
+            <td class="col-net amount" style="background-color: #F0F8FF; font-weight: bold;">${deptTotalNetPay.toLocaleString()}</td>
+            <td class="col-date" style="background-color: #F0F8FF;"></td>
+            <td class="col-status" style="background-color: #F0F8FF; font-weight: bold;">${deptCount}건</td>
+          </tr>
+        `
+      })
+      
+      // 전체 합계 추가
+      html += `
+            <tr class="summary" style="background-color: #E6F7E6;">
+              <td class="col-name" colspan="4" style="background-color: #E6F7E6; font-weight: bold;">총계</td>
+              <td class="col-income amount" style="background-color: #E6F7E6; font-weight: bold;">${totalIncome.toLocaleString()}</td>
+              <td class="col-deduction amount" style="background-color: #E6F7E6; font-weight: bold;">${totalDeduction.toLocaleString()}</td>
+              <td class="col-net amount" style="background-color: #E6F7E6; font-weight: bold;">${totalNetPay.toLocaleString()}</td>
+              <td class="col-date" style="background-color: #E6F7E6;"></td>
+              <td class="col-status" style="background-color: #E6F7E6; font-weight: bold;">${totalEmployees}명</td>
+            </tr>
+          </tbody>
+        </table>
         </body>
         </html>
       `
+      
+      return html
     },
     // PDF 보고서 생성
     async generatePDF() {
       try {
-        // jsPDF 동적 로드
-        const { jsPDF } = await import('jspdf')
+        // PDF 생성을 위한 HTML 생성
+        const htmlContent = this.generatePrintHTMLFixed()
         
-        const doc = new jsPDF()
+        // 새 창에서 HTML 표시
+        const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes')
+        printWindow.document.write(htmlContent)
+        printWindow.document.close()
         
-        // 한글 폰트 설정 (기본 폰트 사용)
-        doc.setFont('helvetica')
-        
-        // 제목
-        doc.setFontSize(20)
-        doc.text('급여 현황 보고서', 105, 20, { align: 'center' })
-        
-        // 생성일
-        doc.setFontSize(10)
-        doc.text(`생성일: ${new Date().toLocaleDateString()}`, 180, 15)
-        
-        // 요약 정보
-        doc.setFontSize(12)
-        doc.text(`보고서 생성일: ${new Date().toLocaleDateString()}`, 20, 40)
-        doc.text(`총 직원 수: ${this.statusData.length}명`, 20, 50)
-        doc.text(`총 지급액: ${this.statusData.reduce((sum, item) => sum + item.totalIncome, 0).toLocaleString()}원`, 20, 60)
-        
-        // 테이블 헤더
-        doc.setFontSize(10)
-        doc.setDrawColor(0, 0, 0)
-        
-        const tableHeaders = ['직원명', '부서', '직급', '기본급', '총지급액', '총공제액', '실수령액', '지급일', '상태']
-        const columnWidths = [20, 15, 15, 20, 20, 20, 20, 20, 15]
-        const startX = 20
-        let currentX = startX
-        
-        // 헤더 그리기
-        tableHeaders.forEach((header, index) => {
-          doc.rect(currentX, 80, columnWidths[index], 8)
-          doc.text(header, currentX + 2, 85)
-          currentX += columnWidths[index]
-        })
-        
-        // 데이터 행들
-        let yPosition = 88
-        this.statusData.forEach((item) => {
-          // 페이지 넘김 체크
-          if (yPosition > 270) {
-            doc.addPage()
-            yPosition = 20
+        // CSS 추가 (인쇄용 스타일)
+        const style = printWindow.document.createElement('style')
+        style.textContent = `
+          @media print {
+            body { margin: 0; }
+            @page { margin: 0.5in; }
           }
-          
-          currentX = startX
-          const rowData = [
-            item.employeeName,
-            item.department,
-            item.position,
-            item.basicSalary.toLocaleString(),
-            item.totalIncome.toLocaleString(),
-            item.totalDeduction.toLocaleString(),
-            item.netPay.toLocaleString(),
-            item.payDate,
-            item.status
-          ]
-          
-          rowData.forEach((data, dataIndex) => {
-            doc.rect(currentX, yPosition, columnWidths[dataIndex], 8)
-            doc.text(data, currentX + 2, yPosition + 5)
-            currentX += columnWidths[dataIndex]
-          })
-          
-          yPosition += 8
-        })
+          @media screen {
+            body { margin: 20px; }
+            .print-instructions {
+              background: #f0f8ff;
+              border: 1px solid #0066cc;
+              border-radius: 5px;
+              padding: 15px;
+              margin-bottom: 20px;
+              font-family: 'Malgun Gothic', sans-serif;
+            }
+            .print-instructions h3 {
+              margin: 0 0 10px 0;
+              color: #0066cc;
+            }
+            .print-instructions ol {
+              margin: 0;
+              padding-left: 20px;
+            }
+            .print-instructions li {
+              margin-bottom: 5px;
+            }
+            .print-button {
+              background: #0066cc;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 14px;
+              margin-right: 10px;
+            }
+            .print-button:hover {
+              background: #0052a3;
+            }
+          }
+        `
+        printWindow.document.head.appendChild(style)
         
-        // 합계 행
-        if (yPosition > 270) {
-          doc.addPage()
-          yPosition = 20
-        }
+        // 인쇄 안내 메시지 추가
+        const instructionsDiv = printWindow.document.createElement('div')
+        instructionsDiv.className = 'print-instructions'
+        instructionsDiv.innerHTML = `
+          <h3>📄 급여 현황 보고서 PDF 출력 안내</h3>
+          <ol>
+            <li><strong>인쇄 버튼</strong>을 클릭하거나 <strong>Ctrl+P</strong>를 눌러주세요</li>
+            <li>인쇄 대화상자에서 <strong>"대상"</strong>을 <strong>"PDF로 저장"</strong> 또는 <strong>"Microsoft Print to PDF"</strong>로 선택하세요</li>
+            <li><strong>"다른 이름으로 저장"</strong> 또는 <strong>"저장"</strong>을 클릭하세요</li>
+            <li>원하는 파일명을 입력하고 <strong>"저장"</strong>을 클릭하세요</li>
+          </ol>
+          <button class="print-button" onclick="window.print()">🖨️ 인쇄/PDF 저장</button>
+          <button class="print-button" onclick="window.close()">❌ 창 닫기</button>
+        `
+        printWindow.document.body.insertBefore(instructionsDiv, printWindow.document.body.firstChild)
         
-        currentX = startX
-        const totalData = [
-          '합계',
-          '',
-          '',
-          '',
-          this.statusData.reduce((sum, item) => sum + item.totalIncome, 0).toLocaleString(),
-          this.statusData.reduce((sum, item) => sum + item.totalDeduction, 0).toLocaleString(),
-          this.statusData.reduce((sum, item) => sum + item.netPay, 0).toLocaleString(),
-          '',
-          ''
-        ]
-        
-        totalData.forEach((data, dataIndex) => {
-          doc.rect(currentX, yPosition, columnWidths[dataIndex], 8)
-          doc.text(data, currentX + 2, yPosition + 5)
-          currentX += columnWidths[dataIndex]
-        })
-        
-        // PDF 다운로드
-        doc.save(`급여현황보고서_${new Date().toISOString().slice(0, 10)}.pdf`)
-        
-        this.success('PDF 보고서가 다운로드되었습니다.')
-        
+        this.success('PDF 생성 창이 열렸습니다. 인쇄 버튼을 클릭하여 PDF로 저장하세요.')
       } catch (error) {
+        this.error('PDF 파일 생성 중 오류가 발생했습니다.')
         console.error('PDF 생성 오류:', error)
-        this.error('PDF 생성 중 오류가 발생했습니다.')
       }
     },
-    // Excel 보고서 생성
+    // Excel 보고서 생성 (ExcelJS 사용)
     async generateExcel() {
       try {
-        // XLSX 라이브러리 동적 로드
-        const XLSX = await import('xlsx')
+        const ExcelJS = await import('exceljs')
+        const workbook = new ExcelJS.Workbook()
+        const worksheet = workbook.addWorksheet('급여현황')
         
-        // 데이터 준비
-        const worksheetData = [
-          ['급여 현황 보고서'],
-          [`생성일: ${new Date().toLocaleDateString()}`],
-          [`총 직원 수: ${this.statusData.length}명`],
-          [`총 지급액: ${this.statusData.reduce((sum, item) => sum + item.totalIncome, 0).toLocaleString()}원`],
-          [''],
-          ['직원명', '부서', '직급', '기본급', '총 지급액', '총 공제액', '실수령액', '지급일', '상태']
-        ]
+        // 데이터를 부서별로 그룹화
+        const groupedData = this.groupDataByDepartment()
         
-        // 데이터 행 추가
-        this.statusData.forEach(item => {
-          worksheetData.push([
-            item.employeeName,
-            item.department,
-            item.position,
-            item.basicSalary,
-            item.totalIncome,
-            item.totalDeduction,
-            item.netPay,
-            item.payDate,
-            item.status
-          ])
+        // 제목 추가
+        const monthStr = this.statusPeriod ? 
+          (typeof this.statusPeriod === 'string' ? this.statusPeriod.replace('-', '년 ').replace('-', '월') : 
+           new Date(this.statusPeriod).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }) + '분') :
+          new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }) + '분'
+        const titleRow = worksheet.addRow([`${monthStr} 급여현황`])
+        titleRow.getCell(1).font = { size: 16, bold: true }
+        titleRow.getCell(1).alignment = { horizontal: 'center' }
+        worksheet.mergeCells('A1:I1')
+        
+        // 빈 행 추가
+        worksheet.addRow([])
+        
+        // 헤더 추가
+        const headerRow = worksheet.addRow(['직원명', '부서', '직급', '기본급', '총 지급액', '총 공제액', '실수령액', '지급일', '상태'])
+        headerRow.eachCell((cell) => {
+          cell.font = { bold: true }
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE6E6FA' }
+          }
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          }
+          cell.alignment = { horizontal: 'center', vertical: 'middle' }
         })
         
-        // 합계 행 추가
-        worksheetData.push([''])
-        worksheetData.push([
-          '합계',
+        let totalIncome = 0
+        let totalDeduction = 0
+        let totalNetPay = 0
+        let totalCount = 0
+        let currentRow = 4 // 제목(1) + 빈행(1) + 헤더(1) + 다음행(1) = 4
+        
+        // 각 부서별로 처리
+        Object.keys(groupedData).forEach(department => {
+          const deptData = groupedData[department]
+          let deptTotalIncome = 0
+          let deptTotalDeduction = 0
+          let deptTotalNetPay = 0
+          let deptCount = 0
+          
+          // 개별 직원 데이터 추가
+          deptData.forEach(employee => {
+            const row = worksheet.addRow([
+              employee.employeeName,
+              employee.department,
+              employee.position,
+              employee.basicSalary,
+              employee.totalIncome,
+              employee.totalDeduction,
+              employee.netPay,
+              employee.payDate,
+              employee.status
+            ])
+            
+            // 테두리 추가
+            row.eachCell((cell, colNumber) => {
+              cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+              }
+              // 숫자 열은 오른쪽 정렬
+              if ([4, 5, 6, 7].includes(colNumber)) {
+                cell.alignment = { horizontal: 'right', vertical: 'middle' }
+                if (colNumber > 3) {
+                  cell.numFmt = '#,##0'
+                }
+              } else {
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }
+              }
+            })
+            
+            deptTotalIncome += employee.totalIncome
+            deptTotalDeduction += employee.totalDeduction
+            deptTotalNetPay += employee.netPay
+            deptCount++
+            currentRow++
+          })
+          
+          // 부서계 추가
+          const deptSummaryRow = worksheet.addRow([
+            '',
+            department,
+            '',
+            '',
+            deptTotalIncome,
+            deptTotalDeduction,
+            deptTotalNetPay,
+            '',
+            `${deptCount}건`
+          ])
+          
+          // 부서계 스타일링
+          deptSummaryRow.eachCell((cell, colNumber) => {
+            cell.font = { bold: true }
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFF0F8FF' }
+            }
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' }
+            }
+            if ([5, 6, 7].includes(colNumber)) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' }
+              cell.numFmt = '#,##0'
+            } else {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' }
+            }
+          })
+          
+          // 부서계에서 직원명, 직급, 기본급, 지급일 셀 병합
+          worksheet.mergeCells(`A${currentRow}:A${currentRow}`)
+          worksheet.mergeCells(`C${currentRow}:C${currentRow}`)
+          worksheet.mergeCells(`D${currentRow}:D${currentRow}`)
+          worksheet.mergeCells(`H${currentRow}:H${currentRow}`)
+          
+          totalIncome += deptTotalIncome
+          totalDeduction += deptTotalDeduction
+          totalNetPay += deptTotalNetPay
+          totalCount += deptCount
+          currentRow++
+        })
+        
+        // 전체 합계 추가
+        const totalSummaryRow = worksheet.addRow([
           '',
           '',
           '',
-          this.statusData.reduce((sum, item) => sum + item.totalIncome, 0),
-          this.statusData.reduce((sum, item) => sum + item.totalDeduction, 0),
-          this.statusData.reduce((sum, item) => sum + item.netPay, 0),
           '',
-          ''
+          totalIncome,
+          totalDeduction,
+          totalNetPay,
+          '',
+          `${totalCount}건`
         ])
         
-        // 워크시트 생성
-        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+        // 전체합계 스타일링
+        totalSummaryRow.eachCell((cell, colNumber) => {
+          cell.font = { bold: true, size: 12 }
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE6F7E6' }
+          }
+          cell.border = {
+            top: { style: 'medium' },
+            left: { style: 'thin' },
+            bottom: { style: 'medium' },
+            right: { style: 'thin' }
+          }
+          if ([5, 6, 7].includes(colNumber)) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' }
+            cell.numFmt = '#,##0'
+          } else {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' }
+          }
+        })
         
-        // 워크북 생성
-        const workbook = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(workbook, worksheet, '급여현황')
+        // 전체합계에서 직원명, 부서, 직급, 기본급, 지급일 셀 병합
+        worksheet.mergeCells(`A${currentRow}:D${currentRow}`)
+        worksheet.mergeCells(`H${currentRow}:H${currentRow}`)
         
-        // Excel 파일 생성 및 다운로드
-        XLSX.writeFile(workbook, `급여현황보고서_${new Date().toISOString().slice(0, 10)}.xlsx`)
+        // 열 너비 설정
+        worksheet.columns = [
+          { width: 12 }, // 직원명
+          { width: 12 }, // 부서
+          { width: 10 }, // 직급
+          { width: 15 }, // 기본급
+          { width: 15 }, // 총 지급액
+          { width: 15 }, // 총 공제액
+          { width: 15 }, // 실수령액
+          { width: 12 }, // 지급일
+          { width: 12 }  // 상태
+        ]
         
-        this.success('Excel 보고서가 생성되었습니다.')
+        // 파일 다운로드
+        const buffer = await workbook.xlsx.writeBuffer()
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        const fileName = this.statusPeriod ? 
+          `급여현황보고서_${typeof this.statusPeriod === 'string' ? this.statusPeriod : new Date(this.statusPeriod).toISOString().slice(0, 7)}_${new Date().toISOString().slice(0, 10)}.xlsx` :
+          `급여현황보고서_${new Date().toISOString().slice(0, 10)}.xlsx`
+        link.setAttribute('download', fileName)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        this.success('Excel 파일이 다운로드되었습니다.')
         
       } catch (error) {
         console.error('Excel 생성 오류:', error)
         this.error('Excel 생성 중 오류가 발생했습니다.')
       }
-    }
+    },
+    
+    // 데이터를 부서별로 그룹화하는 메서드
+    groupDataByDepartment() {
+      const grouped = {}
+      const displayData = this.filteredStatusData // 필터링된 데이터 사용
+      
+      displayData.forEach(employee => {
+        const dept = employee.department || '미지정'
+        if (!grouped[dept]) {
+          grouped[dept] = []
+        }
+        grouped[dept].push(employee)
+      })
+      
+      return grouped
+    },
   }
 }
 </script>
@@ -633,6 +900,23 @@ export default {
   padding: 20px;
   background: #f8f9fa;
   border-radius: 8px;
+}
+
+.status-filters :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.status-filters :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.status-filters :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 8px;
+}
+
+.status-filters :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .status-table {

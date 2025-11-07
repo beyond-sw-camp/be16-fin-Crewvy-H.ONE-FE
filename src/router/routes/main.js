@@ -5,30 +5,20 @@ const routes = [
   {
     path: '/',
     name: 'Dashboard',
-    component: Dashboard
+    component: Dashboard,
+    meta: { requiresAuth: true }
   },
   {
     path: '/search',
     name: 'GlobalSearch',
-    component: GlobalSearch
+    component: GlobalSearch,
+    meta: { requiresAuth: true }
   },
   {
-    path: '/landing',
-    name: 'LandingPage',
-    component: () => import('../../views/LandingPage.vue'),
-    meta: { layout: 'BlankLayout' }
-  },
-  {
-    path: '/landing2',
-    name: 'LandingPage2',
-    component: () => import('../../views/LandingPage2.vue'),
-    meta: { layout: 'BlankLayout' }
-  },
-  {
-    path: '/landing3',
-    name: 'LandingPage3',
-    component: () => import('../../views/LandingPage3.vue'),
-    meta: { layout: 'BlankLayout' }
+    path: '/schedule',
+    name: 'Schedule',
+    component: () => import('@/views/Schedule.vue'),
+    meta: { requiresAuth: true }
   },
 ];
 

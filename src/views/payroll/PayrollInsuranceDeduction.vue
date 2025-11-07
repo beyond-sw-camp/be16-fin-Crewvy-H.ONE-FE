@@ -25,6 +25,9 @@
                   v-model="inquiryPeriod"
                   type="month"
                   placeholder="조회 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="fetchInsuranceData"
                 />
               </el-form-item>
             </el-col>
@@ -37,36 +40,35 @@
               <el-form-item label="부서">
                 <el-select v-model="selectedDepartment" placeholder="부서 선택">
                   <el-option label="전체" value="" />
-                  <el-option label="개발팀" value="dev" />
-                  <el-option label="영업팀" value="sales" />
-                  <el-option label="인사팀" value="hr" />
+                  <el-option 
+                    v-for="dept in departmentList" 
+                    :key="dept" 
+                    :label="dept" 
+                    :value="dept" 
+                  />
                 </el-select>
               </el-form-item>
             </el-col>
           </el-row>
         </div>
         
-        <el-table :data="insuranceData" style="width: 100%" class="insurance-table">
+        <el-table :data="filteredInsuranceData" style="width: 100%" class="insurance-table" v-loading="loading">
           <el-table-column prop="employeeName" label="직원명" min-width="120" align="center" />
           <el-table-column prop="department" label="부서" min-width="100" align="center" />
-          <el-table-column prop="nationalPension" label="국민연금" min-width="120" align="center">
+          <!-- 동적으로 생성되는 공제 항목 컬럼들 -->
+          <el-table-column 
+            v-for="itemName in deductionItemNames" 
+            :key="itemName"
+            :label="itemName" 
+            :prop="`deduction_${itemName}`"
+            min-width="120" 
+            align="center"
+          >
             <template #default="scope">
-              {{ scope.row.nationalPension.toLocaleString() }}원
-            </template>
-          </el-table-column>
-          <el-table-column prop="healthInsurance" label="건강보험" min-width="120" align="center">
-            <template #default="scope">
-              {{ scope.row.healthInsurance.toLocaleString() }}원
-            </template>
-          </el-table-column>
-          <el-table-column prop="employmentInsurance" label="고용보험" min-width="120" align="center">
-            <template #default="scope">
-              {{ scope.row.employmentInsurance.toLocaleString() }}원
-            </template>
-          </el-table-column>
-          <el-table-column prop="industrialAccident" label="산재보험" min-width="120" align="center">
-            <template #default="scope">
-              {{ scope.row.industrialAccident.toLocaleString() }}원
+              <span v-if="scope.row.deductionMap && scope.row.deductionMap[itemName] && scope.row.deductionMap[itemName] !== 0">
+                {{ scope.row.deductionMap[itemName].toLocaleString() }}원
+              </span>
+              <span v-else>-</span>
             </template>
           </el-table-column>
           <el-table-column prop="totalInsurance" label="총 보험료" min-width="120" align="center">
@@ -90,6 +92,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
+import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollInsuranceDeduction',
@@ -98,77 +102,153 @@ export default {
     return { success, error, warning, info }
   },
   created() {
-    // 목업 데이터 늘리기 (총 40행)
-    const base = [...this.insuranceData]
-    const targetCount = 40
-    const mockNames = ['김민준','이서연','박도윤','최지우','정하준','한유진','조준서','윤예린','장수아','임시우','오태윤','서연우','신아윤','권승현','황재민','문서윤','홍지안','강유나','배민서','류하린']
-    let i = 0
-    while (this.insuranceData.length < targetCount) {
-      const src = base[i % base.length]
-      const idx = this.insuranceData.length + 1
-      const varied = {
-        employeeName: mockNames[idx % mockNames.length],
-        department: src.department,
-        nationalPension: src.nationalPension + (idx % 7) * 1000,
-        healthInsurance: src.healthInsurance + (idx % 5) * 800,
-        employmentInsurance: src.employmentInsurance + (idx % 4) * 500,
-        industrialAccident: src.industrialAccident + (idx % 3) * 400,
-        totalInsurance: src.totalInsurance + (idx % 6) * 1500,
-        period: src.period,
-        status: src.status
-      }
-      this.insuranceData.push(varied)
-      i++
-    }
+    // 공제 항목명 목록 로드
+    this.fetchDeductionItems()
+    // 초기 데이터 로드
+    this.fetchInsuranceData()
   },
   data() {
+    // 초기값: 당월 설정
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
     return {
-      inquiryPeriod: new Date(),
+      inquiryPeriod: currentYearMonth,
       employeeName: '',
       selectedDepartment: '',
-      insuranceData: [
-        {
-          employeeName: '김철수',
-          department: '개발팀',
-          nationalPension: 135000,
-          healthInsurance: 108000,
-          employmentInsurance: 15000,
-          industrialAccident: 10000,
-          totalInsurance: 268000,
-          period: '2024-09',
-          status: '완료'
-        },
-        {
-          employeeName: '이영희',
-          department: '영업팀',
-          nationalPension: 126000,
-          healthInsurance: 100800,
-          employmentInsurance: 14000,
-          industrialAccident: 9000,
-          totalInsurance: 249800,
-          period: '2024-09',
-          status: '완료'
-        },
-        {
-          employeeName: '박민수',
-          department: '인사팀',
-          nationalPension: 112500,
-          healthInsurance: 90000,
-          employmentInsurance: 12500,
-          industrialAccident: 8000,
-          totalInsurance: 223000,
-          period: '2024-09',
-          status: '완료'
+      insuranceData: [],
+      deductionItemNames: [], // 공제 항목명 목록
+      loading: false
+    }
+  },
+  computed: {
+    // 필터링된 데이터
+    filteredInsuranceData() {
+      let filtered = [...this.insuranceData]
+      
+      // deductionMap이 비어있는 항목 제외
+      filtered = filtered.filter(item => {
+        if (!item.deductionMap || Object.keys(item.deductionMap).length === 0) {
+          return false
         }
-      ]
+        // deductionMap에 하나라도 0이 아닌 값이 있는지 확인
+        const hasData = Object.values(item.deductionMap).some(value => value && value !== 0)
+        return hasData
+      })
+      
+      // 직원명 필터링
+      if (this.employeeName && this.employeeName.trim() !== '') {
+        filtered = filtered.filter(item => 
+          item.employeeName && item.employeeName.includes(this.employeeName.trim())
+        )
+      }
+      
+      // 부서 필터링
+      if (this.selectedDepartment && this.selectedDepartment !== '') {
+        filtered = filtered.filter(item => item.department === this.selectedDepartment)
+      }
+      
+      return filtered
+    },
+    // 부서 목록 (동적으로 생성)
+    departmentList() {
+      const departments = [...new Set(this.insuranceData.map(item => item.department).filter(Boolean))]
+      return departments.sort()
     }
   },
   methods: {
+    // 공제 항목명 목록 조회
+    async fetchDeductionItems() {
+      try {
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get('/workforce-service/payrollItem/deduction', {
+          headers: userHeaders
+        })
+        
+        // API 응답에서 항목명 목록 추출
+        const apiData = response.data?.data || response.data || []
+        if (Array.isArray(apiData)) {
+          // 항목명만 추출 (itemName 또는 name 필드가 있을 것으로 예상)
+          this.deductionItemNames = apiData.map(item => item.itemName || item.name || item).filter(Boolean)
+        } else if (typeof apiData === 'object') {
+          // 객체 형태인 경우 키나 값에서 추출
+          this.deductionItemNames = Object.keys(apiData).length > 0 ? Object.keys(apiData) : []
+        }
+        
+      } catch (err) {
+        console.error('공제 항목명 조회 실패:', err)
+        // 기본값 사용 (에러가 나도 기본 항목명으로 표시)
+        this.deductionItemNames = ['국민연금', '건강보험', '고용보험', '산재보험']
+      }
+    },
+    
+    // 보험료 공제 데이터 조회
+    async fetchInsuranceData() {
+      try {
+        this.loading = true
+        
+        let yearMonth = ''
+        
+        // inquiryPeriod를 yyyy-MM 형식으로 변환
+        // 조회기간이 선택되지 않았거나 null인 경우 당월로 설정
+        if (this.inquiryPeriod && this.inquiryPeriod !== null && this.inquiryPeriod !== '') {
+          if (typeof this.inquiryPeriod === 'string') {
+            yearMonth = this.inquiryPeriod
+          } else {
+            const date = new Date(this.inquiryPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+          // inquiryPeriod도 당월로 업데이트
+          this.inquiryPeriod = yearMonth
+        }
+        
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get('/workforce-service/salary/deduction', {
+          params: {
+            yearMonth: yearMonth
+          },
+          headers: userHeaders
+        })
+        
+        // API 응답 데이터를 컴포넌트 형식으로 변환
+        const apiData = response.data?.data || response.data || []
+        this.insuranceData = apiData.map(item => {
+          const deductionMap = item.deductionMap || {}
+          
+          return {
+            employeeName: item.memberName || '',
+            department: item.department || '',
+            deductionMap: deductionMap, // 전체 deductionMap 저장
+            totalInsurance: item.totalDeductions || 0,
+            period: item.period || '',
+            status: item.status || '완료'
+          }
+        })
+        
+        this.success('보험료 공제 데이터를 조회했습니다.')
+      } catch (err) {
+        console.error('보험료 공제 데이터 조회 실패:', err)
+        this.error('보험료 공제 데이터를 불러오는데 실패했습니다.')
+        this.insuranceData = []
+      } finally {
+        this.loading = false
+      }
+    },
+    
     exportReport() {
       this.success('보험료 공제 보고서가 내보내기되었습니다.')
     },
+    
     refreshData() {
-      this.success('데이터가 새로고침되었습니다.')
+      this.fetchInsuranceData()
     }
   }
 }
@@ -218,6 +298,23 @@ export default {
   padding: 20px;
   background: #f8f9fa;
   border-radius: 8px;
+}
+
+.insurance-filters :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.insurance-filters :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.insurance-filters :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 8px;
+}
+
+.insurance-filters :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .insurance-table {

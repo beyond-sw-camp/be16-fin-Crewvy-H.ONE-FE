@@ -27,6 +27,9 @@
                   v-model="transferPeriod"
                   type="month"
                   placeholder="이체 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="fetchTransferData"
                 />
               </el-form-item>
             </el-col>
@@ -51,7 +54,7 @@
           </el-row>
         </div>
         
-        <el-table :data="transferData" style="width: 100%" class="transfer-table">
+        <el-table :data="transferData" style="width: 100%" class="transfer-table" v-loading="loading">
           <el-table-column prop="bankName" label="은행" min-width="100" align="center" />
           <el-table-column prop="department" label="부서" min-width="100" align="center" />
           <el-table-column prop="employeeId" label="사번" min-width="100" align="center" />
@@ -71,6 +74,8 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import ExcelJS from 'exceljs'
+import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollTransferOutput',
@@ -79,179 +84,80 @@ export default {
     return { success, error, warning, info }
   },
   created() {
-    // 목업 데이터 늘리기 (총 80행)
-    const base = [...this.transferData]
-    const targetCount = 80
-    const mockNames = ['김민준','이서연','박도윤','최지우','정하준','한유진','조준서','윤예린','장수아','임시우','오태윤','서연우','신아윤','권승현','황재민','문서윤','홍지안','강유나','배민서','류하린']
-    const departments = ['관리팀', '영업팀', '개발팀', '마케팅팀', '인사팀', '재무팀', '디자인팀', 'QA팀']
-    let i = 0
-    while (this.transferData.length < targetCount) {
-      const src = base[i % base.length]
-      const idx = this.transferData.length + 1
-      const varied = {
-        employeeId: String(220500 + idx).padStart(6, '0'),
-        employeeName: mockNames[idx % mockNames.length],
-        department: departments[idx % departments.length],
-        accountNumber: src.accountNumber.replace(/\d/g, (d) => ((+d + idx) % 10)),
-        bankName: src.bankName,
-        amount: src.amount + (idx % 7) * 5000,
-        transferDate: src.transferDate,
-        status: src.status
-      }
-      this.transferData.push(varied)
-      i++
-    }
+    // 초기 데이터 로드
+    this.fetchTransferData()
   },
   data() {
+    // 초기값: 당월 설정
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
     return {
-      transferPeriod: new Date(),
+      transferPeriod: currentYearMonth,
       selectedBank: '',
       fileFormat: 'excel',
-      transferData: [
-        {
-          employeeName: '김철수',
-          employeeId: '220503',
-          department: '관리팀',
-          accountNumber: '285102-04-269765',
-          bankName: '국민은행',
-          amount: 3008550,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '이영희',
-          employeeId: '220504',
-          department: '관리팀',
-          accountNumber: '285102-04-269766',
-          bankName: '국민은행',
-          amount: 2559910,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '박민수',
-          employeeId: '220505',
-          department: '영업팀',
-          accountNumber: '285102-04-269767',
-          bankName: '국민은행',
-          amount: 3200000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '최지영',
-          employeeId: '220506',
-          department: '영업팀',
-          accountNumber: '285102-04-269768',
-          bankName: '국민은행',
-          amount: 2800000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '정하준',
-          employeeId: '220507',
-          department: '개발팀',
-          accountNumber: '285102-04-269769',
-          bankName: '국민은행',
-          amount: 3500000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '한유진',
-          employeeId: '220508',
-          department: '마케팅팀',
-          accountNumber: '110-123-456789',
-          bankName: '신한은행',
-          amount: 2800000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '조준서',
-          employeeId: '220509',
-          department: '마케팅팀',
-          accountNumber: '110-123-456790',
-          bankName: '신한은행',
-          amount: 3200000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '윤예린',
-          employeeId: '220510',
-          department: '마케팅팀',
-          accountNumber: '110-123-456791',
-          bankName: '신한은행',
-          amount: 2900000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '장수아',
-          employeeId: '220511',
-          department: '인사팀',
-          accountNumber: '1002-123-456789',
-          bankName: '우리은행',
-          amount: 3100000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '임시우',
-          employeeId: '220512',
-          department: '인사팀',
-          accountNumber: '1002-123-456790',
-          bankName: '우리은행',
-          amount: 2700000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '오태윤',
-          employeeId: '220513',
-          department: '인사팀',
-          accountNumber: '1002-123-456791',
-          bankName: '우리은행',
-          amount: 3300000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '서연우',
-          employeeId: '220514',
-          department: '인사팀',
-          accountNumber: '1002-123-456792',
-          bankName: '우리은행',
-          amount: 2850000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '신아윤',
-          employeeId: '220515',
-          department: '인사팀',
-          accountNumber: '1002-123-456793',
-          bankName: '우리은행',
-          amount: 2950000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        },
-        {
-          employeeName: '권승현',
-          employeeId: '220516',
-          department: '인사팀',
-          accountNumber: '1002-123-456794',
-          bankName: '우리은행',
-          amount: 3200000,
-          transferDate: '2024-09-25',
-          status: '완료'
-        }
-      ]
+      transferData: [],
+      loading: false
     }
   },
   methods: {
+    // 급여 이체 데이터 조회
+    async fetchTransferData() {
+      try {
+        this.loading = true
+        
+        let yearMonth = ''
+        
+        // transferPeriod를 yyyy-MM 형식으로 변환
+        // 조회기간이 선택되지 않았거나 null인 경우 당월로 설정
+        if (this.transferPeriod && this.transferPeriod !== null && this.transferPeriod !== '') {
+          if (typeof this.transferPeriod === 'string') {
+            yearMonth = this.transferPeriod
+          } else {
+            const date = new Date(this.transferPeriod)
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            yearMonth = `${year}-${month}`
+          }
+        } else {
+          // 기본값: 현재 년월 (당월)
+          const now = new Date()
+          const year = now.getFullYear()
+          const month = String(now.getMonth() + 1).padStart(2, '0')
+          yearMonth = `${year}-${month}`
+          // transferPeriod도 당월로 업데이트
+          this.transferPeriod = yearMonth
+        }
+        
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get('/workforce-service/salary/output', {
+          params: {
+            yearMonth: yearMonth
+          },
+          headers: userHeaders
+        })
+        
+        // API 응답 데이터를 컴포넌트 형식으로 변환
+        const apiData = response.data?.data || response.data || []
+        this.transferData = apiData.map(item => ({
+          bankName: item.bank || '',
+          department: item.department || '',
+          employeeId: item.sabun || '',
+          employeeName: item.memberName || '',
+          accountNumber: item.bankAccount || '',
+          amount: item.netPay || 0
+        }))
+        
+        this.success('급여 이체 데이터를 조회했습니다.')
+      } catch (err) {
+        console.error('급여 이체 데이터 조회 실패:', err)
+        this.error('급여 이체 데이터를 불러오는데 실패했습니다.')
+        this.transferData = []
+      } finally {
+        this.loading = false
+      }
+    },
+    
     generateFile() {
       this.success('급여 이체 파일이 생성되었습니다.')
     },
@@ -1224,6 +1130,23 @@ export default {
   padding: 20px;
   background: #f8f9fa;
   border-radius: 8px;
+}
+
+.transfer-filters :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.transfer-filters :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.transfer-filters :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 8px;
+}
+
+.transfer-filters :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .transfer-table {

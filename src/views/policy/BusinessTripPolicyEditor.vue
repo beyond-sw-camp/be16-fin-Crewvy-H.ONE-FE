@@ -73,6 +73,22 @@
             </div>
           </div>
 
+          <!-- 허용 출장지 블록 -->
+          <div class="policy-block">
+            <div class="block-header">
+              <h4>허용 출장지</h4>
+              <el-switch v-model="policy.blocks.allowedLocations.enabled"></el-switch>
+            </div>
+            <div v-if="policy.blocks.allowedLocations.enabled" class="block-content">
+              <el-form-item label="출장 가능 지역">
+                <el-select v-model="policy.blocks.allowedLocations.locations" multiple placeholder="출장지를 선택하세요" style="width: 100%;">
+                  <el-option v-for="location in workLocations" :key="location.workLocationId" :label="location.name" :value="location.name"></el-option>
+                </el-select>
+              </el-form-item>
+              <p class="help-text">특정 출장지만 허용하려면 선택하세요. 선택하지 않으면 모든 출장지가 허용됩니다.</p>
+            </div>
+          </div>
+
         </el-form>
       </div>
     </div>
@@ -80,15 +96,17 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
+import { getActiveWorkLocations } from '@/api/attendance';
 
 export default {
   name: 'BusinessTripPolicyEditor',
   setup() {
     const router = useRouter();
-    const { success } = useSnackbar();
+    const { success, error } = useSnackbar();
+    const workLocations = ref([]);
 
     // This data structure now mirrors the JSON format from the scenario
     const policy = ref({
@@ -109,7 +127,23 @@ export default {
         accommodation: {
           enabled: false,
         },
+        allowedLocations: {
+          enabled: false,
+          locations: [],
+        },
       },
+    });
+
+    const fetchWorkLocations = async () => {
+      try {
+        workLocations.value = await getActiveWorkLocations();
+      } catch (err) {
+        error(err.message || '근무지 목록을 불러오는 데 실패했습니다.');
+      }
+    };
+
+    onMounted(() => {
+      fetchWorkLocations();
     });
 
     const goBack = () => {
@@ -124,6 +158,7 @@ export default {
 
     return {
       policy,
+      workLocations,
       goBack,
       savePolicy,
     };
@@ -193,5 +228,12 @@ export default {
     padding-left: 24px;
     margin-top: 8px;
     max-width: 400px;
+}
+
+.help-text {
+  font-size: 13px;
+  color: #909399;
+  margin-top: 8px;
+  line-height: 1.5;
 }
 </style>

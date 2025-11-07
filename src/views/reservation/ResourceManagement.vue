@@ -6,6 +6,14 @@
         <p>회의실, 차량 등 공용 자원을 관리하세요.</p>
       </div>
       <div class="header-actions">
+        <el-button @click="showStatisticsModal">
+          <el-icon><DataAnalysis /></el-icon>
+          <span style="margin-left: 8px;">통계</span>
+        </el-button>
+        <el-button type="success" @click="showCategoryDialog">
+          <el-icon><Setting /></el-icon>
+          <span style="margin-left: 8px;">카테고리 관리</span>
+        </el-button>
         <el-button type="primary" @click="showAddDialog">
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">자원 추가</span>
@@ -30,16 +38,23 @@
       <div class="filter-section">
         <el-select v-model="selectedCategory" placeholder="카테고리" clearable @change="handleFilter">
           <el-option label="전체" value="" />
-          <el-option label="회의실" value="meeting_room" />
-          <el-option label="차량" value="vehicle" />
-          <el-option label="장비" value="equipment" />
-          <el-option label="기타" value="other" />
+          <el-option 
+            v-for="category in categories" 
+            :key="category.id" 
+            :label="category.name" 
+            :value="category.value" 
+          />
         </el-select>
+      </div>
+      <div class="filter-section">
         <el-select v-model="selectedStatus" placeholder="상태" clearable @change="handleFilter">
           <el-option label="전체" value="" />
-          <el-option label="사용가능" value="available" />
-          <el-option label="사용중" value="in_use" />
-          <el-option label="점검중" value="maintenance" />
+          <el-option 
+            v-for="status in statusOptions" 
+            :key="status.value" 
+            :label="status.label" 
+            :value="status.value" 
+          />
         </el-select>
       </div>
     </div>
@@ -49,34 +64,35 @@
       <el-table
         :data="filteredResources"
         v-loading="loading"
-        stripe
         style="width: 100%"
         empty-text="등록된 자원이 없습니다."
+        :reserve-selection="true"
+        :row-key="row => row.id"
       >
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="ID" width="50">
+          <template #default="{ $index }">
+            {{ $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="자원명" min-width="150" />
-        <el-table-column prop="category" label="카테고리" width="120">
+        <el-table-column prop="reservationCategoryName" label="카테고리" width="120">
           <template #default="{ row }">
-            <el-tag :type="getCategoryTagType(row.category)">
-              {{ getCategoryLabel(row.category) }}
+            <el-tag :type="getCategoryTagTypeByName(row.reservationCategoryName)">
+              {{ row.reservationCategoryName || '기타' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="location" label="위치" min-width="120" />
-        <el-table-column prop="capacity" label="수용인원" width="100" />
-        <el-table-column prop="status" label="상태" width="100">
+        <el-table-column prop="capacity" label="인원" width="50" />
+        <el-table-column prop="status" label="상태" width="130">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="facilities" label="시설" min-width="150" show-overflow-tooltip />
         <el-table-column prop="description" label="설명" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="등록일" width="120">
-          <template #default="{ row }">
-            {{ formatDate(row.createdAt) }}
-          </template>
-        </el-table-column>
         <el-table-column label="관리" width="150" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="editResource(row)">수정</el-button>
@@ -92,6 +108,8 @@
       v-model="dialogVisible"
       width="600px"
       @close="resetForm"
+      :destroy-on-close="true"
+      :close-on-click-modal="false"
     >
       <el-form
         ref="resourceForm"
@@ -104,10 +122,12 @@
         </el-form-item>
         <el-form-item label="카테고리" prop="category">
           <el-select v-model="resourceForm.category" placeholder="카테고리를 선택하세요">
-            <el-option label="회의실" value="meeting_room" />
-            <el-option label="차량" value="vehicle" />
-            <el-option label="장비" value="equipment" />
-            <el-option label="기타" value="other" />
+            <el-option 
+              v-for="category in categories" 
+              :key="category.id" 
+              :label="category.name" 
+              :value="category.value" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="위치" prop="location">
@@ -121,11 +141,20 @@
             placeholder="수용인원"
           />
         </el-form-item>
-        <el-form-item label="상태" prop="status">
+        <el-form-item label="시설" prop="facilities">
+          <el-input 
+            v-model="resourceForm.facilities" 
+            placeholder="시설 정보를 입력하세요 (예: 프로젝터, 화이트보드, 에어컨 등)"
+          />
+        </el-form-item>
+        <el-form-item v-if="isEditMode" label="상태" prop="status">
           <el-select v-model="resourceForm.status" placeholder="상태를 선택하세요">
-            <el-option label="사용가능" value="available" />
-            <el-option label="사용중" value="in_use" />
-            <el-option label="점검중" value="maintenance" />
+            <el-option 
+              v-for="status in statusOptions" 
+              :key="status.value" 
+              :label="status.label" 
+              :value="status.value" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="설명" prop="description">
@@ -146,18 +175,181 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 카테고리 관리 다이얼로그 -->
+    <el-dialog
+      title="카테고리 관리"
+      v-model="categoryDialogVisible"
+      width="600px"
+      @close="resetCategoryForm"
+      :destroy-on-close="true"
+      :close-on-click-modal="false"
+    >
+      <div class="category-management">
+        <div class="category-form">
+          <div class="category-form-content">
+            <el-form
+              ref="categoryForm"
+              :model="categoryForm"
+              :rules="categoryFormRules"
+              label-width="100px"
+              inline
+            >
+              <el-form-item label="카테고리명" prop="name">
+                <el-input 
+                  v-model="categoryForm.name" 
+                  placeholder="카테고리명을 입력하세요" 
+                  style="width: 200px;"
+                />
+              </el-form-item>
+            </el-form>
+            <div class="category-form-buttons">
+              <el-button type="primary" @click="saveCategory" :loading="categorySaving">
+                {{ isCategoryEditMode ? '수정' : '추가' }}
+              </el-button>
+              <el-button v-if="isCategoryEditMode" @click="cancelCategoryEdit">
+                취소
+              </el-button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="category-list">
+          <el-table 
+            :data="categories" 
+            style="width: 100%"
+            :reserve-selection="true"
+            :row-key="row => row.id"
+          >
+            <el-table-column prop="name" label="카테고리명" align="center" />
+            <el-table-column label="관리" align="center">
+              <template #default="{ row, $index }">
+                <el-button 
+                  size="small" 
+                  @click="editCategory(row, $index)"
+                >
+                  수정
+                </el-button>
+                <el-button 
+                  size="small" 
+                  type="danger" 
+                  @click="deleteCategory(row, $index)"
+                  :disabled="categories.length <= 1"
+                >
+                  삭제
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="categoryDialogVisible = false">닫기</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 통계 모달 -->
+    <el-dialog
+      v-model="showStatistics"
+      width="1000px"
+    >
+      <template #header>
+        <div class="statistics-header">
+          <h3 class="statistics-title">자원 이용 통계</h3>
+          <el-button @click="exportToPDF" type="primary" size="default">
+            <el-icon><Download /></el-icon>
+            <span style="margin-left: 8px;">PDF 내보내기</span>
+          </el-button>
+        </div>
+      </template>
+      <div class="statistics-content" id="statistics-report">
+        <div class="stats-summary-section">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h4>이용률</h4>
+              <div class="stat-value">{{ statistics.usageRate }}%</div>
+            </div>
+            <div class="stat-card">
+              <h4>Peak Time</h4>
+              <div class="stat-value">{{ statistics.peakTime || '데이터 없음' }}</div>
+            </div>
+            <div class="stat-card">
+              <h4>No Show</h4>
+              <div class="stat-value">{{ statistics.noShow }}건</div>
+            </div>
+            <div class="stat-card">
+              <h4>총 예약</h4>
+              <div class="stat-value">{{ statistics.totalReservations }}건</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <h4>월별 이용 현황</h4>
+          <div class="chart-container">
+            <canvas ref="monthlyChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <h4>카테고리별 이용률</h4>
+          <div class="chart-container">
+            <canvas ref="resourceChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showStatistics = false">닫기</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
+import { Plus, Search, Setting, DataAnalysis, Download } from '@element-plus/icons-vue'
+import { useSnackbar } from '@/composables/useSnackbar'
+import axios from 'axios'
+import { getAuthHeadersFromToken } from '@/utils/authUtils'
+import Chart from 'chart.js/auto'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default {
   name: 'ResourceManagement',
   components: {
     Plus,
-    Search
+    Search,
+    Setting,
+    DataAnalysis,
+    Download
+  },
+  setup() {
+    const { success, error } = useSnackbar()
+    
+    // ResizeObserver 루프 경고 방지
+    const suppressResizeObserverError = () => {
+      const originalError = console.error
+      console.error = (...args) => {
+        if (args[0] && args[0].includes && args[0].includes('ResizeObserver loop completed with undelivered notifications')) {
+          return
+        }
+        originalError.apply(console, args)
+      }
+    }
+    
+    // 컴포넌트 마운트 시 에러 억제
+    suppressResizeObserverError()
+    
+    return {
+      success,
+      error
+    }
   },
   data() {
     return {
@@ -169,59 +361,39 @@ export default {
       selectedCategory: '',
       selectedStatus: '',
       
+      // 상태 옵션
+      statusOptions: [],
+      
+      // 카테고리 관리
+      categoryDialogVisible: false,
+      categorySaving: false,
+      isCategoryEditMode: false,
+      editingCategoryIndex: -1,
+      categories: [],
+      categoryForm: {
+        name: ''
+      },
+      categoryFormRules: {
+        name: [
+          { required: true, message: '카테고리명을 입력해주세요', trigger: 'blur' },
+          { min: 2, max: 20, message: '카테고리명은 2-20자 사이여야 합니다', trigger: 'blur' }
+        ]
+      },
+      
       // 자원 목록 데이터
-      resources: [
-        {
-          id: 1,
-          name: '대회의실 A',
-          category: 'meeting_room',
-          location: '3층 301호',
-          capacity: 20,
-          status: 'available',
-          description: '프레젠테이션 시설이 완비된 대형 회의실',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 2,
-          name: '소회의실 B',
-          category: 'meeting_room',
-          location: '3층 302호',
-          capacity: 8,
-          status: 'in_use',
-          description: '소규모 회의용 회의실',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 3,
-          name: '회사 차량 1',
-          category: 'vehicle',
-          location: '지하 1층 주차장',
-          capacity: 5,
-          status: 'available',
-          description: '승용차 - 외근 및 출장용',
-          createdAt: '2024-01-10'
-        },
-        {
-          id: 4,
-          name: '프로젝터',
-          category: 'equipment',
-          location: '3층 보관실',
-          capacity: 1,
-          status: 'maintenance',
-          description: '고화질 프로젝터 - 회의실 사용',
-          createdAt: '2024-01-20'
-        },
-        {
-          id: 5,
-          name: '노트북',
-          category: 'equipment',
-          location: 'IT팀 사무실',
-          capacity: 1,
-          status: 'available',
-          description: '회의용 노트북',
-          createdAt: '2024-01-25'
-        }
-      ],
+      resources: [],
+      
+      // 통계 관련
+      showStatistics: false,
+      statistics: {
+        usageRate: 0,
+        peakTime: '',
+        noShow: 0,
+        totalReservations: 0
+      },
+      allReservations: [], // 전체 예약 목록 (통계용)
+      monthlyChartInstance: null,
+      resourceChartInstance: null,
       
       // 폼 데이터
       resourceForm: {
@@ -230,6 +402,7 @@ export default {
         category: '',
         location: '',
         capacity: 1,
+        facilities: '',
         status: 'available',
         description: ''
       },
@@ -252,10 +425,15 @@ export default {
           { type: 'number', min: 1, max: 1000, message: '수용인원은 1-1000명 사이여야 합니다', trigger: 'blur' }
         ],
         status: [
-          { required: true, message: '상태를 선택해주세요', trigger: 'change' }
+          { required: this.isEditMode, message: '상태를 선택해주세요', trigger: 'change' }
         ]
       }
     }
+  },
+  mounted() {
+    this.loadResourceList()
+    this.loadCategories()
+    this.loadStatusOptions()
   },
   computed: {
     filteredResources() {
@@ -284,6 +462,55 @@ export default {
     }
   },
   methods: {
+    async loadResourceList() {
+      this.loading = true
+      try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        // 응답을 화면 테이블 스키마로 매핑
+        this.resources = list.map(item => ({
+          id: item.id || item.uuid || item.reservationTypeId,
+          name: item.name || item.resourceName,
+          reservationCategoryId: item.reservationCategory?.id || item.reservationCategoryId || null,
+          reservationCategoryName: item.categoryName || item.reservationCategory?.name || item.reservationCategoryName || '',
+          category: item.category || (item.categoryName || item.reservationCategory?.name || item.reservationCategoryName || '').toLowerCase().replace(/\s+/g, '_'),
+          location: item.location || '',
+          capacity: item.capacity ?? 1,
+          facilities: item.facilities || '',
+          status: item.reservationTypeStatus || 'available',
+          description: item.description || '',
+          createdAt: item.createdAt || ''
+        })).sort((a, b) => {
+          // 먼저 카테고리명으로 정렬
+          const categoryA = a.reservationCategoryName || ''
+          const categoryB = b.reservationCategoryName || ''
+          
+          if (categoryA !== categoryB) {
+            return categoryA.localeCompare(categoryB, 'ko')
+          }
+          
+          // 같은 카테고리 내에서는 자원명으로 정렬
+          const nameA = a.name || ''
+          const nameB = b.name || ''
+          return nameA.localeCompare(nameB, 'ko')
+        })
+      } catch (e) {
+        this.error('자원 목록 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+      } finally {
+        this.loading = false
+      }
+    },
     // 검색 처리
     handleSearch() {
       // 검색은 computed property에서 자동으로 처리됨
@@ -298,13 +525,36 @@ export default {
     showAddDialog() {
       this.isEditMode = false
       this.resetForm()
+      // 카테고리 및 상태 목록 최신화
+      this.loadCategories()
+      this.loadStatusOptions()
       this.dialogVisible = true
     },
     
     // 자원 수정
     editResource(resource) {
       this.isEditMode = true
-      this.resourceForm = { ...resource }
+      
+      // 카테고리 매핑: reservationCategoryName을 기반으로 category value 찾기
+      let categoryValue = ''
+      if (resource.reservationCategoryName) {
+        const category = this.categories.find(cat => cat.name === resource.reservationCategoryName)
+        categoryValue = category ? category.value : ''
+      } else if (resource.reservationCategoryId) {
+        const category = this.categories.find(cat => cat.id === resource.reservationCategoryId)
+        categoryValue = category ? category.value : ''
+      } else {
+        categoryValue = resource.category || ''
+      }
+      
+      this.resourceForm = { 
+        ...resource,
+        category: categoryValue,
+        facilities: resource.facilities || ''
+      }
+      // 카테고리 및 상태 목록 최신화
+      this.loadCategories()
+      this.loadStatusOptions()
       this.dialogVisible = true
     },
     
@@ -321,13 +571,26 @@ export default {
           }
         )
         
-        const index = this.resources.findIndex(r => r.id === resource.id)
-        if (index > -1) {
-          this.resources.splice(index, 1)
-          ElMessage.success('자원이 삭제되었습니다.')
-        }
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        // 실제 API 삭제 요청
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/delete/${resource.id}`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        
+        // 삭제 후 목록을 다시 로드하여 최신 데이터 반영
+        await this.loadResourceList()
+        this.success('자원이 삭제되었습니다.')
+        
       } catch (error) {
-        // 사용자가 취소한 경우
+        if (error.message !== 'cancel') { // 사용자가 취소한 경우가 아닌 경우
+          this.error('자원 삭제 중 오류가 발생했습니다.')
+          console.error('자원 삭제 오류:', error)
+        }
       }
     },
     
@@ -338,26 +601,56 @@ export default {
         
         this.saving = true
         
-        // 실제 API 호출 시뮬레이션
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const selectedCategory = this.categories.find(cat => cat.value === this.resourceForm.category)
+        
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        const requestHeaders = authHeaders ? {
+          'Authorization': authHeaders['Authorization'],
+          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+        } : {}
         
         if (this.isEditMode) {
           // 수정
-          const index = this.resources.findIndex(r => r.id === this.resourceForm.id)
-          if (index > -1) {
-            this.resources.splice(index, 1, { ...this.resourceForm })
-            ElMessage.success('자원이 수정되었습니다.')
+          const updateData = {
+            reservationCategory: {
+              id: selectedCategory?.id || null
+            },
+            name: this.resourceForm.name,
+            location: this.resourceForm.location,
+            capacity: this.resourceForm.capacity,
+            facilities: this.resourceForm.facilities || '',
+            description: this.resourceForm.description,
+            reservationTypeStatus: this.resourceForm.status
           }
+          
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData, {
+            headers: requestHeaders
+          })
+          
+          // 자원 수정 후 목록을 다시 로드하여 최신 데이터 반영
+          await this.loadResourceList()
+          this.success('자원이 수정되었습니다.')
         } else {
           // 추가
-          const newId = Math.max(...this.resources.map(r => r.id)) + 1
-          const newResource = {
-            ...this.resourceForm,
-            id: newId,
-            createdAt: new Date().toISOString().split('T')[0]
+          const createData = {
+            reservationCategory: {
+              id: selectedCategory?.id || null
+            },
+            name: this.resourceForm.name,
+            location: this.resourceForm.location,
+            capacity: this.resourceForm.capacity,
+            facilities: this.resourceForm.facilities || '',
+            description: this.resourceForm.description
           }
-          this.resources.unshift(newResource)
-          ElMessage.success('자원이 추가되었습니다.')
+          
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/register`, createData, {
+            headers: requestHeaders
+          })
+          
+          // 자원 추가 후 목록을 다시 로드하여 최신 데이터 반영
+          await this.loadResourceList()
+          this.success('자원이 추가되었습니다.')
         }
         
         this.dialogVisible = false
@@ -365,8 +658,9 @@ export default {
         
       } catch (error) {
         if (error !== false) { // 폼 검증 실패가 아닌 경우
-          ElMessage.error('저장 중 오류가 발생했습니다.')
+          this.error('저장 중 오류가 발생했습니다.')
         }
+        console.error('자원 저장 오류:', error)
       } finally {
         this.saving = false
       }
@@ -380,6 +674,7 @@ export default {
         category: '',
         location: '',
         capacity: 1,
+        facilities: '',
         status: 'available',
         description: ''
       }
@@ -388,46 +683,100 @@ export default {
       }
     },
     
-    // 카테고리 라벨 반환
-    getCategoryLabel(category) {
-      const labels = {
-        meeting_room: '회의실',
-        vehicle: '차량',
-        equipment: '장비',
-        other: '기타'
-      }
-      return labels[category] || category
-    },
     
-    // 카테고리 태그 타입 반환
-    getCategoryTagType(category) {
-      const types = {
-        meeting_room: 'primary',
-        vehicle: 'success',
-        equipment: 'warning',
-        other: 'info'
+    // 카테고리 이름을 기반으로 태그 타입 반환
+    getCategoryTagTypeByName(categoryName) {
+      if (!categoryName) return 'info'
+      
+      const name = categoryName.toLowerCase()
+      
+      // 회의실 관련
+      if (name.includes('회의실') || name.includes('meeting') || 
+          name.includes('conference') || name.includes('room')) {
+        return 'primary'
       }
-      return types[category] || 'info'
+      // 차량 관련
+      else if (name.includes('차량') || name.includes('vehicle') || 
+               name.includes('car') || name.includes('법인차량') ||
+               name.includes('자동차')) {
+        return 'success'
+      }
+      // 장비 관련
+      else if (name.includes('장비') || name.includes('equipment') || 
+               name.includes('기자재') || name.includes('device') ||
+               name.includes('노트북') || name.includes('laptop')) {
+        return 'warning'
+      }
+      // 시설 관련
+      else if (name.includes('시설') || name.includes('facility') || 
+               name.includes('공간') || name.includes('space')) {
+        return 'info'
+      }
+      // 기타
+      else if (name.includes('기타') || name.includes('other') || 
+               name.includes('etc')) {
+        return 'danger'
+      }
+      // 기본값
+      else {
+        return 'info'
+      }
     },
     
     // 상태 라벨 반환
     getStatusLabel(status) {
-      const labels = {
-        available: '사용가능',
-        in_use: '사용중',
-        maintenance: '점검중'
-      }
-      return labels[status] || status
+      const statusOption = this.statusOptions.find(option => option.value === status)
+      return statusOption ? statusOption.label : status
     },
     
     // 상태 태그 타입 반환
     getStatusTagType(status) {
-      const types = {
-        available: 'success',
-        in_use: 'warning',
-        maintenance: 'danger'
+      const statusOption = this.statusOptions.find(option => option.value === status)
+      return statusOption ? statusOption.type : 'info'
+    },
+
+    // 상태명을 기반으로 태그 타입 반환 (API 응답 매핑용)
+    getStatusTagTypeFromCode(statusName) {
+      if (!statusName) return 'info'
+      
+      const upperStatusName = statusName.toUpperCase()
+      const typeMapping = {
+        // 사용 가능 상태
+        'AVAILABLE': 'success',
+        'ACTIVE': 'success',
+        'READY': 'success',
+        
+        // 사용 중 상태
+        'IN_USE': 'warning',
+        'USING': 'warning',
+        'OCCUPIED': 'warning',
+        'BUSY': 'warning',
+        
+        // 점검/유지보수 상태
+        'MAINTENANCE': 'danger',
+        'REPAIR': 'danger',
+        'OUT_OF_ORDER': 'danger',
+        'DISABLED': 'danger',
+        
+        // 예약/대기 상태
+        'BEFORE': 'primary',
+        'RESERVED': 'primary',
+        'PENDING': 'primary',
+        'SCHEDULED': 'primary',
+        
+        // 완료/사용됨 상태
+        'USED': 'info',
+        'COMPLETED': 'info',
+        'FINISHED': 'info',
+        
+        // 취소 상태
+        'CANCELLED': 'info',
+        
+        // 비활성/정지 상태
+        'INACTIVE': 'warning',
+        'SUSPENDED': 'warning'
       }
-      return types[status] || 'info'
+      return typeMapping[upperStatusName] || 'info'
     },
     
     // 날짜 포맷팅
@@ -435,6 +784,871 @@ export default {
       if (!dateString) return ''
       const date = new Date(dateString)
       return date.toLocaleDateString('ko-KR')
+    },
+    
+    // 카테고리 관리 다이얼로그 표시
+    showCategoryDialog() {
+      this.categoryDialogVisible = true
+      this.loadCategories()
+    },
+
+    async loadCategories() {
+      this.categorySaving = true
+      try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
+          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        this.categories = list.map(cat => ({
+          id: cat.id || cat.categoryId || cat.uuid,
+          name: cat.name,
+          value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
+        }))
+        
+      } catch (e) {
+        this.error('카테고리 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+      } finally {
+        this.categorySaving = false
+      }
+    },
+
+    async loadStatusOptions() {
+      try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/status-list`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        const list = Array.isArray(data) ? data : (data?.data || [])
+        
+        // 백엔드 응답을 statusOptions 형식으로 매핑
+        this.statusOptions = list.map(status => ({
+          value: status.statusName,
+          label: status.codeName,
+          type: this.getStatusTagTypeFromCode(status.statusName)
+        }))
+        
+      } catch (e) {
+        this.error('상태 목록 조회 실패')
+        // eslint-disable-next-line no-console
+        console.error(e)
+        // API 실패 시 빈 배열로 설정
+        this.statusOptions = []
+      }
+    },
+    
+    // 카테고리 저장 (추가/수정)
+    async saveCategory() {
+      try {
+        await this.$refs.categoryForm.validate()
+        
+        this.categorySaving = true
+        
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        const requestHeaders = authHeaders ? {
+          'Authorization': authHeaders['Authorization'],
+          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+        } : {}
+        
+        if (this.isCategoryEditMode) {
+          // 수정: PUT /update/{id}
+          const id = this.categories[this.editingCategoryIndex]?.id
+          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/update/${id}`, {
+            name: this.categoryForm.name
+          }, {
+            headers: requestHeaders
+          })
+          this.success('카테고리가 수정되었습니다.')
+        } else {
+          // 추가: POST /register
+          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
+            name: this.categoryForm.name,
+            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+          }, {
+            headers: requestHeaders
+          })
+          this.success('카테고리가 추가되었습니다.')
+        }
+        
+        await this.loadCategories()
+        this.resetCategoryForm()
+        
+      } catch (error) {
+        if (error !== false) { // 폼 검증 실패가 아닌 경우
+          this.error(this.isCategoryEditMode ? '카테고리 수정 중 오류가 발생했습니다.' : '카테고리 추가 중 오류가 발생했습니다.')
+        }
+      } finally {
+        this.categorySaving = false
+      }
+    },
+    
+    // 카테고리 수정
+    editCategory(category, index) {
+      this.isCategoryEditMode = true
+      this.editingCategoryIndex = index
+      this.categoryForm.name = category.name
+    },
+    
+    // 카테고리 수정 취소
+    cancelCategoryEdit() {
+      this.isCategoryEditMode = false
+      this.editingCategoryIndex = -1
+      this.resetCategoryForm()
+    },
+    
+    // 카테고리 삭제
+    async deleteCategory(category) {
+      try {
+        await ElMessageBox.confirm(
+          `"${category.name}" 카테고리를 삭제하시겠습니까?`,
+          '카테고리 삭제',
+          {
+            confirmButtonText: '삭제',
+            cancelButtonText: '취소',
+            type: 'warning'
+          }
+        )
+        
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/delete/${category.id}`, {
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        await this.loadCategories()
+        this.success('카테고리가 삭제되었습니다.')
+        
+      } catch (error) {
+        // 사용자가 취소한 경우
+      }
+    },
+    
+    // 카테고리 폼 초기화
+    resetCategoryForm() {
+      this.categoryForm = {
+        name: ''
+      }
+      this.isCategoryEditMode = false
+      this.editingCategoryIndex = -1
+      if (this.$refs.categoryForm) {
+        this.$refs.categoryForm.clearValidate()
+      }
+    },
+    
+    // 통계 모달 표시
+    async showStatisticsModal() {
+      this.showStatistics = true
+      
+      // 자원 데이터가 없으면 먼저 로드
+      if (this.resources.length === 0) {
+        await this.loadResources()
+      }
+      
+      // 예약 데이터 로드
+      await this.loadAllReservationsForStatistics()
+      
+      // 통계 계산
+      this.calculateStatistics()
+      
+      // 차트 생성
+      this.$nextTick(() => {
+        setTimeout(() => {
+          this.createMonthlyChart()
+          this.createResourceChart()
+        }, 100)
+      })
+    },
+    
+    // 통계용 예약 데이터 로드
+    async loadAllReservationsForStatistics() {
+      try {
+        // 헤더 설정
+        const authHeaders = getAuthHeadersFromToken()
+        
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
+          params: { 
+            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+          },
+          headers: authHeaders ? {
+            'Authorization': authHeaders['Authorization'],
+            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
+          } : {}
+        })
+        const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
+        
+        // 예약 데이터 변환 (date, startTime, endTime 추가)
+        const now = new Date()
+        this.allReservations = list.map(item => {
+          const startDateTime = new Date(item.startDateTime)
+          const endDateTime = new Date(item.endDateTime)
+          
+          // 상태 업데이트: 예약 종료 시간이 지난 경우 USED로 처리
+          let status = item.status
+          if (now > endDateTime) {
+            // 종료 시간이 지났으면 USED (사용 완료)로 처리
+            if (status === 'BEFORE' || status === 'IN_USE') {
+              status = 'USED'
+            }
+          } else if (now >= startDateTime && now <= endDateTime) {
+            // 현재 시간이 예약 시간 내에 있으면 IN_USE로 처리
+            if (status === 'BEFORE') {
+              status = 'IN_USE'
+            }
+          }
+          
+          return {
+            id: item.id,
+            reservationTypeId: item.reservationTypeId,
+            memberId: item.memberId,
+            companyId: item.companyId,
+            status: status,
+            startDateTime: item.startDateTime,
+            endDateTime: item.endDateTime,
+            date: startDateTime.toISOString().split('T')[0],
+            startTime: startDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            endTime: endDateTime.toTimeString().split(' ')[0].substring(0, 5),
+            resourceName: item.resourceName || '알 수 없음'
+          }
+        })
+      } catch (error) {
+        console.error('통계용 예약 데이터 로드 실패:', error)
+        this.allReservations = []
+      }
+    },
+    
+    // 통계 계산
+    calculateStatistics() {
+      const reservations = this.allReservations
+      
+      if (reservations.length === 0) {
+        this.statistics = {
+          usageRate: 0,
+          peakTime: '데이터 없음',
+          noShow: 0,
+          totalReservations: 0
+        }
+        return
+      }
+      
+      // 총 예약 수
+      const totalReservations = reservations.length
+      
+      // 이용률 계산
+      // 종료 시간이 지난 예약 중 취소되지 않은 것들을 이용 완료로 간주
+      // 또는 USED + IN_USE 상태의 예약을 이용 중인 것으로 간주
+      const now = new Date()
+      let usedReservations = 0
+      
+      reservations.forEach(r => {
+        const endDateTime = new Date(r.endDateTime)
+        // 종료 시간이 지난 예약은 USED로 간주
+        if (now > endDateTime) {
+          // 취소되지 않았고 종료 시간이 지났으면 이용 완료
+          if (r.status !== 'CANCELLED' && r.status !== 'CANCEL') {
+            usedReservations++
+          }
+        } else {
+          // 종료 시간이 아직 지나지 않았지만, USED나 IN_USE 상태면 이용 중/완료로 간주
+          if (r.status === 'USED' || r.status === 'IN_USE') {
+            usedReservations++
+          }
+        }
+      })
+      
+      const usageRate = totalReservations > 0 ? Math.round((usedReservations / totalReservations) * 100) : 0
+      
+      // 디버깅: 상태별 통계 출력
+      if (process.env.NODE_ENV === 'development') {
+        const statusCounts = {}
+        reservations.forEach(r => {
+          statusCounts[r.status] = (statusCounts[r.status] || 0) + 1
+        })
+        console.log('예약 상태별 통계:', statusCounts)
+        console.log('이용 완료 예약 수:', usedReservations, '/ 전체:', totalReservations)
+      }
+      
+      // No Show 계산 (BEFORE 상태의 예약 수)
+      const noShow = reservations.filter(r => r.status === 'BEFORE').length
+      
+      // Peak Time 계산 (가장 많이 예약된 시간대)
+      const timeSlotCounts = {}
+      reservations.forEach(reservation => {
+        if (reservation.startTime) {
+          const startHour = parseInt(reservation.startTime.split(':')[0])
+          const timeSlot = `${startHour}:00-${startHour + 1}:00`
+          timeSlotCounts[timeSlot] = (timeSlotCounts[timeSlot] || 0) + 1
+        }
+      })
+      
+      let peakTime = '데이터 없음'
+      let maxCount = 0
+      Object.entries(timeSlotCounts).forEach(([timeSlot, count]) => {
+        if (count > maxCount) {
+          maxCount = count
+          peakTime = timeSlot
+        }
+      })
+      
+      this.statistics = {
+        usageRate,
+        peakTime,
+        noShow,
+        totalReservations
+      }
+    },
+    
+    // 월별 차트 생성
+    createMonthlyChart() {
+      // 기존 차트가 있으면 제거
+      if (this.monthlyChartInstance) {
+        this.monthlyChartInstance.destroy()
+      }
+      
+      const monthlyData = this.generateMonthlyData()
+      
+      const ctx = this.$refs.monthlyChart?.getContext('2d')
+      if (!ctx) return
+      
+      this.monthlyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: monthlyData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '월별 예약 현황',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            legend: {
+              display: true,
+              position: 'top'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '예약 건수'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: '월'
+              }
+            }
+          }
+        }
+      })
+    },
+    
+    // 카테고리별 차트 생성
+    createResourceChart() {
+      // 기존 차트가 있으면 제거
+      if (this.resourceChartInstance) {
+        this.resourceChartInstance.destroy()
+      }
+      
+      const categoryData = this.generateCategoryData()
+      
+      const ctx = this.$refs.resourceChart?.getContext('2d')
+      if (!ctx) return
+      
+      this.resourceChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: categoryData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '카테고리별 이용률',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            legend: {
+              display: true,
+              position: 'right'
+            }
+          }
+        }
+      })
+    },
+    
+    // 월별 데이터 생성
+    generateMonthlyData() {
+      const reservations = this.allReservations
+      
+      // 최근 12개월 데이터 생성
+      const months = []
+      const counts = []
+      
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        months.push(monthKey)
+        
+        // 해당 Month의 예약 수 계산
+        const monthReservations = reservations.filter(reservation => {
+          if (!reservation.date) return false
+          const reservationDate = new Date(reservation.date)
+          const reservationMonth = `${reservationDate.getFullYear()}-${String(reservationDate.getMonth() + 1).padStart(2, '0')}`
+          return reservationMonth === monthKey
+        })
+        
+        counts.push(monthReservations.length)
+      }
+      
+      return {
+        labels: months,
+        datasets: [{
+          label: '예약 수',
+          data: counts,
+          backgroundColor: 'rgba(79, 70, 229, 0.2)',
+          borderColor: 'rgba(79, 70, 229, 1)',
+          borderWidth: 2,
+          tension: 0.4
+        }]
+      }
+    },
+    
+    // 카테고리별 데이터 생성
+    generateCategoryData() {
+      const reservations = this.allReservations
+      const resourceCounts = {}
+      
+      // 카테고리별 예약 수 계산
+      reservations.forEach(reservation => {
+        // 자원 정보 찾기
+        const resource = this.resources.find(r => r.id === reservation.reservationTypeId)
+        
+        if (resource) {
+          // 카테고리명 사용 (reservationCategoryName 또는 categoryName)
+          const categoryName = resource.reservationCategoryName || resource.categoryName || '기타'
+          resourceCounts[categoryName] = (resourceCounts[categoryName] || 0) + 1
+        } else {
+          // 자원을 찾을 수 없는 경우
+          const fallbackCategory = '알 수 없음'
+          resourceCounts[fallbackCategory] = (resourceCounts[fallbackCategory] || 0) + 1
+        }
+      })
+      
+      const labels = Object.keys(resourceCounts)
+      const data = Object.values(resourceCounts)
+      
+      // 카테고리별 색상 매핑
+      const categoryColors = {
+        '회의실': 'rgba(79, 70, 229, 0.8)',
+        '차량': 'rgba(16, 185, 129, 0.8)',
+        '기타': 'rgba(245, 158, 11, 0.8)',
+        '알 수 없음': 'rgba(239, 68, 68, 0.8)'
+      }
+      
+      // 기본 색상 배열
+      const defaultColors = [
+        'rgba(139, 92, 246, 0.8)',
+        'rgba(236, 72, 153, 0.8)',
+        'rgba(6, 182, 212, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(251, 146, 60, 0.8)',
+        'rgba(168, 85, 247, 0.8)',
+        'rgba(20, 184, 166, 0.8)',
+        'rgba(244, 63, 94, 0.8)'
+      ]
+      
+      // 각 라벨에 대한 색상 생성
+      const backgroundColor = labels.map((label, index) => {
+        // 카테고리별 색상 우선 적용
+        for (const [category, color] of Object.entries(categoryColors)) {
+          if (label.includes(category)) {
+            return color
+          }
+        }
+        // 기본 색상 적용
+        return defaultColors[index % defaultColors.length]
+      })
+      
+      return {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor,
+          borderColor: backgroundColor.map(color => color.replace('0.8', '1')),
+          borderWidth: 2
+        }]
+      }
+    },
+    
+    // PDF 내보내기
+    async exportToPDF() {
+      try {
+        this.success('PDF 생성 중입니다...')
+        
+        // 모달이 열려있지 않거나 차트가 생성되지 않은 경우, 차트 생성
+        if (!this.showStatistics || !this.monthlyChartInstance || !this.resourceChartInstance) {
+          // 차트 데이터가 없으면 로드
+          if (this.allReservations.length === 0) {
+            await this.loadAllReservationsForStatistics()
+            this.calculateStatistics()
+          }
+          
+          // 차트 생성 대기
+          await this.$nextTick()
+          if (!this.monthlyChartInstance && this.$refs.monthlyChart) {
+            this.createMonthlyChart()
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
+          if (!this.resourceChartInstance && this.$refs.resourceChart) {
+            this.createResourceChart()
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
+        }
+        
+        // PDF 생성 (A4 크기: 210mm x 297mm)
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = 210
+        const pdfHeight = 297
+        const margin = 15
+        const contentWidth = pdfWidth - (margin * 2)
+        let yPos = margin
+        
+        // 한글 텍스트를 포함한 HTML 요소 생성
+        const today = new Date()
+        const dateStr = today.toLocaleDateString('ko-KR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+        
+        // 헤더 부분 HTML 생성
+        const headerHtml = `
+          <div style="width: ${contentWidth}mm; padding: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+            <h1 style="font-size: 22px; font-weight: bold; text-align: center; margin: 0 0 8px 0; color: #2c3e50; font-family: inherit;">자원 이용 통계</h1>
+            <p style="font-size: 12px; text-align: center; margin: 0; color: #808080; font-family: inherit;">생성일: ${dateStr}</p>
+          </div>
+        `
+        
+        // HTML 요소 생성 및 캡처
+        const headerElement = document.createElement('div')
+        headerElement.style.position = 'absolute'
+        headerElement.style.left = '-9999px'
+        headerElement.style.width = `${contentWidth}mm`
+        headerElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+        headerElement.innerHTML = headerHtml
+        document.body.appendChild(headerElement)
+        
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        const headerCanvas = await html2canvas(headerElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false,
+          useCORS: true,
+          allowTaint: false,
+          width: headerElement.scrollWidth,
+          height: headerElement.scrollHeight,
+          fontEmbedCSS: true
+        })
+        
+        const headerImgData = headerCanvas.toDataURL('image/png', 1.0)
+        const headerHeight = (headerCanvas.height / headerCanvas.width) * contentWidth
+        pdf.addImage(headerImgData, 'PNG', margin, yPos, contentWidth, headerHeight)
+        yPos += headerHeight + 4
+        
+        document.body.removeChild(headerElement)
+        
+        // PDF용 개선된 통계 요약 HTML 생성 (한 줄에 2개씩, 작은 크기)
+        const statsHtml = `
+          <div style="width: ${contentWidth}mm; padding: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+            <h3 style="font-size: 16px; font-weight: bold; margin: 0 0 12px 0; color: #2c3e50; font-family: inherit; display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 18px;">📊</span>
+              통계 요약
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: 10px; border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">📈</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">이용률</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #409eff; margin-bottom: 4px;">${this.statistics.usageRate}%</div>
+                <div style="font-size: 10px; color: #909399;">실제 이용된 예약 비율</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: 10px; border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">🕐</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">Peak Time</div>
+                </div>
+                <div style="font-size: 18px; font-weight: 700; color: #67c23a; margin-bottom: 4px;">${this.statistics.peakTime || '데이터 없음'}</div>
+                <div style="font-size: 10px; color: #909399;">가장 많이 예약된 시간대</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: 10px; border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">⚠️</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">No Show</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #e6a23c; margin-bottom: 4px;">${this.statistics.noShow}건</div>
+                <div style="font-size: 10px; color: #909399;">예약 후 미사용 건수</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: 10px; border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">📄</span>
+                  <div style="font-size: 12px; font-weight: 500; color: #606266;">총 예약</div>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #909399; margin-bottom: 4px;">${this.statistics.totalReservations}건</div>
+                <div style="font-size: 10px; color: #909399;">전체 예약 건수</div>
+              </div>
+            </div>
+          </div>
+        `
+        
+        const statsElement = document.createElement('div')
+        statsElement.style.position = 'absolute'
+        statsElement.style.left = '-9999px'
+        statsElement.style.width = `${contentWidth}mm`
+        statsElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+        statsElement.innerHTML = statsHtml
+        document.body.appendChild(statsElement)
+        
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        const statsCanvas = await html2canvas(statsElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false,
+          useCORS: true,
+          allowTaint: false,
+          fontEmbedCSS: true
+        })
+        
+        const statsImgData = statsCanvas.toDataURL('image/png', 1.0)
+        const statsHeight = (statsCanvas.height / statsCanvas.width) * contentWidth
+        
+        document.body.removeChild(statsElement)
+        
+        // 페이지 넘김 확인
+        if (yPos + statsHeight > pdfHeight - margin) {
+          pdf.addPage()
+          yPos = margin
+        }
+        
+        pdf.addImage(statsImgData, 'PNG', margin, yPos, contentWidth, statsHeight)
+        yPos += statsHeight + 8
+        
+        // 월별 이용 현황 차트
+        const monthlyChartElement = this.$refs.monthlyChart
+        if (!monthlyChartElement) {
+          console.warn('월별 차트 요소를 찾을 수 없습니다.')
+        } else {
+          try {
+            // 차트가 렌더링될 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // 다음 페이지로 넘어갈 수 있는지 확인
+            if (yPos + 70 > pdfHeight - margin) {
+              pdf.addPage()
+              yPos = margin
+            }
+            
+            // 차트 제목
+            const chartTitleHtml = `
+              <div style="width: ${contentWidth}mm; padding: 8px 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+                <h4 style="font-size: 14px; font-weight: bold; margin: 0; color: #2c3e50; font-family: inherit;">월별 이용 현황</h4>
+              </div>
+            `
+            const titleElement = document.createElement('div')
+            titleElement.style.position = 'absolute'
+            titleElement.style.left = '-9999px'
+            titleElement.style.width = `${contentWidth}mm`
+            titleElement.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+            titleElement.innerHTML = chartTitleHtml
+            document.body.appendChild(titleElement)
+            
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            const titleCanvas = await html2canvas(titleElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: false,
+              fontEmbedCSS: true
+            })
+            
+            const titleImgData = titleCanvas.toDataURL('image/png', 1.0)
+            const titleHeight = (titleCanvas.height / titleCanvas.width) * contentWidth
+            pdf.addImage(titleImgData, 'PNG', margin, yPos, contentWidth, titleHeight)
+            yPos += titleHeight + 2
+            
+            document.body.removeChild(titleElement)
+            
+            // 차트 캡처
+            const monthlyCanvas = await html2canvas(monthlyChartElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: true,
+              fontEmbedCSS: true
+            })
+            
+            if (!monthlyCanvas || monthlyCanvas.width === 0 || monthlyCanvas.height === 0) {
+              console.warn('월별 차트 캡처 실패: 캔버스가 비어있습니다.')
+            } else {
+              const monthlyImgData = monthlyCanvas.toDataURL('image/png', 1.0)
+              
+              // 차트 크기를 줄여서 한 페이지에 맞춤 (높이 제한)
+              const chartAspectRatio = monthlyCanvas.height / monthlyCanvas.width
+              const maxChartHeight = pdfHeight - yPos - 78
+              const chartWidth = contentWidth
+              let chartHeight = chartWidth * chartAspectRatio
+              
+              // 월별 차트는 최대 70mm로 제한 (크기 증가)
+              const maxMonthlyChartHeight = 70
+              
+              if (chartHeight > maxMonthlyChartHeight) {
+                chartHeight = maxMonthlyChartHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(monthlyImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else if (chartHeight > maxChartHeight) {
+                chartHeight = maxChartHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(monthlyImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else {
+                pdf.addImage(monthlyImgData, 'PNG', margin, yPos, chartWidth, chartHeight)
+              }
+              
+              yPos += chartHeight + 6
+            }
+          } catch (error) {
+            console.error('월별 차트 캡처 오류:', error)
+          }
+        }
+        
+        // 카테고리별 이용률 차트
+        const resourceChartElement = this.$refs.resourceChart
+        if (!resourceChartElement) {
+          console.warn('카테고리별 차트 요소를 찾을 수 없습니다.')
+        } else {
+          try {
+            // 차트가 렌더링될 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // 다음 페이지로 넘어갈 수 있는지 확인
+            if (yPos + 70 > pdfHeight - margin) {
+              pdf.addPage()
+              yPos = margin
+            }
+            
+            // 차트 제목
+            const chartTitle2Html = `
+              <div style="width: ${contentWidth}mm; padding: 8px 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: white; box-sizing: border-box;">
+                <h4 style="font-size: 14px; font-weight: bold; margin: 0; color: #2c3e50; font-family: inherit;">카테고리별 이용률</h4>
+              </div>
+            `
+            const title2Element = document.createElement('div')
+            title2Element.style.position = 'absolute'
+            title2Element.style.left = '-9999px'
+            title2Element.style.width = `${contentWidth}mm`
+            title2Element.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+            title2Element.innerHTML = chartTitle2Html
+            document.body.appendChild(title2Element)
+            
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            const title2Canvas = await html2canvas(title2Element, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: false,
+              fontEmbedCSS: true
+            })
+            
+            const title2ImgData = title2Canvas.toDataURL('image/png', 1.0)
+            const title2Height = (title2Canvas.height / title2Canvas.width) * contentWidth
+            pdf.addImage(title2ImgData, 'PNG', margin, yPos, contentWidth, title2Height)
+            yPos += title2Height + 2
+            
+            document.body.removeChild(title2Element)
+            
+            // 차트 캡처
+            const resourceCanvas = await html2canvas(resourceChartElement, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: true,
+              fontEmbedCSS: true
+            })
+            
+            if (!resourceCanvas || resourceCanvas.width === 0 || resourceCanvas.height === 0) {
+              console.warn('카테고리별 차트 캡처 실패: 캔버스가 비어있습니다.')
+            } else {
+              const resourceImgData = resourceCanvas.toDataURL('image/png', 1.0)
+              
+              // 차트 크기를 줄여서 한 페이지에 맞춤
+              const chartAspectRatio = resourceCanvas.height / resourceCanvas.width
+              const maxChartHeight = pdfHeight - yPos - margin
+              const maxResourceChartHeight = 60
+              const chartWidth = contentWidth
+              let chartHeight = chartWidth * chartAspectRatio
+              
+              const finalMaxHeight = Math.min(maxChartHeight, maxResourceChartHeight)
+              
+              if (chartHeight > finalMaxHeight) {
+                chartHeight = finalMaxHeight
+                const adjustedWidth = chartHeight / chartAspectRatio
+                const xOffset = (contentWidth - adjustedWidth) / 2
+                pdf.addImage(resourceImgData, 'PNG', margin + xOffset, yPos, adjustedWidth, chartHeight)
+              } else {
+                pdf.addImage(resourceImgData, 'PNG', margin, yPos, chartWidth, chartHeight)
+              }
+            }
+          } catch (error) {
+            console.error('카테고리별 차트 캡처 오류:', error)
+          }
+        }
+        
+        // 파일명 생성 (날짜 포함)
+        const fileName = `자원이용통계_${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}.pdf`
+        
+        // PDF 다운로드
+        pdf.save(fileName)
+        
+        this.success('PDF가 생성되었습니다.')
+      } catch (error) {
+        console.error('PDF 생성 오류:', error)
+        this.error('PDF 생성 중 오류가 발생했습니다.')
+      }
     }
   }
 }
@@ -477,24 +1691,26 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
-}
-
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.search-bar .el-input {
-  max-width: 400px;
-}
-
-.filter-section {
   display: flex;
   gap: 16px;
   align-items: center;
 }
 
+.search-bar {
+  flex: 2;
+  min-width: 180px;
+}
+
+.search-bar .el-input {
+  width: 100%;
+}
+
+.filter-section {
+  flex: 1;
+}
+
 .filter-section .el-select {
-  min-width: 150px;
+  width: 100%;
 }
 
 .table-section {
@@ -502,6 +1718,7 @@ export default {
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 400px;
 }
 
 .dialog-footer {
@@ -527,20 +1744,26 @@ export default {
   
   .search-section {
     padding: 16px;
-  }
-  
-  .search-bar .el-input {
-    max-width: 100%;
-  }
-  
-  .filter-section {
     flex-direction: column;
-    align-items: stretch;
     gap: 12px;
   }
   
+  .search-bar {
+    max-width: 100%;
+    flex: none;
+  }
+  
+  .search-bar .el-input {
+    width: 100%;
+  }
+  
+  .filter-section {
+    flex: none;
+    width: 100%;
+  }
+  
   .filter-section .el-select {
-    min-width: auto;
+    width: 100%;
   }
   
   .table-section {
@@ -553,6 +1776,7 @@ export default {
 :deep(.el-table) {
   border-radius: 8px;
   overflow: hidden;
+  min-height: 400px;
 }
 
 :deep(.el-table th) {
@@ -566,6 +1790,19 @@ export default {
 
 :deep(.el-table .cell) {
   padding: 0 12px;
+}
+
+/* 빈 상태 스타일 개선 */
+:deep(.el-table__empty-block) {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.el-table__empty-text) {
+  color: #909399;
+  font-size: 14px;
 }
 
 /* 태그 스타일 */
@@ -614,5 +1851,146 @@ export default {
 :deep(.el-dialog__footer) {
   padding: 10px 20px 20px;
   border-top: 1px solid #ebeef5;
+}
+
+/* 카테고리 관리 스타일 */
+.category-management {
+  padding: 10px 0;
+}
+
+.category-form {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  width: 100%;
+  min-width: 500px;
+}
+
+.category-form :deep(.el-form-item) {
+  margin-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.category-form :deep(.el-form-item__label) {
+  margin-bottom: 0 !important;
+  line-height: 32px;
+}
+
+.category-form-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.category-form-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.category-form :deep(.el-form-item) {
+  margin-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.category-form :deep(.el-form-item__label) {
+  margin-bottom: 0 !important;
+  line-height: 32px;
+}
+
+.category-form :deep(.el-form-item__content) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.category-list {
+  margin-top: 20px;
+}
+
+.category-list .el-table {
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 200px;
+}
+
+.category-list :deep(.el-table th) {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+/* 통계 모달 스타일 */
+.statistics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.statistics-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.statistics-content {
+  padding: 20px 0;
+}
+
+.stats-summary-section {
+  margin-bottom: 30px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+
+.stat-card h4 {
+  margin: 0 0 10px 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.chart-section {
+  margin-top: 30px;
+}
+
+.chart-section h4 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.chart-container {
+  position: relative;
+  height: 300px;
 }
 </style>

@@ -9,19 +9,25 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.0.0",
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@mdi/font": "^7.4.47",
     "axios": "^1.12.2",
     "chart.js": "^4.5.0",
     "core-js": "^3.8.3",
     "element-plus": "^2.0.0",
+    "event-source-polyfill": "^1.0.31",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.12.1",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^5.0.2",
     "jwt-decode": "^4.0.0",
+    "livekit-client": "^2.15.10",
+    "openvidu-browser": "^2.31.0",
     "vue": "^3.2.13",
     "vue-chartjs": "^5.3.2",
     "vue-router": "^4.5.1",
+    "vuedraggable": "^4.1.0",
     "vuetify": "^3.10.2",
     "vuex": "^4.1.0",
     "xlsx": "^0.18.5"
@@ -39,6 +45,9 @@
     "root": true,
     "env": {
       "node": true
+    },
+    "globals": {
+      "daum": "readonly"
     },
     "extends": [
       "plugin:vue/vue3-essential",

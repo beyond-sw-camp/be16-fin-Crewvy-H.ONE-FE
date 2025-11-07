@@ -1,14 +1,16 @@
 import Payroll from '../../views/payroll/Payroll.vue'
-import PayrollBasicInfo from '../../views/payroll/PayrollBasicInfo.vue'
+import PayrollContractInfo from '../../views/payroll/PayrollContractInfo.vue'
 import PayrollCalculation from '../../views/payroll/PayrollCalculation.vue'
+import PayrollActualCalculation from '../../views/payroll/PayrollActualCalculation.vue'
 import PayrollTransferOutput from '../../views/payroll/PayrollTransferOutput.vue'
 import PayrollStatementOutput from '../../views/payroll/PayrollStatementOutput.vue'
 import PayrollItemInquiry from '../../views/payroll/PayrollItemInquiry.vue'
 import PayrollInsuranceDeduction from '../../views/payroll/PayrollInsuranceDeduction.vue'
 import PayrollStatusOutput from '../../views/payroll/PayrollStatusOutput.vue'
+import PayrollMyInquiry from '../../views/payroll/PayrollMyInquiry.vue'
 import PayrollWithholdingReport from '../../views/payroll/PayrollWithholdingReport.vue'
 import PayrollElderlyIncentive from '../../views/payroll/PayrollElderlyIncentive.vue'
-import PayrollItemManagement from '../../views/payroll/PayrollItemManagement.vue'
+import PayrollSettings from '../../views/payroll/PayrollSettings.vue'
 
 const routes = [
   {
@@ -17,19 +19,24 @@ const routes = [
     component: Payroll
   },
   {
-    path: '/payroll/item-management',
-    name: 'PayrollItemManagement',
-    component: PayrollItemManagement
+    path: '/payroll/settings',
+    name: 'PayrollSettings',
+    component: PayrollSettings
   },
   {
-    path: '/payroll/basic-info',
-    name: 'PayrollBasicInfo',
-    component: PayrollBasicInfo
+    path: '/payroll/contract-info',
+    name: 'PayrollContractInfo',
+    component: PayrollContractInfo
   },
   {
     path: '/payroll/calculation',
     name: 'PayrollCalculation',
     component: PayrollCalculation
+  },
+  {
+    path: '/payroll/actual-calculation',
+    name: 'PayrollActualCalculation',
+    component: PayrollActualCalculation
   },
   {
     path: '/payroll/transfer-output',
@@ -55,6 +62,11 @@ const routes = [
     path: '/payroll/status-output',
     name: 'PayrollStatusOutput',
     component: PayrollStatusOutput
+  },
+  {
+    path: '/payroll/my-inquiry',
+    name: 'PayrollMyInquiry',
+    component: PayrollMyInquiry
   },
   {
     path: '/payroll/withholding-report',

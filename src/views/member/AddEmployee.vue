@@ -5,24 +5,29 @@
     </div>
 
     <el-card class="form-card">
-      <el-form ref="employeeForm" :model="form" label-position="top">
+      <el-form ref="employeeForm" :model="form" :rules="rules" label-position="top">
         <!-- 계정 정보 -->
         <h2 class="section-title">계정 정보</h2>
         <el-row :gutter="24">
           <el-col :span="12">
-            <el-form-item label="이메일">
+            <el-form-item label="이메일" prop="email">
               <el-input v-model="form.email" placeholder="이메일">
                 <template #append>
-                  <el-button>중복확인</el-button>
+                  <el-button @click="checkEmail">중복확인</el-button>
                 </template>
               </el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="비밀번호">
-              <el-input v-model="form.password" placeholder="비밀번호">
+            <el-form-item label="비밀번호" prop="password">
+              <el-input v-model="form.password" :type="passwordFieldType" placeholder="비밀번호">
                 <template #append>
-                  <el-button>자동생성</el-button>
+                  <el-button @click="generatePassword">자동생성</el-button>
+                </template>
+                <template #suffix>
+                  <el-icon class="el-input__icon" @click="togglePasswordVisibility">
+                    <component :is="passwordFieldType === 'password' ? 'View' : 'Hide'" />
+                  </el-icon>
                 </template>
               </el-input>
             </el-form-item>
@@ -33,35 +38,96 @@
         <h2 class="section-title">개인 정보</h2>
         <el-row :gutter="24">
           <el-col :span="12">
-            <el-form-item label="이름">
+            <el-form-item label="이름" prop="name">
               <el-input v-model="form.name" placeholder="이름"></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="생년월일">
-              <el-date-picker v-model="form.birthDate" type="date" placeholder="생년월일 선택" style="width: 100%;"></el-date-picker>
+              <el-input v-model="form.birthDate" placeholder="YYYY-MM-DD" @input="formatBirthDateInput">
+                <template #append>
+                  <el-button @click="openDatePicker">
+                    <el-icon><Calendar /></el-icon>
+                  </el-button>
+                </template>
+              </el-input>
+              <el-date-picker
+                ref="birthDatePicker"
+                v-model="form.birthDate"
+                type="date"
+                value-format="YYYY-MM-DD"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: -1;"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="휴대폰 번호">
-              <el-input v-model="form.phone" placeholder="휴대폰 번호"></el-input>
+            <el-form-item label="휴대폰 번호" prop="phone">
+              <el-input v-model="form.phone" placeholder="휴대폰 번호" @input="formatPhoneNumber('phone')"></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="비상연락처">
-              <el-input v-model="form.emergencyContact" placeholder="비상연락처"></el-input>
+            <el-form-item label="비상연락처" prop="emergencyContact">
+              <el-input v-model="form.emergencyContact" placeholder="비상연락처"
+                @input="formatPhoneNumber('emergencyContact')"></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="자택 주소">
-              <el-input v-model="form.address" placeholder="자택 주소"></el-input>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
 
-        <!-- 급여 정보 -->
-        <h2 class="section-title">급여 정보</h2>
-        <el-row :gutter="20">
+        <!-- 인사 정보 -->
+        <h2 class="section-title">인사 정보</h2>
+        <el-row :gutter="24">
+          <el-col :span="12">
+            <el-form-item label="사번">
+              <el-input v-model="form.sabun" placeholder="사번"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="직급" prop="gradeId">
+              <el-select v-model="form.gradeId" placeholder="직급 선택" style="width: 100%;">
+                <el-option v-for="grade in allGrades" :key="grade.id" :label="grade.name" :value="grade.id"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="고용형태" prop="employmentType">
+              <el-select v-model="form.employmentType" placeholder="고용형태 선택" style="width: 100%;">
+                <el-option label="정규직" value="ET001"></el-option>
+                <el-option label="계약직" value="ET002"></el-option>
+                <el-option label="인턴" value="ET003"></el-option>
+                <el-option label="기타" value="ET004"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="입사일">
+              <el-date-picker v-model="form.joinDate" type="date" placeholder="입사일 선택" style="width: 100%;"
+                value-format="YYYY-MM-DD"></el-date-picker>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="내선 전화">
+              <el-input v-model="form.extensionNumber" placeholder="내선 전화"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="일반 전화">
+              <el-input v-model="form.telNumber" placeholder="일반 전화"></el-input>
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item label="은행">
               <el-input v-model="form.bank"></el-input>
@@ -77,52 +143,32 @@
         <!-- 직무 정보 -->
         <div class="section-title-container">
           <h2 class="section-title">직무/역할 정보</h2>
-          <el-button @click="addPosition" type="primary" plain size="small"><el-icon><Plus /></el-icon> 직무 추가</el-button>
         </div>
-        
+
         <div class="positions-list">
-          <el-card v-for="(position, index) in form.positions" :key="index" class="position-card">
-            <template #header>
-              <div class="position-card-header">
-                <span>직무 {{ index + 1 }}</span>
-                <el-button @click="removePosition(index)" type="danger" text v-if="form.positions.length > 1">
-                  삭제
-                </el-button>
-              </div>
-            </template>
+          <el-card class="position-card">
             <el-row :gutter="24">
-              <el-col :span="12">
-                <el-form-item label="부서">
-                  <el-input v-model="position.department" placeholder="부서명">
+              <el-col :span="8">
+                <el-form-item label="부서" prop="positions[0].organizationId">
+                  <el-input v-model="form.positions[0].department" placeholder="부서명">
                     <template #append>
-                      <el-button>조직도에서 선택</el-button>
+                      <el-button @click="openOrganizationModal(0)">조직도</el-button>
                     </template>
                   </el-input>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
-                <el-form-item label="직책">
-                  <el-select v-model="position.title" placeholder="직책 선택" style="width: 100%;">
-                    <el-option label="팀원" value="팀원"></el-option>
-                    <el-option label="팀장" value="팀장"></el-option>
+              <el-col :span="8">
+                <el-form-item label="직책" prop="positions[0].titleId">
+                  <el-select v-model="form.positions[0].titleId" placeholder="직책 선택" style="width: 100%;">
+                    <el-option v-for="title in allTitles" :key="title.id" :label="title.name"
+                      :value="title.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
-                <el-form-item label="직급">
-                  <el-select v-model="position.rank" placeholder="직급 선택" style="width: 100%;">
-                    <el-option label="사원" value="사원"></el-option>
-                    <el-option label="주임" value="주임"></el-option>
-                    <el-option label="대리" value="대리"></el-option>
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="역할">
-                  <el-select v-model="position.role" placeholder="역할 선택" style="width: 100%;">
-                    <el-option label="일반 사용자" value="user"></el-option>
-                    <el-option label="인사 관리자" value="hr_manager"></el-option>
-                    <el-option label="시스템 관리자" value="admin"></el-option>
+              <el-col :span="8">
+                <el-form-item label="역할" prop="positions[0].roleId">
+                  <el-select v-model="form.positions[0].roleId" placeholder="역할 선택" style="width: 100%;">
+                    <el-option v-for="role in allRoles" :key="role.id" :label="role.name" :value="role.id"></el-option>
                   </el-select>
                 </el-form-item>
               </el-col>
@@ -137,12 +183,36 @@
       <el-button @click="handleCancel">취소</el-button>
       <el-button type="primary" @click="handleSubmit">직원 추가</el-button>
     </div>
+    <OrganizationSelectionModal ref="orgModal" @organization-selected="handleOrganizationSelected" />
+    <AddressModal v-if="isAddressModalVisible" @close="closeAddressModal" @address-selected="handleAddressSelected" />
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+import { ElMessage } from 'element-plus';
+import OrganizationSelectionModal from '@/components/member/OrganizationSelectionModal.vue';
+import AddressModal from '@/components/member/AddressModal.vue';
+import gradeService from '@/api/gradeService';
+import titleService from '@/api/titleService';
+import roleService from '@/api/roleService';
+import { useSnackbar } from '@/composables/useSnackbar';
+import employeeService from '@/api/employeeService';
+import { View, Hide, Calendar } from '@element-plus/icons-vue';
+
 export default {
   name: 'AddEmployee',
+  components: {
+    OrganizationSelectionModal,
+    AddressModal,
+    View,
+    Hide,
+    Calendar,
+  },
+  setup() {
+    const { error } = useSnackbar();
+    return { showError: error };
+  },
   data() {
     return {
       form: {
@@ -154,32 +224,235 @@ export default {
         emergencyContact: '',
         birthDate: '',
         address: '',
+        detailAddress: '',
         bank: '',
         accountNumber: '',
+        sabun: '',
+        joinDate: '',
+        extensionNumber: '',
+        telNumber: '',
+        employmentType: '',
+        gradeId: null,
         positions: [
-          { department: '', title: '', rank: '', role: '' }
+          { department: '', organizationId: null, titleId: null, roleId: null }
         ]
       },
+      rules: {
+        email: [
+          { required: true, message: '이메일을 입력해주세요.', trigger: 'blur' },
+          { type: 'email', message: '올바른 이메일 형식이 아닙니다.', trigger: ['blur', 'change'] }
+        ],
+        password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }],
+        name: [{ required: true, message: '이름을 입력해주세요.', trigger: 'blur' }],
+        phone: [
+          { pattern: /^\d{3}-\d{3,4}-\d{4}$/, message: '올바른 휴대폰 번호 형식이 아닙니다.', trigger: 'blur' }
+        ],
+        emergencyContact: [
+          { pattern: /^\d{3}-\d{3,4}-\d{4}$/, message: '올바른 휴대폰 번호 형식이 아닙니다.', trigger: 'blur' }
+        ],
+        employmentType: [{ required: true, message: '고용형태를 선택해주세요.', trigger: 'change' }],
+        gradeId: [{ required: true, message: '직급을 선택해주세요.', trigger: 'change' }],
+        'positions[0].organizationId': [{ required: true, message: '부서를 선택해주세요.', trigger: 'change' }],
+        'positions[0].titleId': [{ required: true, message: '직책을 선택해주세요.', trigger: 'change' }],
+        'positions[0].roleId': [{ required: true, message: '역할을 선택해주세요.', trigger: 'change' }]
+      },
+      editingPositionIndex: null,
+      isEmailChecked: false,
+      allGrades: [],
+      allTitles: [],
+      allRoles: [],
+      passwordFieldType: 'password', // Add this for password visibility toggle
+      isAddressModalVisible: false,
     };
   },
+  watch: {
+    'form.email': function () {
+      this.isEmailChecked = false;
+    }
+  },
   methods: {
-    handleSubmit() {
-      this.$message.success('새로운 직원이 추가되었습니다.');
-      console.log('Form Submitted', this.form);
-      this.$router.push('/employee');
+    async fetchInitialData() {
+      try {
+        this.allGrades = await gradeService.getGrade();
+        this.allTitles = await titleService.getTitle();
+        const roleResponse = await roleService.getRole(localStorage.getItem('memberPositionId'));
+        this.allRoles = roleResponse.data.data;
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+        ElMessage.error('직책, 직급, 역할 목록을 불러오는 데 실패했습니다.');
+      }
+    },
+    async generatePassword() {
+      try {
+        const response = await employeeService.generateRandomPassword();
+        this.form.password = response.data.data; // Assuming the password is in response.data.data
+        ElMessage.success('비밀번호가 자동 생성되었습니다.');
+        this.$refs.employeeForm.clearValidate('password');
+      } catch (error) {
+        console.error('비밀번호 자동 생성 오류:', error);
+        ElMessage.error(error.response?.data?.message || '비밀번호 자동 생성에 실패했습니다.');
+      }
+    },
+    togglePasswordVisibility() {
+      this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
+    },
+    openDatePicker() {
+      this.$refs.birthDatePicker.focus();
+    },
+    formatBirthDateInput(value) {
+      if (value) {
+        const digitsOnly = value.replace(/\D/g, '');
+        let formatted = digitsOnly.substring(0, 4);
+        if (digitsOnly.length > 4) {
+          formatted += '-' + digitsOnly.substring(4, 6);
+        }
+        if (digitsOnly.length > 6) {
+          formatted += '-' + digitsOnly.substring(6, 8);
+        }
+        
+        if (formatted !== value) {
+          this.form.birthDate = formatted;
+        }
+      }
+    },
+    openOrganizationModal(index) {
+      this.editingPositionIndex = index;
+      this.$refs.orgModal.open();
+    },
+    handleOrganizationSelected(organization) {
+      if (this.editingPositionIndex !== null) {
+        this.form.positions[this.editingPositionIndex].department = organization.label;
+        this.form.positions[this.editingPositionIndex].organizationId = organization.id;
+      }
+    },
+    openAddressSearch() {
+      this.isAddressModalVisible = true;
+    },
+    closeAddressModal() {
+      this.isAddressModalVisible = false;
+    },
+    handleAddressSelected(data) {
+      let roadAddr = data.roadAddress;
+      let extraRoadAddr = '';
+
+      if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+        extraRoadAddr += data.bname;
+      }
+      if (data.buildingName !== '' && data.apartment === 'Y') {
+        extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+      }
+      if (extraRoadAddr !== '') {
+        extraRoadAddr = ' (' + extraRoadAddr + ')';
+      }
+
+      this.form.address = roadAddr + extraRoadAddr;
+      this.form.detailAddress = '';
+      this.isAddressModalVisible = false;
+    },
+    formatPhoneNumber(field) {
+      let value = this.form[field].replace(/\D/g, '');
+      if (value.length > 3 && value.length <= 7) {
+        value = `${value.slice(0, 3)}-${value.slice(3)}`;
+      } else if (value.length > 7) {
+        value = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+      }
+      this.form[field] = value;
+    },
+    async checkEmail() {
+      if (!this.form.email) {
+        ElMessage.error('이메일을 입력해주세요.');
+        return;
+      }
+      try {
+        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/check-email`, {
+          params: { email: this.form.email }
+        });
+        if (response.data.data) {
+          ElMessage.error('이미 사용 중인 이메일입니다.');
+          this.isEmailChecked = false;
+        } else {
+          ElMessage.success('사용 가능한 이메일입니다.');
+          this.isEmailChecked = true;
+        }
+      } catch (error) {
+        console.error('이메일 중복 확인 오류:', error);
+        ElMessage.error('이메일 중복 확인 중 오류가 발생했습니다.');
+        this.isEmailChecked = false;
+      }
+    },
+    async handleSubmit() {
+      if (!this.isEmailChecked) {
+        this.showError('이메일 중복 확인을 진행해주세요.');
+        return;
+      }
+
+      this.$refs.employeeForm.validate(async (valid) => {
+        if (valid) {
+          const token = localStorage.getItem('accessToken');
+          const userUuid = localStorage.getItem('memberId');
+          const memberPositionId = localStorage.getItem('memberPositionId');
+
+          if (!token || !userUuid || !memberPositionId) {
+            ElMessage.error('인증 정보가 없습니다. 다시 로그인해주세요.');
+            this.$router.push('/login');
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append('email', this.form.email);
+          formData.append('password', this.form.password);
+          formData.append('name', this.form.name);
+          formData.append('localDate', this.form.birthDate);
+          formData.append('phoneNumber', this.form.phone);
+          formData.append('emergencyContact', this.form.emergencyContact);
+          formData.append('address', this.form.address);
+          formData.append('detailAddress', this.form.detailAddress);
+          formData.append('bank', this.form.bank);
+          formData.append('bankAccount', this.form.accountNumber);
+          formData.append('sabun', this.form.sabun);
+          formData.append('joinDate', this.form.joinDate);
+          formData.append('extensionNumber', this.form.extensionNumber);
+          formData.append('telNumber', this.form.telNumber);
+          formData.append('employmentType', this.form.employmentType);
+
+          if (this.form.positions.length > 0) {
+            const firstPosition = this.form.positions[0];
+            formData.append('organizationId', firstPosition.organizationId);
+            formData.append('titleId', firstPosition.titleId);
+            formData.append('roleId', firstPosition.roleId);
+            formData.append('gradeId', this.form.gradeId);
+          }
+
+          try {
+            const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/member-service/member/create`, formData, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-User-UUID': userUuid,
+                'X-User-MemberPositionId': memberPositionId,
+                'Content-Type': 'multipart/form-data'
+              }
+            });
+
+            if (response.data && response.data.success) {
+              ElMessage.success('새로운 직원이 추가되었습니다.');
+              this.$router.push('/employee');
+            } else {
+              ElMessage.error(response.data.message || '직원 추가에 실패했습니다.');
+            }
+          } catch (error) {
+            console.error('직원 추가 오류:', error);
+            ElMessage.error(error.response?.data?.message || '직원 추가 중 오류가 발생했습니다.');
+          }
+        }
+      });
     },
     handleCancel() {
       this.$router.push('/employee');
-    },
-    addPosition() {
-      this.form.positions.push({ department: '', title: '', rank: '', role: '' });
-    },
-    removePosition(index) {
-      if (this.form.positions.length > 1) {
-        this.form.positions.splice(index, 1);
-      }
     }
   },
+  created() {
+    this.fetchInitialData();
+  }
 };
 </script>
 
@@ -222,8 +495,8 @@ export default {
 }
 
 .section-title-container .section-title {
-    border-bottom: none;
-    margin-bottom: 0;
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .positions-list .position-card {

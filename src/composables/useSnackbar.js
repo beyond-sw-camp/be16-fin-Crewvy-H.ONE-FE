@@ -5,6 +5,9 @@ let idCounter = 0
 
 export function useSnackbar() {
   const showSnackbar = (options) => {
+    // 기존 스낵바 모두 제거 (최대 1개만 표시)
+    snackbars.value = []
+    
     const id = ++idCounter
     const snackbar = reactive({
       id,
@@ -13,7 +16,8 @@ export function useSnackbar() {
       title: options.title || '',
       message: options.message || '',
       duration: options.duration || 4000,
-      position: options.position || 'top-center'
+      position: options.position || 'top-center',
+      action: options.action || null, // Add this line
     })
 
     snackbars.value.push(snackbar)

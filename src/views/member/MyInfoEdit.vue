@@ -5,95 +5,114 @@
     </div>
 
     <el-form ref="form" :model="form" label-width="120px" label-position="top">
+
+      <!-- 기본 정보 -->
       <el-card class="form-section">
         <template #header><span>기본 정보</span></template>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="이름">
-              <el-input v-model="form.name" disabled></el-input>
+        <el-row :gutter="32">
+          <!-- Left Column (Profile Picture) -->
+          <el-col :xs="24" :sm="8" :md="6" class="profile-col">
+            <el-form-item>
+               <div class="profile-picture-container">
+                <el-avatar :size="150" :src="form.profileUrl || defaultAvatarSvg" />
+                <el-upload
+                    class="profile-image-uploader"
+                    action="#"
+                    :show-file-list="false"
+                    :before-upload="beforeAvatarUpload"
+                >
+                  <el-icon><Edit /></el-icon>
+                </el-upload>
+              </div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="이메일">
-              <el-input v-model="form.email" disabled></el-input>
+          <!-- Right Column (Fields) -->
+          <el-col :xs="24" :sm="16" :md="18">
+            <el-form-item class="form-item-with-toggle">
+              <template #label>
+                <div class="label-with-toggle">
+                  <span>연락처</span>
+                  <el-switch v-model="form.isPhoneNumberPublic" active-text="공개" inactive-text="비공개" inline-prompt size="small" />
+                </div>
+              </template>
+              <el-input v-model="form.phoneNumber" placeholder="- 없이 입력"></el-input>
             </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="고용형태">
-              <el-input v-model="form.employment_type" disabled></el-input>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="연락처">
-              <el-input v-model="form.phone_number"></el-input>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
             <el-form-item label="비상연락처">
-              <el-input v-model="form.emergency_contact"></el-input>
+              <el-input v-model="form.emergencyContact"></el-input>
             </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="내선번호">
-              <el-input v-model="form.extension_number"></el-input>
+            <el-form-item class="form-item-with-toggle">
+              <template #label>
+                <div class="label-with-toggle">
+                  <span>주소</span>
+                  <el-switch v-model="form.isAddressDisclosure" active-text="공개" inactive-text="비공개" inline-prompt size="small" />
+                </div>
+              </template>
+              <el-input v-model="form.address" placeholder="주소 검색 버튼을 눌러 주소를 입력하세요" readonly @click="openAddressSearch">
+                <template #append>
+                  <el-button @click="openAddressSearch">주소 검색</el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="상세주소">
+              <el-input v-model="form.detailAddress" placeholder="상세주소를 입력하세요"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="주소">
-          <el-input v-model="form.address"></el-input>
-        </el-form-item>
-        <el-form-item label="공개 설정">
-          <el-checkbox v-model="form.is_phone_number_public">연락처 공개</el-checkbox>
-          <el-checkbox v-model="form.is_address_disclosure">주소 공개</el-checkbox>
-        </el-form-item>
       </el-card>
 
+      <!-- 인사 정보 -->
       <el-card class="form-section">
-        <template #header><span>급여 정보</span></template>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="은행">
+        <template #header><span>인사 정보</span></template>
+        <el-row :gutter="24">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="대표 직책">
+              <el-select v-model="form.defaultPositionId" placeholder="대표 직책을 선택하세요" style="width: 100%;">
+                <el-option
+                    v-for="position in memberPositionList"
+                    :key="position.id"
+                    :label="position.name"
+                    :value="position.id">
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="은행명">
               <el-input v-model="form.bank"></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+        </el-row>
+        <el-row :gutter="24">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="계좌번호">
-              <el-input v-model="form.bank_account"></el-input>
+              <el-input v-model="form.bankAccount"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="내선전화">
+              <el-input v-model="form.extensionNumber"></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="일반전화">
+              <el-input v-model="form.telNumber"></el-input>
             </el-form-item>
           </el-col>
         </el-row>
       </el-card>
 
+      <!-- 비밀번호 변경 -->
       <el-card class="form-section">
         <template #header><span>비밀번호 변경</span></template>
         <el-form-item label="현재 비밀번호">
-          <el-input type="password" v-model="passwordChange.current"></el-input>
+          <el-input type="password" v-model="form.currentPassword" show-password></el-input>
         </el-form-item>
         <el-form-item label="새 비밀번호">
-          <el-input type="password" v-model="passwordChange.new"></el-input>
+          <el-input type="password" v-model="form.newPassword" show-password></el-input>
         </el-form-item>
         <el-form-item label="새 비밀번호 확인">
-          <el-input type="password" v-model="passwordChange.confirm"></el-input>
+          <el-input type="password" v-model="form.confirmPassword" show-password></el-input>
         </el-form-item>
-      </el-card>
-
-      <el-card class="form-section">
-        <template #header><span>프로필 사진</span></template>
-        <div class="profile-picture-section">
-            <el-avatar :size="100" :src="form.profile_url" />
-            <el-upload
-                class="avatar-uploader"
-                action="#" 
-                :show-file-list="false"
-                :before-upload="beforeAvatarUpload"
-            >
-                <el-button type="primary">사진 변경</el-button>
-            </el-upload>
-        </div>
       </el-card>
 
       <div class="form-actions">
@@ -101,45 +120,93 @@
         <el-button type="primary" @click="onSubmit">저장</el-button>
       </div>
     </el-form>
+    <AddressModal 
+      v-if="isAddressModalVisible" 
+      @close="closeAddressModal" 
+      @address-selected="handleAddressSelected" 
+    />
   </div>
 </template>
 
 <script>
+import memberService from '../../api/memberService';
+import { Edit } from '@element-plus/icons-vue';
+import AddressModal from '@/components/member/AddressModal.vue';
+import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
+
 export default {
   name: 'MyInfoEdit',
+  components: {
+    Edit,
+    AddressModal,
+  },
   data() {
     return {
+      defaultAvatarSvg, // Expose to template
+      memberPositionList: [],
+      isAddressModalVisible: false,
       form: {
-        name: '홍길동',
-        email: 'hong.gildong@h.one',
-        phone_number: '010-1234-5678',
-        is_phone_number_public: true,
-        address: '서울시 강남구 테헤란로 123',
-        is_address_disclosure: true,
-        bank: 'H.ONE 은행',
-        bank_account: '123-456-789012',
-        profile_url: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', // Placeholder
-        extension_number: '1234',
-        employment_type: '정규직',
-        emergency_contact: '010-8765-4321'
-      },
-      passwordChange: {
-        current: '',
-        new: '',
-        confirm: ''
+        profileUrl: '',
+        phoneNumber: '',
+        isPhoneNumberPublic: false,
+        emergencyContact: '',
+        extensionNumber: '',
+        telNumber: '',
+        address: '',
+        detailAddress: '',
+        isAddressDisclosure: false,
+        bank: '',
+        bankAccount: '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+        defaultPositionId: null,
       }
     };
   },
   methods: {
-    onSubmit() {
-      // Add validation logic here
-      console.log('Form submitted:', this.form);
-      console.log('Password change:', this.passwordChange);
-      this.$message.success('정보가 성공적으로 저장되었습니다.');
-      this.$router.push('/my-info');
+    async onSubmit() {
+      try {
+        if (this.form.newPassword && this.form.newPassword !== this.form.confirmPassword) {
+          this.$message.error('새 비밀번호와 확인 비밀번호가 일치하지 않습니다.');
+          return;
+        }
+        
+        await memberService.updateMyInfo(this.form);
+        this.$message.success('정보가 성공적으로 저장되었습니다.');
+        this.$router.push('/my-info');
+      } catch (error) {
+        console.error('정보 저장에 실패했습니다:', error);
+        const errorMessage = error.response?.data?.message || '정보 저장에 실패했습니다. 다시 시도해주세요.';
+        this.$message.error(errorMessage);
+      }
     },
     onCancel() {
       this.$router.push('/my-info');
+    },
+    openAddressSearch() {
+      this.isAddressModalVisible = true;
+    },
+    closeAddressModal() {
+      this.isAddressModalVisible = false;
+    },
+    handleAddressSelected(data) {
+      let roadAddr = data.roadAddress;
+      let extraRoadAddr = '';
+
+      if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
+        extraRoadAddr += data.bname;
+      }
+      if (data.buildingName !== '' && data.apartment === 'Y') {
+        extraRoadAddr += (extraRoadAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+      }
+      if (extraRoadAddr !== '') {
+        extraRoadAddr = ' (' + extraRoadAddr + ')';
+      }
+
+      this.form.address = roadAddr + extraRoadAddr;
+      this.form.detailAddress = '';
+      this.isAddressModalVisible = false;
     },
     beforeAvatarUpload(file) {
       const isJPG = file.type === 'image/jpeg';
@@ -155,23 +222,92 @@ export default {
         return false;
       }
       
-      // Read the file and set it as the avatar source
       const reader = new FileReader();
       reader.onload = (e) => {
-        this.form.profile_url = e.target.result;
+        this.form.profileUrl = e.target.result;
       };
       reader.readAsDataURL(file);
 
-      return false; // Prevent auto-upload
+      return false; 
+    },
+    async fetchMyInfo() {
+        try {
+            const data = await memberService.getMyPage();
+            this.form.profileUrl = data.profileUrl;
+            this.form.phoneNumber = data.phoneNumber;
+            this.form.isPhoneNumberPublic = data.phoneNumberPublic;
+            this.form.emergencyContact = data.emergencyContact;
+            this.form.extensionNumber = data.extensionNumber;
+            this.form.telNumber = data.telNumber;
+            this.form.address = data.address;
+            this.form.detailAddress = data.detailAddress;
+            this.form.isAddressDisclosure = data.addressDisclosure;
+            this.form.bank = data.bank;
+            this.form.bankAccount = data.bankAccount;
+            this.memberPositionList = data.memberPositionList;
+            this.form.defaultPositionId = data.defaultPositionId;
+        } catch (error) {
+            console.error("내 정보를 불러오는데 실패했습니다:", error);
+            this.$message.error("정보를 불러오는데 실패했습니다.");
+        }
     }
+  },
+  created() {
+    this.fetchMyInfo();
   }
 };
 </script>
 
 <style scoped>
+.profile-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.form-item-with-toggle :deep(.el-form-item__label) {
+  width: 100%;
+}
+
+.label-with-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.profile-picture-container {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.profile-image-uploader {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.profile-image-uploader:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.profile-image-uploader .el-icon {
+  color: white;
+  font-size: 20px;
+}
+
 .my-info-edit-page {
   padding: 24px;
-  max-width: 800px;
+  max-width: 900px;
   margin: auto;
 }
 
@@ -183,13 +319,7 @@ export default {
 }
 
 .form-section {
-  margin-bottom: 24px;
-}
-
-.profile-picture-section {
-    display: flex;
-    align-items: center;
-    gap: 20px;
+  margin-bottom: 32px;
 }
 
 .form-actions {
@@ -198,11 +328,11 @@ export default {
 }
 
 .el-form-item {
-    margin-bottom: 20px;
+    margin-bottom: 22px;
 }
 
-.el-form-item[label-position="top"] .el-form-item__label {
-    padding-bottom: 4px;
+.el-form--label-top .el-form-item__label {
+    padding-bottom: 8px;
     font-weight: 600;
 }
 </style>

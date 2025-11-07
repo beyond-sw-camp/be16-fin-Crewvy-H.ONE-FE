@@ -5,12 +5,14 @@ const routes = [
   {
     path: '/resource/reservation',
     name: 'ResourceReservation',
-    component: ResourceReservation
+    component: ResourceReservation,
+    meta: { requiresAuth: true }
   },
   {
     path: '/resource/management',
     name: 'ResourceManagement',
-    component: ResourceManagement
+    component: ResourceManagement,
+    meta: { requiresAuth: true }
   },
 ];
 
