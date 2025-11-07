@@ -127,54 +127,64 @@
           </el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="payroll">
-          <template #title>
+        <template v-if="hasEmployeeReadCompanyOrSystem">
+          <el-sub-menu index="payroll">
+            <template #title>
+              <el-icon> 
+                <Money />
+              </el-icon>
+              <span>급여 관리</span>
+            </template>
+            <el-sub-menu index="payroll-management">
+              <template #title>
+                <span>급여 관리</span>
+              </template>
+              <el-menu-item index="/payroll/settings">
+                <span>급여 설정</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/contract-info">
+                <span>급여 계약 정보</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/actual-calculation">
+                <span>급여 계산</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/calculation">
+                <span>급여 모의 계산</span>
+              </el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="payroll-inquiry">
+              <template #title>
+                <span>급여 조회</span>
+              </template>
+              <el-menu-item index="/payroll/transfer-output">
+                <span>급여 이체 출력</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/statement-output">
+                <span>명세서 출력</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/item-inquiry">
+                <span>급여 항목별 조회</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/insurance-deduction">
+                <span>월별 보험료 공제 현황</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/status-output">
+                <span>급여 현황 출력</span>
+              </el-menu-item>
+              <el-menu-item index="/payroll/my-inquiry">
+                <span>내 급여 조회</span>
+              </el-menu-item>
+            </el-sub-menu>
+          </el-sub-menu>
+        </template>
+        <template v-else>
+          <el-menu-item index="/payroll/my-inquiry">
             <el-icon>
               <Money />
             </el-icon>
-            <span>급여 관리</span>
-          </template>
-          <el-sub-menu index="payroll-management">
-            <template #title>
-              <span>급여 관리</span>
-            </template>
-            <el-menu-item index="/payroll/settings">
-              <span>급여 설정</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/contract-info">
-              <span>급여 계약 정보</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/actual-calculation">
-              <span>급여 계산</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/calculation">
-              <span>급여 모의 계산</span>
-            </el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="payroll-inquiry">
-            <template #title>
-              <span>급여 조회</span>
-            </template>
-            <el-menu-item index="/payroll/transfer-output">
-              <span>급여 이체 출력</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/statement-output">
-              <span>명세서 출력</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/item-inquiry">
-              <span>급여 항목별 조회</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/insurance-deduction">
-              <span>월별 보험료 공제 현황</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/status-output">
-              <span>급여 현황 출력</span>
-            </el-menu-item>
-            <el-menu-item index="/payroll/my-inquiry">
-              <span>내 급여 조회</span>
-            </el-menu-item>
-          </el-sub-menu>
-        </el-sub-menu>
+            <span>내 급여 조회</span>
+          </el-menu-item>
+        </template>
 
         <el-menu-item index="/meeting">
           <el-icon>
@@ -197,20 +207,30 @@
           <span>게시판</span>
         </el-menu-item>
 
-        <el-sub-menu index="resource">
-          <template #title>
+        <template v-if="hasEmployeeReadCompanyOrSystem">
+          <el-sub-menu index="resource">
+            <template #title>
+              <el-icon>
+                <Calendar />
+              </el-icon>
+              <span>예약</span>
+            </template>
+            <el-menu-item index="/resource/reservation">
+              <span>예약하기</span>
+            </el-menu-item>
+            <el-menu-item index="/resource/management">
+              <span>자원 관리</span>
+            </el-menu-item>
+          </el-sub-menu>
+        </template>
+        <template v-else>
+          <el-menu-item index="/resource/reservation">
             <el-icon>
               <Calendar />
             </el-icon>
-            <span>예약</span>
-          </template>
-          <el-menu-item index="/resource/reservation">
             <span>예약하기</span>
           </el-menu-item>
-          <el-menu-item index="/resource/management">
-            <span>자원 관리</span>
-          </el-menu-item>
-        </el-sub-menu>
+        </template>
 
       </el-menu>
 
