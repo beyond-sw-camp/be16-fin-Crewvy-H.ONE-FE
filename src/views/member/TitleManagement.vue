@@ -182,8 +182,6 @@ const deleteTitle = async (title) => {
       success('삭제되었습니다.');
       await fetchTitle();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || '직책 삭제에 실패했습니다.';
-      error(errorMessage);
       console.error("Error deleting title:", error);
     } finally {
       loading.value = false;

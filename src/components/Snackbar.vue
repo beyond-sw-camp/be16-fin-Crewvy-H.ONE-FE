@@ -93,6 +93,7 @@ export default {
   transform: translateX(100%);
   opacity: 0;
   transition: all 0.3s ease;
+  word-break: keep-all;
 }
 
 .snackbar--top-center {
@@ -136,10 +137,9 @@ export default {
 
 .snackbar__content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 16px;
   gap: 12px;
-  text-align: center;
 }
 
 .snackbar__icon {
@@ -156,7 +156,9 @@ export default {
 .snackbar__message {
   flex: 1;
   min-width: 0;
-  text-align: center;
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .snackbar__title {
@@ -167,7 +169,10 @@ export default {
 
 .snackbar__text {
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .snackbar__close {

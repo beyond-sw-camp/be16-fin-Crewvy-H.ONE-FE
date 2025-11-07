@@ -7,11 +7,15 @@
       </div>
       <div class="header-actions">
         <el-button v-if="canCreate" type="primary" @click="goToAddEmployee">
-          <el-icon><Plus /></el-icon>
+          <el-icon>
+            <Plus />
+          </el-icon>
           <span style="margin-left: 8px;">직원 추가</span>
         </el-button>
         <el-button @click="exportEmployees">
-          <el-icon><Download /></el-icon>
+          <el-icon>
+            <Download />
+          </el-icon>
           <span style="margin-left: 8px;">Excel 다운로드</span>
         </el-button>
       </div>
@@ -20,17 +24,8 @@
     <!-- 필터 및 검색 -->
     <div class="filter-section">
       <div class="filter-left">
-        <el-input
-          v-model="searchQuery"
-          placeholder="직원명, 이메일로 검색..."
-          prefix-icon="Search"
-          style="width: 300px"
-        />
-        <el-select v-model="selectedDepartment" placeholder="부서 선택" style="width: 150px">
-          <el-option label="전체" value="" />
-          <el-option v-for="dep in departmentList" :key="dep" :label="dep" :value="dep" />
-        </el-select>
-        <el-select v-model="selectedStatus" placeholder="상태 선택" style="width: 120px">
+        <el-input v-model="searchQuery" placeholder="직원명, 이메일로 검색..." prefix-icon="Search" />
+        <el-select v-model="selectedStatus" placeholder="상태 선택">
           <el-option label="전체" value="" />
           <el-option label="재직" value="WORKING" />
           <el-option label="휴직" value="LEAVE" />
@@ -42,6 +37,8 @@
       </div>
     </div>
 
+    <OrganizationSelectionModal ref="orgSelectModal" :visible="showOrganizationSelectionModal"
+      @update:visible="showOrganizationSelectionModal = $event" @organization-selected="handleOrganizationSelected" />
     <!-- 직원 목록 -->
     <div class="employee-list">
       <div class="list-header">
@@ -60,51 +57,63 @@
 
       <!-- 카드 뷰 -->
       <div v-if="viewMode === 'card'" class="employee-cards">
-        <div 
-          class="employee-card" 
-          v-for="employee in filteredEmployees" 
-          :key="employee.id"
-        >
+        <div class="employee-card" v-for="employee in filteredEmployees" :key="employee.id"
+          @click="openEmployeeDetail(employee)">
           <div class="card-header">
             <el-avatar :src="employee.avatar || defaultAvatarSvg" :size="60" />
             <div class="employee-basic">
               <h3>{{ employee.name }}</h3>
               <p>{{ employee.position }} • {{ employee.department }}</p>
-              <el-tag 
+              <el-tag
                 :type="employee.status === 'WORKING' ? 'success' : (employee.status === 'LEAVE' ? 'warning' : (employee.status === 'DELETED' ? 'danger' : 'primary'))"
-                size="small"
-              >
+                size="small">
                 {{ formatMemberStatus(employee.status) }}
               </el-tag>
             </div>
             <div class="card-actions">
-                <el-button v-if="canUpdate" type="text" @click.stop="editEmployee(employee)">
-                  <el-icon><Edit /></el-icon>
-                </el-button>
-                <el-button v-if="canDelete && employee.status !== 'DELETED'" type="text" @click.stop="deleteEmployee(employee)">
-                  <el-icon><Delete /></el-icon>
-                </el-button>
-                <el-button v-if="canDelete && employee.status === 'DELETED'" type="text" @click.stop="restoreEmployee(employee)">
-                  <el-icon><Refresh /></el-icon>
-                </el-button>
+              <el-button v-if="canUpdate" type="text" @click.stop="editEmployee(employee)">
+                <el-icon>
+                  <Edit />
+                </el-icon>
+              </el-button>
+              <el-button v-if="canDelete && employee.status !== 'DELETED'" type="text"
+                @click.stop="deleteEmployee(employee)">
+                <el-icon>
+                  <Delete />
+                </el-icon>
+              </el-button>
+              <el-button v-if="canDelete && employee.status === 'DELETED'" type="text"
+                @click.stop="restoreEmployee(employee)">
+                <el-icon>
+                  <Refresh />
+                </el-icon>
+              </el-button>
             </div>
           </div>
-          
+
           <div class="card-content">
             <div class="info-row">
-              <el-icon><Postcard /></el-icon>
+              <el-icon>
+                <Postcard />
+              </el-icon>
               <span>사번: {{ employee.sabun }}</span>
             </div>
             <div class="info-row">
-              <el-icon><Message /></el-icon>
+              <el-icon>
+                <Message />
+              </el-icon>
               <span>{{ employee.email }}</span>
             </div>
             <div class="info-row">
-              <el-icon><Phone /></el-icon>
+              <el-icon>
+                <Phone />
+              </el-icon>
               <span>{{ employee.phone }}</span>
             </div>
             <div class="info-row">
-              <el-icon><Calendar /></el-icon>
+              <el-icon>
+                <Calendar />
+              </el-icon>
               <span>입사일: {{ employee.joinDate }}</span>
             </div>
           </div>
@@ -113,42 +122,46 @@
 
       <!-- 테이블 뷰 -->
       <div v-else class="employee-table">
-        <el-table :data="filteredEmployees" style="width: 100%">
-          <el-table-column prop="name" label="이름" width="180" show-overflow-tooltip>
+        <el-table :data="filteredEmployees" style="width: 100%" @row-click="openEmployeeDetail">
+          <el-table-column prop="name" label="이름" show-overflow-tooltip align="center">
             <template #default="scope">
-              <div class="table-employee">
-                <el-avatar :src="scope.row.avatar || defaultAvatarSvg" :size="32" />
-                <span>{{ scope.row.name }}</span>
-              </div>
+              <span>{{ scope.row.name }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="sabun" label="사번" width="100" />
-          <el-table-column prop="position" label="직책" width="120" show-overflow-tooltip />
-          <el-table-column prop="department" label="부서" width="120" show-overflow-tooltip />
-          <el-table-column prop="email" label="이메일" width="220" show-overflow-tooltip />
-          <el-table-column prop="phone" label="전화번호" width="150" />
-          <el-table-column prop="joinDate" label="입사일" width="120" />
-          <el-table-column prop="status" label="상태" width="100">
+          <el-table-column prop="sabun" label="사번" align="center" />
+          <el-table-column prop="position" label="직책" show-overflow-tooltip align="center" />
+          <el-table-column prop="department" label="부서" show-overflow-tooltip align="center" />
+          <el-table-column prop="email" label="이메일" show-overflow-tooltip align="center" />
+          <el-table-column prop="phone" label="전화번호" align="center" />
+          <el-table-column prop="joinDate" label="입사일" align="center" />
+          <el-table-column label="상태" align="center">
             <template #default="scope">
-              <el-tag 
+              <el-tag
                 :type="scope.row.status === 'WORKING' ? 'success' : (scope.row.status === 'LEAVE' ? 'warning' : (scope.row.status === 'DELETED' ? 'danger' : 'primary'))"
-                size="small"
-              >
+                size="small">
                 {{ formatMemberStatus(scope.row.status) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="액션" width="120">
+          <el-table-column label="수정/삭제" align="center">
             <template #default="scope">
               <div>
                 <el-button v-if="canUpdate" type="text" size="small" @click="editEmployee(scope.row)">
-                  <el-icon><Edit /></el-icon>
+                  <el-icon>
+                    <Edit />
+                  </el-icon>
                 </el-button>
-                <el-button v-if="canDelete && scope.row.status !== 'DELETED'" type="text" size="small" @click="deleteEmployee(scope.row)">
-                  <el-icon><Delete /></el-icon>
+                <el-button v-if="canDelete && scope.row.status !== 'DELETED'" type="text" size="small"
+                  @click="deleteEmployee(scope.row)">
+                  <el-icon>
+                    <Delete />
+                  </el-icon>
                 </el-button>
-                <el-button v-if="canDelete && scope.row.status === 'DELETED'" type="text" size="small" @click="restoreEmployee(scope.row)">
-                  <el-icon><Refresh /></el-icon>
+                <el-button v-if="canDelete && scope.row.status === 'DELETED'" type="text" size="small"
+                  @click="restoreEmployee(scope.row)">
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
                 </el-button>
               </div>
             </template>
@@ -158,30 +171,29 @@
     </div>
 
     <!-- 직원 상세 모달 -->
-    <el-dialog
-      v-model="showEmployeeDetail"
-      title="직원 정보"
-      width="800px"
-      custom-class="custom-employee-detail-dialog"
-    >
+    <el-dialog v-model="showEmployeeDetail" title="직원 정보" width="800px" custom-class="custom-employee-detail-dialog">
       <div v-if="selectedEmployee" class="employee-detail">
         <div class="detail-header">
           <el-avatar :src="selectedEmployee.avatar || defaultAvatarSvg" :size="60" />
           <div class="detail-info">
             <div class="name-and-status">
               <h3>{{ selectedEmployee.name }}</h3>
-              <el-tag :type="selectedEmployee.memberStatusName === '재직' ? 'success' : (selectedEmployee.memberStatusName === '휴직' ? 'warning' : 'primary')" size="small">
+              <el-tag
+                :type="selectedEmployee.memberStatusName === '재직' ? 'success' : (selectedEmployee.memberStatusName === '휴직' ? 'warning' : 'primary')"
+                size="small">
                 {{ selectedEmployee.memberStatusName }}
               </el-tag>
             </div>
-            <p>{{ selectedEmployee.memberPositionResList[0]?.title?.name || '-' }} • {{ selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
+            <p>{{ selectedEmployee.memberPositionResList[0]?.title?.name || '-' }} • {{
+              selectedEmployee.memberPositionResList[0]?.organization?.name || '-' }}</p>
           </div>
           <div class="detail-header-actions">
-            <el-button v-if="selectedEmployee && selectedEmployee.memberId" @click="goToEmployeeDetailPage(selectedEmployee.memberId)" type="primary" size="small">상세조회</el-button>
+            <el-button v-if="selectedEmployee && selectedEmployee.memberId"
+              @click="goToEmployeeDetailPage(selectedEmployee.memberId)" type="primary" size="small">상세조회</el-button>
             <el-button @click="showEmployeeDetail = false" size="small">닫기</el-button>
           </div>
         </div>
-        
+
         <el-tabs v-model="activeTab" class="detail-tabs">
           <el-tab-pane label="기본 정보" name="basic">
             <div class="detail-content">
@@ -251,7 +263,8 @@
 
           <el-tab-pane label="인사 정보" name="hr">
             <div class="detail-content">
-              <el-table v-if="selectedEmployee.gradeHistoryList && selectedEmployee.gradeHistoryList.length > 0" :data="selectedEmployee.gradeHistoryList" style="width: 100%">
+              <el-table v-if="selectedEmployee.gradeHistoryList && selectedEmployee.gradeHistoryList.length > 0"
+                :data="selectedEmployee.gradeHistoryList" style="width: 100%">
                 <el-table-column prop="gradeName" label="직급명"></el-table-column>
                 <el-table-column prop="promotionDate" label="진급일"></el-table-column>
               </el-table>
@@ -262,7 +275,9 @@
           <el-tab-pane label="직무 정보" name="job">
             <div class="detail-content">
               <div v-if="selectedEmployee.memberPositionResList && selectedEmployee.memberPositionResList.length > 0">
-                <div v-for="(position, index) in selectedEmployee.memberPositionResList" :key="index" class="position-detail-item" style="border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div v-for="(position, index) in selectedEmployee.memberPositionResList" :key="index"
+                  class="position-detail-item"
+                  style="border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                   <el-row :gutter="20">
                     <el-col :span="12">
                       <div class="info-item">
@@ -315,7 +330,6 @@
     </el-dialog>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
@@ -326,6 +340,7 @@ import { ElMessageBox } from 'element-plus';
 import axios from 'axios';
 import { defaultAvatarSvg } from '@/utils/defaultAvatar.js';
 import employeeService from '@/api/employeeService'; // Import employeeService
+import OrganizationSelectionModal from '@/components/member/OrganizationSelectionModal.vue';
 
 const router = useRouter();
 const { success, error, info } = useSnackbar();
@@ -340,6 +355,9 @@ const showEmployeeDetail = ref(false);
 const selectedEmployee = ref(null);
 const activeTab = ref('basic');
 const employees = ref([]);
+const showOrganizationSelectionModal = ref(false);
+const selectedOrganizationId = ref(null);
+const orgSelectModal = ref(null); // Declare ref for the modal
 
 // Permissions State
 const canCreate = ref(false);
@@ -370,6 +388,7 @@ const fetchEmployees = async () => {
         name: emp.name,
         position: emp.titleName,
         department: emp.organizationName,
+        organizationId: emp.organizationId, // Add organizationId here
         email: emp.email,
         phone: emp.phoneNumber,
         status: memberStatusEnumMapping[emp.memberStatusName] || emp.memberStatusName,
@@ -378,11 +397,8 @@ const fetchEmployees = async () => {
         avatar: null,
         employmentType: emp.employmentTypeName,
       }));
-    } else {
-      error(response.data.message || '직원 목록을 불러오는 데 실패했습니다.');
     }
   } catch (err) {
-    console.error(err);
     const errorMessage = err.response?.data?.message || '서버 오류가 발생했습니다.';
     error(errorMessage);
   }
@@ -399,27 +415,24 @@ onMounted(async () => {
 });
 
 // Computed Properties
-const departmentList = computed(() => {
-  const deps = employees.value.map(emp => emp.department);
-  return [...new Set(deps)];
-});
+
 
 const filteredEmployees = computed(() => {
   return employees.value.filter(employee => {
-    const matchesSearch = !searchQuery.value || 
+    const matchesSearch = !searchQuery.value ||
       employee.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       employee.email.toLowerCase().includes(searchQuery.value.toLowerCase());
-    
-    const matchesDepartment = !selectedDepartment.value || 
-      employee.department === selectedDepartment.value;
-    
+
+    const matchesDepartment = !selectedOrganizationId.value ||
+      employee.organizationId === selectedOrganizationId.value;
+
     let matchesStatus;
     if (selectedStatus.value) {
       matchesStatus = employee.status === selectedStatus.value;
     } else {
       matchesStatus = employee.status !== 'DELETED';
     }
-    
+
     return matchesSearch && matchesDepartment && matchesStatus;
   });
 });
@@ -429,6 +442,26 @@ const activeEmployees = computed(() => {
 });
 
 // Methods
+const openEmployeeDetail = async (employee) => {
+  await fetchEmployeeDetails(employee.id);
+};
+
+const fetchEmployeeDetails = async (employeeId) => {
+  try {
+    const response = await employeeService.getEmployeeDetails(employeeId);
+    if (response.data && response.data.success) {
+      selectedEmployee.value = response.data.data;
+      showEmployeeDetail.value = true;
+    } else {
+      error(response.data.message || '직원 상세 정보를 불러오는 데 실패했습니다.');
+    }
+  } catch (err) {
+    console.error(err);
+    const errorMessage = err.response?.data?.message || '서버 오류가 발생했습니다.';
+    error(errorMessage);
+  }
+};
+
 const goToAddEmployee = () => {
   router.push('/employee/add');
 };
@@ -440,7 +473,7 @@ const editEmployee = (emp) => {
 const deleteEmployee = (employee) => {
   ElMessageBox.confirm('정말로 삭제하시겠습니까?', '확인', {
     confirmButtonText: '삭제',
-    cancelButtonText: '취소', 
+    cancelButtonText: '취소',
     type: 'warning'
   }).then(async () => {
     try {
@@ -501,6 +534,18 @@ const resetFilters = () => {
   searchQuery.value = '';
   selectedDepartment.value = '';
   selectedStatus.value = '';
+  selectedOrganizationId.value = null; // Reset selected organization ID
+};
+
+const handleOrganizationSelected = (organization) => {
+  if (organization) {
+    selectedDepartment.value = organization.name;
+    selectedOrganizationId.value = organization.id;
+  } else {
+    selectedDepartment.value = '';
+    selectedOrganizationId.value = null;
+  }
+  showOrganizationSelectionModal.value = false;
 };
 
 // Helper functions for formatting
@@ -525,7 +570,6 @@ const formatAccountStatus = (status) => {
 };
 
 const goToEmployeeDetailPage = (employeeId) => {
-  console.log('goToEmployeeDetailPage 호출, employeeId:', employeeId); // Add this log
   router.push(`/employee/detail/${employeeId}`);
   showEmployeeDetail.value = false; // Close the modal
 };
@@ -574,9 +618,52 @@ const formatDate = (dateString) => {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   margin-bottom: 24px;
+  display: flex; /* 자식 요소들(left, right)을 가로로 배치 */
+  justify-content: space-between; /* left는 왼쪽 끝, right는 오른쪽 끝으로 보냄 */
+  align-items: center; /* 세로 중앙 정렬 */
+  width: 100%; /* 부모 너비를 꽉 채움 */
+  gap: 1rem; /* left와 right 사이 간격 */
+}
+
+.filter-left {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex: 1; /* 남는 공간을 모두 차지 (가장 중요) */
+  gap: 1rem; /* input과 select 사이 간격 */
+}
+
+/* :deep() 사용 */
+.filter-left :deep(.el-input) {
+  flex: 1; /* filter-left 안에서 남는 공간을 모두 차지 */
+  min-width: 200px; /* 너무 좁아지지 않도록 최소 너비 설정 */
+}
+
+.filter-left :deep(.el-select) {
+  width: 150px; /* '상태 선택'이 보이도록 적절한 너비 */
+}
+
+/* --- 반응형 --- */
+@media (max-width: 768px) {
+  .filter-section {
+    flex-direction: column; /* 세로로 쌓음 */
+    align-items: stretch; /* 자식 요소들을 100% 너비로 늘림 */
+  }
+
+  .filter-left {
+    flex-direction: column; /* input과 select를 세로로 쌓음 */
+    width: 100%;
+  }
+
+  .filter-left :deep(.el-select) {
+    width: 100%;
+  }
+
+  .filter-right {
+    width: 100%;
+  }
+
+  .filter-right :deep(.el-button) {
+    width: 100%;
+  }
 }
 
 .filter-left {

@@ -186,8 +186,6 @@ const deleteGrade = async (grade) => {
       success('삭제되었습니다.');
       await fetchGrade();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || '직급 삭제에 실패했습니다.';
-      error(errorMessage);
       console.error("Error deleting grade:", error);
     } finally {
       loading.value = false;

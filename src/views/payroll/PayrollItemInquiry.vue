@@ -146,6 +146,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollItemInquiry',
@@ -210,7 +211,6 @@ export default {
       try {
         this.loading = true
         
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
         let yearMonth = ''
         
         // 조회기간을 yyyy-MM 형식으로 변환
@@ -232,24 +232,12 @@ export default {
           this.inquiryPeriod = yearMonth
         }
         
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/salary/summary', {
           params: {
-            companyId: companyId,
             yearMonth: yearMonth
           },
-          headers: headers
+          headers: userHeaders
         })
         
         const responseData = response.data?.data || response.data || {}
@@ -309,7 +297,6 @@ export default {
       try {
         this.detailLoading = true
         
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
         let yearMonth = ''
         
         // 조회기간을 yyyy-MM 형식으로 변환
@@ -330,25 +317,13 @@ export default {
           yearMonth = `${year}-${month}`
         }
         
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/salary/summary-details', {
           params: {
-            companyId: companyId,
             yearMonth: yearMonth,
             name: item.itemName
           },
-          headers: headers
+          headers: userHeaders
         })
         
         const apiData = response.data?.data || response.data || []

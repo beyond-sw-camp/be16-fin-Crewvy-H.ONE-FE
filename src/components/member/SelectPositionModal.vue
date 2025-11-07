@@ -50,8 +50,11 @@ const fetchPositions = async () => {
     const response = await apiClient.get(`/member-service/member/my-positions`);
     const positionData = response.data.data;
 
+    console.log('Fetched positions:', JSON.stringify(positionData, null, 2));
+
     if (positionData && Array.isArray(positionData)) {
-        positions.value = positionData;
+        // Filter out positions where ynDel is true
+        positions.value = positionData.filter(p => !p.ynDel);
     } else {
         console.error("Invalid data structure for positions", response.data);
         error('직무 목록의 데이터 형식이 올바르지 않습니다.');

@@ -76,6 +76,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollMyInquiry',
@@ -120,34 +121,9 @@ export default {
       try {
         this.loading = true
         
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-        const memberId = localStorage.getItem('memberId')
-        
-        if (!memberId) {
-          this.error('사용자 정보를 찾을 수 없습니다.')
-          this.loading = false
-          return
-        }
-        
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
-        // 처음에는 전체 조회 (yearMonth 파라미터 없이)
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/salary/member', {
-          params: {
-            companyId: companyId,
-            memberId: memberId
-          },
-          headers: headers
+          headers: userHeaders
         })
         
         const apiData = response.data?.data || response.data || []

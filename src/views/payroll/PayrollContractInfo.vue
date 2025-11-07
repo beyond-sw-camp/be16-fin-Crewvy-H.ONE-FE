@@ -275,7 +275,7 @@
 import { useSnackbar } from '@/composables/useSnackbar'
 import { Loading } from '@element-plus/icons-vue'
 import apiClient from '@/api/http'
-import { getAuthHeadersFromToken } from '@/utils/authUtils'
+import { getAuthHeadersFromToken, getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollContractInfo',
@@ -398,11 +398,6 @@ export default {
     }
   },
   methods: {
-    // 회사 ID 가져오기
-    getCompanyId() {
-      return 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-    },
-    
     // 화면 크기 변경 핸들러
     handleResize() {
       this.screenWidth = window.innerWidth
@@ -501,15 +496,9 @@ export default {
       try {
         this.loading = true
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get(`/workforce-service/payrollItem/fixed-allowance`, {
-          params: { companyId: this.getCompanyId() },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+          headers: userHeaders
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -791,19 +780,10 @@ export default {
       this.loading = true
       
       try {
-        // 인증 헤더 가져오기
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const response = await apiClient.get(
-          `/workforce-service/salary-config/list`,
-          {
-            params: { companyId: this.getCompanyId() },
-            headers: authHeaders ? {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            } : {}
-          }
-        )
+        const userHeaders = getUserHeaders()
+        const response = await apiClient.get(`/workforce-service/salary-config/list`, {
+          headers: userHeaders
+        })
 
         let dataList = []
         if (response.data) {
@@ -832,6 +812,7 @@ export default {
     processFetchedData(backendData) {
       const employeeData = backendData.map((employeeConfig) => {
         const employee = {
+          id: employeeConfig.id || null, // salary-history id 저장
           memberId: employeeConfig.memberId,
           empNo: employeeConfig.sabun,
           name: employeeConfig.memberName,
@@ -839,7 +820,11 @@ export default {
           position: '', // 직급 정보가 없음
           // 기본급 설정
           baseSalary: employeeConfig.baseSalary || 0,
-          baseSalaryDisplay: this.formatCurrency(employeeConfig.baseSalary || 0)
+          baseSalaryDisplay: this.formatCurrency(employeeConfig.baseSalary || 0),
+          // 급여 이력 관련 필드 저장
+          payType: employeeConfig.payType || 'MONTHLY', // 기본값: MONTHLY (월급)
+          customaryWage: employeeConfig.customaryWage || 0,
+          effectiveDate: employeeConfig.effectiveDate || null
         }
         
         // fixedAllowanceList가 있으면 각 항목을 매핑
@@ -890,33 +875,24 @@ export default {
       try {
         this.saving = true
         
-        // 프론트엔드 데이터를 백엔드 형식으로 변환
+        // 프론트엔드 데이터를 백엔드 형식으로 변환 (리스트로 직접 전송)
         const saveData = this.filteredRows.map(row => {
-          const fixedAllowanceList = this.allowanceItems
-            .filter(item => {
-              const property = this.getItemProperty(item.name)
-              return row[property] && row[property] > 0
-            })
-            .map(item => {
-              const property = this.getItemProperty(item.name)
-              return {
-                allowanceName: item.name,
-                amount: row[property] || 0
-              }
-            })
-
           return {
+            id: row.id || null, // 조회 시 받은 id, 없으면 null
             memberId: row.memberId,
+            payType: row.payType || 'MONTHLY', // 기본값: MONTHLY (월급)
             baseSalary: row.baseSalary || 0,
-            fixedAllowanceList: fixedAllowanceList
+            customaryWage: row.customaryWage || 0,
+            effectiveDate: row.effectiveDate || this.getCurrentDate()
           }
         })
 
-        await apiClient.post(
-          `/workforce-service/salary-config/save`,
+        const userHeaders = getUserHeaders()
+        await apiClient.put(
+          `/workforce-service/salary-history/save`,
+          saveData, // 리스트로 직접 전송
           {
-            companyId: this.getCompanyId(),
-            salaryConfigList: saveData
+            headers: userHeaders
           }
         )
 
@@ -1054,18 +1030,12 @@ export default {
           return
         }
 
-        // API 요청
+        const userHeaders = getUserHeaders()
         await apiClient.put(
           `/workforce-service/fixed-allowance/update-all`,
           requestData,
           {
-            headers: {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            },
-            params: {
-              companyId: this.getCompanyId()
-            }
+            headers: userHeaders
           }
         )
 

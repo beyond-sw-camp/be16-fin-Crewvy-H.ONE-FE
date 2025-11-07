@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="isModalVisible" title="직원 찾기" width="70%" @close="closeModal" top="5vh"
-    custom-class="org-employee-modal" height="70%">
+  <el-dialog ref="dialog" v-model="isModalVisible" title="직원 찾기" width="70%" @close="closeModal" top="5vh"
+    custom-class="org-employee-modal">
     <el-tabs v-model="activeTab" class="main-tabs">
       <!-- Organization Tree Tab -->
       <el-tab-pane label="조직도" name="orgTree">
@@ -49,27 +49,39 @@
                   <div v-for="member in selectedOrg.members" :key="member.id" class="employee-list-row">
                     <div class="employee-list-cell name">
                       <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
-                        <span class="cell-content">{{ member.name }}</span>
+                        <div class="cell-content truncate-text">{{ member.name }}</div>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell position">
                       <el-tooltip :content="member.titleName ? member.titleName.join(', ') : (member.position || '')"
                         placement="top" effect="dark" :show-after="1000">
-                        <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : (member.position
-                          || '')
-                        }}</span>
+                        <div class="cell-content">
+                          <div v-if="member.titleName && member.titleName.length > 1">
+                            <div v-for="(title, index) in member.titleName" :key="index">{{ title }}</div>
+                          </div>
+                          <div v-else-if="member.titleName && member.titleName.length === 1" class="truncate-text">
+                            {{ member.titleName[0] }}
+                          </div>
+                          <div v-else class="truncate-text">
+                            {{ member.position || '' }}
+                          </div>
+                        </div>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell contact">
                       <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark"
                         :show-after="1000">
-                        <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
+                        <div class="cell-content truncate-text">{{ member.phoneNumber || 'N/A' }}</div>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell email">
                       <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                        <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle
-                            plain @click="copyToClipboard(member.email, '이메일')" /></span>
+                        <span class="cell-content">
+                          <div class="email-content-wrapper">
+                            <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                            <span>{{ member.email || 'N/A' }}</span>
+                          </div>
+                        </span>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
@@ -101,33 +113,57 @@
             <div v-else-if="employeeSearchResults.length > 0" class="employee-list-wrapper">
               <div class="employee-list">
                 <div class="employee-list-header">
-                  <div class="employee-list-cell name">이름</div>
+                  <div class="employee-list-cell department">부서</div>
                   <div class="employee-list-cell position">직책</div>
+                  <div class="employee-list-cell name">이름</div>
                   <div class="employee-list-cell contact">연락처</div>
                   <div class="employee-list-cell email">이메일</div>
                   <div class="employee-list-cell status">상태</div>
                 </div>
                 <div v-for="member in employeeSearchResults" :key="member.memberId" class="employee-list-row">
-                  <div class="employee-list-cell name">
-                    <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.name }}</span>
+                  <div class="employee-list-cell department">
+                    <el-tooltip :content="member.organizationList ? member.organizationList.map(org => org.name).join(', ') : ''" placement="top" effect="dark" :show-after="1000">
+                      <div class="cell-content">
+                        <div v-if="member.organizationList && member.organizationList.length > 1">
+                          <div v-for="(org, index) in member.organizationList" :key="index">{{ org.name }}</div>
+                        </div>
+                        <div v-else-if="member.organizationList && member.organizationList.length === 1" class="truncate-text">
+                          {{ member.organizationList[0].name }}
+                        </div>
+                      </div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell position">
                     <el-tooltip :content="member.titleName ? member.titleName.join(', ') : ''" placement="top"
                       effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.titleName ? member.titleName.join(', ') : '' }}</span>
+                      <div class="cell-content">
+                        <div v-if="member.titleName && member.titleName.length > 1">
+                          <div v-for="(title, index) in member.titleName" :key="index">{{ title }}</div>
+                        </div>
+                        <div v-else-if="member.titleName && member.titleName.length === 1" class="truncate-text">
+                          {{ member.titleName[0] }}
+                        </div>
+                      </div>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell name">
+                    <el-tooltip :content="member.name" placement="top" effect="dark" :show-after="1000">
+                      <div class="cell-content truncate-text">{{ member.name }}</div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell contact">
                     <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.phoneNumber || 'N/A' }}</span>
+                      <div class="cell-content truncate-text">{{ member.phoneNumber || 'N/A' }}</div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell email">
                     <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ member.email || 'N/A' }}<el-button :icon="CopyDocument" circle plain
-                          @click="copyToClipboard(member.email, '이메일')" /></span>
+                      <span class="cell-content">
+                        <div class="email-content-wrapper">
+                          <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
+                          <span>{{ member.email || 'N/A' }}</span>
+                        </div>
+                      </span>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
@@ -158,8 +194,7 @@
 <script>
 import searchService from '@/api/searchService';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { Search, CopyDocument } from '@element-plus/icons-vue';
-import { ElSpinner } from 'element-plus';
+import { CopyDocument } from '@element-plus/icons-vue';
 
 export default {
   name: 'OrganizationTreeModal',
@@ -170,7 +205,6 @@ export default {
     },
   },
   emits: ['update:visible', 'select'],
-  components: { Search, ElSpinner },
   setup() {
     const { success, error } = useSnackbar();
     return { success, error, CopyDocument };
@@ -225,7 +259,7 @@ export default {
     },
     orgEmployeePage(newPage) {
       if (this.currentSelectedOrgNode) {
-        this.handleOrgNodeClick(this.currentSelectedOrgNode, newPage);
+        this.handleOrgNodeClick(this.currentSelectedOrgNode, newPage, true);
       }
     },
     searchPage(newPage) {
@@ -253,9 +287,9 @@ export default {
       return data.label.indexOf(value) !== -1;
     },
 
-    async handleOrgNodeClick(data, page = 1) {
+    async handleOrgNodeClick(data, page = 1, isPageChange = false) {
       // If the same node is clicked, do nothing unless the page changes.
-      if (this.currentSelectedOrgNode && this.currentSelectedOrgNode.id === data.id && this.orgEmployeePage === page) {
+      if (!isPageChange && this.currentSelectedOrgNode && this.currentSelectedOrgNode.id === data.id && this.orgEmployeePage === page) {
         return;
       }
       this.currentSelectedOrgNode = data; // Save current node
@@ -283,6 +317,9 @@ export default {
     },
 
     async searchEmployees(page = 1) {
+      if (typeof page !== 'number') {
+        page = 1;
+      }
       if (!this.employeeSearchQuery) {
         this.employeeSearchResults = [];
         this.searchTotal = 0;
@@ -374,18 +411,13 @@ export default {
 
 <style>
 .el-dialog.org-employee-modal {
-  height: 70vh !important;
   display: flex !important;
   flex-direction: column !important;
 }
 
-.el-dialog.org-employee-modal .el-dialog__header {
-  flex-shrink: 0 !important;
-}
-
 .el-dialog.org-employee-modal .el-dialog__body {
   flex-grow: 1 !important;
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
   padding: 0 !important;
 }
 
@@ -420,14 +452,13 @@ export default {
 
 <style scoped>
 :deep(.org-employee-modal) {
-  height: 70vh !important;
   display: flex;
   flex-direction: column;
 }
 
 :deep(.org-employee-modal .el-dialog__body) {
   flex-grow: 1;
-  overflow-y: hidden;
+  overflow-y: auto;
   padding: 0;
 }
 
@@ -562,12 +593,19 @@ export default {
   min-width: 0;
 }
 
-.cell-content {
-  display: block;
-  width: 100%;
+.truncate-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.cell-content {
+  display: block;
+  width: 100%;
+}
+
+.employee-list-cell.department {
+  flex: 1.5;
 }
 
 .employee-list-cell.name {
@@ -621,4 +659,20 @@ export default {
   overflow-y: hidden;
   margin-top: 15px;
 }
+
+.email-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Added for centering */
+  gap: 5px; /* Adjust as needed */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-content-wrapper > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 </style>

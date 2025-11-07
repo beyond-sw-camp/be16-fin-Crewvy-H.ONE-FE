@@ -30,13 +30,11 @@ class SearchService {
   searchGlobal(query) {
     const accessToken = localStorage.getItem('accessToken');
     const companyId = localStorage.getItem('companyId');
-    const memberPositionId = localStorage.getItem('memberPositionId');
     return axios.get(`${API_URL}/search/global`, {
       params: { query },
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'X-User-CompanyId': companyId,
-        'X-User-MemberPositionId': memberPositionId,
       },
     });
   }
@@ -44,13 +42,11 @@ class SearchService {
   searchApprovals(query, page, size) {
     const accessToken = localStorage.getItem('accessToken');
     const companyId = localStorage.getItem('companyId');
-    const memberPositionId = localStorage.getItem('memberPositionId');
     return axios.get(`${API_URL}/search/approvals`, {
       params: { query, page, size },
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'X-User-CompanyId': companyId,
-        'X-User-MemberPositionId': memberPositionId,
       },
     });
   }
