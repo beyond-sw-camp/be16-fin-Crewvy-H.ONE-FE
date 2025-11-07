@@ -29,38 +29,62 @@
               <h2 class="group-title">직원</h2>
               <div class="employee-list">
                 <div class="employee-list-header">
-                  <div class="employee-list-cell name">이름</div>
+                  <div class="employee-list-cell department">부서</div>
                   <div class="employee-list-cell position">직책</div>
+                  <div class="employee-list-cell name">이름</div>
                   <div class="employee-list-cell contact">연락처</div>
                   <div class="employee-list-cell email">이메일</div>
                   <div class="employee-list-cell status">상태</div>
                 </div>
                 <div v-for="result in getResultsByCategory('employee').slice(0, 5)" :key="result.id"
                   class="employee-list-row" @click="navigateTo(result)">
-                  <div class="employee-list-cell name">
-                    <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ result.title }}</span>
+                  <div class="employee-list-cell department">
+                    <el-tooltip :content="result.department" placement="top" effect="dark" :show-after="1000">
+                      <div class="cell-content">
+                        <div v-if="result.department && result.department.split(', ').length > 1">
+                          <div v-for="(dep, index) in result.department.split(', ')" :key="index">{{ dep }}</div>
+                        </div>
+                        <div v-else class="truncate-text">
+                          {{ result.department }}
+                        </div>
+                      </div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell position">
                     <el-tooltip :content="result.position" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ result.position }}</span>
+                      <div class="cell-content">
+                        <div v-if="result.position && result.position.split(', ').length > 1">
+                          <div v-for="(pos, index) in result.position.split(', ')" :key="index">{{ pos }}</div>
+                        </div>
+                        <div v-else class="truncate-text">
+                          {{ result.position }}
+                        </div>
+                      </div>
+                    </el-tooltip>
+                  </div>
+                  <div class="employee-list-cell name">
+                    <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
+                      <div class="cell-content truncate-text">{{ result.title }}</div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell contact">
                     <el-tooltip :content="result.contact" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ result.contact }}</span>
+                      <div class="cell-content truncate-text">{{ result.contact }}</div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell email">
                     <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
-                      <el-button icon="CopyDocument" circle plain @click.stop="copyToClipboard(result.email, '이메일')" />
-                      <span class="cell-content">{{ result.email }}</span>
+                    <div class="cell-content truncate-text">
+                      <div class="email-content-wrapper">
+                        <el-button icon="CopyDocument" circle plain @click.stop="copyToClipboard(result.email, '이메일')" />
+                        <span>{{ result.email }}</span>
+                      </div>
+                    </div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell status">
                     <el-tooltip :content="result.status" placement="top" effect="dark" :show-after="1000">
-                      <span class="cell-content">{{ result.status }}</span>
+                      <div class="cell-content truncate-text">{{ result.status }}</div>
                     </el-tooltip>
                   </div>
                 </div>
@@ -105,39 +129,63 @@
           </div>
           <div v-else class="employee-list">
             <div class="employee-list-header">
-              <div class="employee-list-cell name">이름</div>
+              <div class="employee-list-cell department">부서</div>
               <div class="employee-list-cell position">직책</div>
+              <div class="employee-list-cell name">이름</div>
               <div class="employee-list-cell contact">연락처</div>
               <div class="employee-list-cell email">이메일</div>
               <div class="employee-list-cell status">상태</div>
             </div>
             <div v-for="result in getResultsByCategory('employee')" :key="result.id" class="employee-list-row"
               @click="navigateTo(result)">
-              <div class="employee-list-cell name">
-                <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.title }}</span>
+              <div class="employee-list-cell department">
+                <el-tooltip :content="result.department" placement="top" effect="dark" :show-after="1000">
+                  <div class="cell-content">
+                    <div v-if="result.department && result.department.split(', ').length > 1">
+                      <div v-for="(dep, index) in result.department.split(', ')" :key="index">{{ dep }}</div>
+                    </div>
+                    <div v-else class="truncate-text">
+                      {{ result.department }}
+                    </div>
+                  </div>
                 </el-tooltip>
               </div>
               <div class="employee-list-cell position">
                 <el-tooltip :content="result.position" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.position }}</span>
+                  <div class="cell-content">
+                    <div v-if="result.position && result.position.split(', ').length > 1">
+                      <div v-for="(pos, index) in result.position.split(', ')" :key="index">{{ pos }}</div>
+                    </div>
+                    <div v-else class="truncate-text">
+                      {{ result.position }}
+                    </div>
+                  </div>
+                </el-tooltip>
+              </div>
+              <div class="employee-list-cell name">
+                <el-tooltip :content="result.title" placement="top" effect="dark" :show-after="1000">
+                  <div class="cell-content truncate-text">{{ result.title }}</div>
                 </el-tooltip>
               </div>
               <div class="employee-list-cell contact">
                 <el-tooltip :content="result.contact" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.contact }}</span>
+                  <div class="cell-content truncate-text">{{ result.contact }}</div>
                 </el-tooltip>
               </div>
               <div class="employee-list-cell email">
                 <el-tooltip :content="result.email" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.email }}
-                    <el-button icon="CopyDocument" circle plain
-                      @click.stop="copyToClipboard(result.email, '이메일')" /></span>
+                  <div class="cell-content truncate-text">
+                    <div class="email-content-wrapper">
+                      <el-button icon="CopyDocument" circle plain
+                      @click.stop="copyToClipboard(result.email, '이메일')" />
+                      <span>{{ result.email }}</span>
+                    </div>
+                  </div>
                 </el-tooltip>
               </div>
               <div class="employee-list-cell status">
                 <el-tooltip :content="result.status" placement="top" effect="dark" :show-after="1000">
-                  <span class="cell-content">{{ result.status }}</span>
+                  <div class="cell-content truncate-text">{{ result.status }}</div>
                 </el-tooltip>
               </div>
             </div>
@@ -246,11 +294,11 @@ export default {
             return {
               id: res.id,
               type: '직원',
-              title: res.title,
-              department: res.department,
-              position: res.position,
+              title: res.title, // This is the employee's name
+              department: res.department, // This is the comma-separated string of organization names
+              position: res.position, // This is the comma-separated string of title names
               contact: res.contact,
-              email: res.email, // Added email
+              email: res.email,
               status: res.status,
               category: 'employee',
               path: `/member/detail/${res.id}`
@@ -491,16 +539,23 @@ export default {
   min-width: 0;
 }
 
-.cell-content {
-  display: block;
-  width: 100%;
+.truncate-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.employee-list-cell.name {
+.cell-content {
+  display: block;
+  width: 100%;
+}
+
+.employee-list-cell.department {
   flex: 1.5;
+}
+
+.employee-list-cell.name {
+  flex: 1;
   font-weight: 500;
   color: #303133;
   text-align: center;
@@ -512,7 +567,7 @@ export default {
 }
 
 .employee-list-cell.contact {
-  flex: 2;
+  flex: 1.5;
   text-align: center;
 }
 
@@ -581,6 +636,21 @@ export default {
 .pagination-container {
   margin-top: 30px;
   text-align: center;
+}
+
+.email-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Added for centering */
+  gap: 5px; /* Adjust as needed */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-content-wrapper > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 768px) {

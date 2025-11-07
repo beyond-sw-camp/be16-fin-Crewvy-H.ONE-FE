@@ -71,8 +71,10 @@ const fetchOrganizations = async () => {
   try {
     const response = await organizationService.getOrganizationTree();
     if (response.data && Array.isArray(response.data.data)) {
+      // Filter out organizations where ynDel is true
+      const activeOrganizations = response.data.data.filter(org => !org.ynDel);
       // Convert flat list to tree structure
-      const treeData = buildTree(response.data.data);
+      const treeData = buildTree(activeOrganizations);
       orgTree.value = treeData;
       // Expand top-level nodes by default
       if (treeData.length > 0) {

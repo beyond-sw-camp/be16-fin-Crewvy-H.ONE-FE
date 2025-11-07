@@ -163,8 +163,6 @@ const deleteRole = (role) => {
       selectedRole.value = null;
       await fetchRole();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || '삭제에 실패했습니다.';
-      error(errorMessage);
       console.error(error);
     }
   }).catch(() => {
