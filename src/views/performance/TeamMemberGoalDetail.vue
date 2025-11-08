@@ -340,7 +340,7 @@ export default {
         };
         await apiClient.patch('/workforce-service/performance/update-status', null, { params: payload });
 
-        this.goalDetail.status = 'APPROVED';
+        this.goalDetail.status = '승인';
         this.$message({
           type: 'success',
           message: '승인되었습니다.',
@@ -371,7 +371,7 @@ export default {
         };
         await apiClient.patch('/workforce-service/performance/update-status', null, { params: payload });
 
-        this.goalDetail.status = 'REJECTED';
+        this.goalDetail.status = '반려';
         this.rejectDialogVisible = false;
         this.rejectForm.reason = '';
         this.$message.success('반려 처리되었습니다.');
