@@ -707,8 +707,8 @@
 
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
-import axios from 'axios'
-import { getAuthHeadersFromToken } from '@/utils/authUtils'
+import apiClient from '@/api'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'ResourceReservation',
@@ -928,15 +928,10 @@ export default {
     async loadResources() {
       this.loadingResources = true
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list-available`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const { data } = await apiClient.get('/workforce-service/reservation/type/list-available', {
+          headers: userHeaders
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -964,15 +959,10 @@ export default {
     // 카테고리 목록 로드
     async loadCategories() {
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const { data } = await apiClient.get('/workforce-service/reservation/category/list', {
+          headers: userHeaders
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         this.categories = list.map(cat => ({
@@ -1005,19 +995,10 @@ export default {
     async loadMyReservations() {
       this.loadingMyReservations = true
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const memberId = localStorage.getItem('memberId')
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/myList`, {
-          params: { 
-            memberId: memberId,
-            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' 
-          },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const response = await apiClient.get('/workforce-service/reservation/myList', {
+          headers: userHeaders
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         
@@ -1073,17 +1054,10 @@ export default {
     
     async loadAllReservations() {
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
-          params: { 
-            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' 
-          },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const response = await apiClient.get('/workforce-service/reservation/list', {
+          headers: userHeaders
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         
@@ -1142,11 +1116,8 @@ export default {
     
     async submitReservationToServer(reservationData, reservationId = null) {
       try {
-        const memberId = localStorage.getItem('memberId')
         const requestData = {
           reservationTypeId: reservationData.resourceId,
-          memberId: memberId,
-          companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0',
           startDateTime: `${reservationData.date}T${reservationData.startTime}:00`,
           endDateTime: `${reservationData.date}T${reservationData.endTime}:00`,
           // reservation-details 확장 필드
@@ -1178,20 +1149,15 @@ export default {
             : null
         }
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        const requestHeaders = authHeaders ? {
-          'Authorization': authHeaders['Authorization'],
-          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-        } : {}
+        const requestHeaders = getUserHeaders()
         
         let response
         if (reservationId) {
-          response = await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/${reservationId}`, requestData, {
+          response = await apiClient.put(`/workforce-service/reservation/${reservationId}`, requestData, {
             headers: requestHeaders
           })
         } else {
-          response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/register`, requestData, {
+          response = await apiClient.post('/workforce-service/reservation/register', requestData, {
             headers: requestHeaders
           })
         }
@@ -2243,17 +2209,11 @@ export default {
           type: 'warning'
         })
 
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
         // API 요청으로 예약 삭제
-        const response = await axios.delete(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/${reservation.id}`,
+        const response = await apiClient.delete(
+          `/workforce-service/reservation/${reservation.id}`,
           {
-            headers: authHeaders ? {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            } : {}
+            headers: getUserHeaders()
           }
         )
 
@@ -2294,20 +2254,14 @@ export default {
           }
         )
 
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
         // API 요청으로 예약 상태를 USED로 변경
-        const response = await axios.put(
-          `${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/status/${reservation.id}`,
+        const response = await apiClient.put(
+          `/workforce-service/reservation/status/${reservation.id}`,
           {
             reservationStatus: 'USED'
           },
           {
-            headers: authHeaders ? {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            } : {}
+            headers: getUserHeaders()
           }
         )
 
