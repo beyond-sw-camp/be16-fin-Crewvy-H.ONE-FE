@@ -11,12 +11,6 @@ const routes = [
     component: () => import('@/views/Approval/ApprovalView.vue'),
     meta: { requiresAuth: true }
   },
-  {
-    path: '/board',
-    name: 'Board',
-    component: () => import('@/views/dashboard/Board.vue'),
-    meta: { requiresAuth: true }
-  },
 ];
 
 export default routes;

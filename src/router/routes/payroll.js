@@ -8,7 +8,6 @@ import PayrollItemInquiry from '../../views/payroll/PayrollItemInquiry.vue'
 import PayrollInsuranceDeduction from '../../views/payroll/PayrollInsuranceDeduction.vue'
 import PayrollStatusOutput from '../../views/payroll/PayrollStatusOutput.vue'
 import PayrollMyInquiry from '../../views/payroll/PayrollMyInquiry.vue'
-import PayrollWithholdingReport from '../../views/payroll/PayrollWithholdingReport.vue'
 import PayrollElderlyIncentive from '../../views/payroll/PayrollElderlyIncentive.vue'
 import PayrollSettings from '../../views/payroll/PayrollSettings.vue'
 
@@ -67,11 +66,6 @@ const routes = [
     path: '/payroll/my-inquiry',
     name: 'PayrollMyInquiry',
     component: PayrollMyInquiry
-  },
-  {
-    path: '/payroll/withholding-report',
-    name: 'PayrollWithholdingReport',
-    component: PayrollWithholdingReport
   },
   {
     path: '/payroll/elderly-incentive',

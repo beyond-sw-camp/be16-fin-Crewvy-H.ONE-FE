@@ -22,6 +22,7 @@ export const getAuthHeadersFromToken = () => {
 export const getUserHeaders = () => {
   const accessToken = localStorage.getItem('accessToken');
   const companyId = localStorage.getItem('companyId');
+  const memberId = localStorage.getItem('memberId');
   
   const headers = {};
   
@@ -37,6 +38,10 @@ export const getUserHeaders = () => {
     } catch (error) {
       console.error("Error decoding access token:", error);
     }
+  }
+
+  if (memberId) {
+    headers['X-Member-UUID'] = memberId;
   }
   
   if (companyId) {

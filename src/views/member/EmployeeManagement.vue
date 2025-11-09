@@ -584,8 +584,8 @@ const formatDate = (dateString) => {
 
 <style scoped>
 .employee {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header {
