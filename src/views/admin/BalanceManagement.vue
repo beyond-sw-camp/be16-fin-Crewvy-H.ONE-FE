@@ -3,17 +3,30 @@
     <div class="content-card">
       <div class="card-header">
         <h3>연차 잔고 관리</h3>
-        <el-button type="primary" @click="exportToExcel">
-          <el-icon><Download /></el-icon>
-          <span style="margin-left: 8px;">엑셀로 내보내기</span>
-        </el-button>
+        <div class="header-actions">
+          <el-select v-model="selectedYear" placeholder="연도 선택" style="width: 150px; margin-right: 12px;" @change="fetchBalances">
+            <el-option
+              v-for="year in availableYears"
+              :key="year"
+              :label="`${year}년`"
+              :value="year"
+            ></el-option>
+          </el-select>
+          <el-button type="primary" @click="exportToExcel">
+            <el-icon><Download /></el-icon>
+            <span style="margin-left: 8px;">엑셀로 내보내기</span>
+          </el-button>
+        </div>
       </div>
       <div class="filter-section">
         <el-select v-model="selectedDepartment" placeholder="부서 필터" clearable style="width: 200px;">
           <el-option label="전체 부서" value=""></el-option>
-          <el-option label="개발팀" value="dev"></el-option>
-          <el-option label="디자인팀" value="design"></el-option>
-          <el-option label="마케팅팀" value="marketing"></el-option>
+          <el-option
+            v-for="dept in departments"
+            :key="dept"
+            :label="dept"
+            :value="dept"
+          ></el-option>
         </el-select>
         <el-input
           v-model="searchQuery"
@@ -27,17 +40,41 @@
         </el-input>
       </div>
       <div class="balance-table">
-        <el-table :data="mockData" style="width: 100%">
-          <el-table-column prop="name" label="이름" width="150"></el-table-column>
-          <el-table-column prop="department" label="부서" width="180"></el-table-column>
-          <el-table-column prop="totalGranted" label="총 연차" align="right"></el-table-column>
-          <el-table-column prop="used" label="사용 일수" align="right"></el-table-column>
-          <el-table-column prop="remaining" label="잔여 일수" align="right">
+        <el-table :data="filteredBalances" v-loading="isLoading" style="width: 100%" empty-text="조회된 데이터가 없습니다">
+          <el-table-column prop="memberName" label="이름" width="120"></el-table-column>
+          <el-table-column prop="organizationName" label="부서" width="150"></el-table-column>
+          <el-table-column prop="titleName" label="직책" width="120"></el-table-column>
+          <el-table-column prop="policyTypeName" label="정책 유형" width="150"></el-table-column>
+          <el-table-column prop="totalGranted" label="총 부여" align="right" width="100">
             <template #default="scope">
-              <span style="font-weight: bold; color: #4f46e5;">{{ scope.row.remaining }}</span>
+              {{ scope.row.totalGranted || 0 }}일
             </template>
           </el-table-column>
-          <el-table-column label="작업" width="180" align="center">
+          <el-table-column prop="totalUsed" label="사용" align="right" width="100">
+            <template #default="scope">
+              {{ scope.row.totalUsed || 0 }}일
+            </template>
+          </el-table-column>
+          <el-table-column prop="remainingBalance" label="잔여" align="right" width="100">
+            <template #default="scope">
+              <span style="font-weight: bold; color: #4f46e5;">{{ scope.row.remainingBalance || 0 }}일</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="상태" width="110" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.isUsable ? 'success' : 'danger'" size="small">
+                {{ scope.row.isUsable ? '사용 가능' : '사용 불가' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="유급 여부" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.isPaid ? 'success' : 'info'" size="small">
+                {{ scope.row.isPaid ? '유급' : '무급' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="작업" width="200" align="center" fixed="right">
             <template #default="scope">
               <el-button size="small" @click="adjustBalance(scope.row)">잔고 조정</el-button>
               <el-button size="small" type="info" plain @click="viewHistory(scope.row)">이력 보기</el-button>
@@ -50,32 +87,102 @@
 </template>
 
 <script>
+import { ref, computed, onMounted } from 'vue';
+import { getLeaveBalanceStatus } from '@/api/attendance';
+import { useSnackbar } from '@/composables/useSnackbar';
+import { Download, Search } from '@element-plus/icons-vue';
+
 export default {
   name: 'BalanceManagement',
-  data() {
-    return {
-      searchQuery: '',
-      selectedDepartment: '',
-      mockData: [
-        { id: 1, name: '김철수', department: '개발팀', totalGranted: 15, used: 5, remaining: 10 },
-        { id: 2, name: '이영희', department: '디자인팀', totalGranted: 15, used: 10, remaining: 5 },
-        { id: 3, name: '박민준', department: '개발팀', totalGranted: 16, used: 15.5, remaining: 0.5 },
-        { id: 4, name: '최지우', department: '마케팅팀', totalGranted: 2, used: 0, remaining: 2 },
-        { id: 5, name: '정다솜', department: '개발팀', totalGranted: 15, used: 7, remaining: 8 },
-      ]
+  components: { Download, Search },
+  setup() {
+    const { success, error } = useSnackbar();
+
+    const balances = ref([]);
+    const isLoading = ref(false);
+    const searchQuery = ref('');
+    const selectedDepartment = ref('');
+    const selectedYear = ref(new Date().getFullYear());
+
+    // 최근 5년 연도 옵션
+    const availableYears = computed(() => {
+      const currentYear = new Date().getFullYear();
+      return Array.from({ length: 5 }, (_, i) => currentYear - i);
+    });
+
+    // 부서 목록 (데이터에서 추출)
+    const departments = computed(() => {
+      const depts = new Set(balances.value.map(b => b.organizationName).filter(Boolean));
+      return Array.from(depts);
+    });
+
+    // 필터링된 잔액 목록
+    const filteredBalances = computed(() => {
+      return balances.value.filter(balance => {
+        const matchesSearch = !searchQuery.value ||
+          balance.memberName?.toLowerCase().includes(searchQuery.value.toLowerCase());
+        const matchesDept = !selectedDepartment.value ||
+          balance.organizationName === selectedDepartment.value;
+        return matchesSearch && matchesDept;
+      });
+    });
+
+    const fetchBalances = async () => {
+      isLoading.value = true;
+      try {
+        const data = await getLeaveBalanceStatus({ year: selectedYear.value });
+        balances.value = data || [];
+      } catch (err) {
+        error(err.message || '잔고 데이터를 불러오는 데 실패했습니다.');
+        balances.value = [];
+      } finally {
+        isLoading.value = false;
+      }
     };
-  },
-  methods: {
-    exportToExcel() { console.log('Exporting to Excel...'); },
-    adjustBalance(row) { console.log('Adjusting balance for', row.name); },
-    viewHistory(row) { console.log('Viewing history for', row.name); },
+
+    const exportToExcel = () => {
+      // TODO: 엑셀 내보내기 구현
+      console.log('Exporting to Excel...');
+      success('엑셀 내보내기 기능은 준비 중입니다.');
+    };
+
+    const adjustBalance = (row) => {
+      // TODO: 잔고 조정 모달 구현
+      console.log('Adjusting balance for', row.memberName);
+      success(`${row.memberName}님의 잔고 조정 기능은 준비 중입니다.`);
+    };
+
+    const viewHistory = (row) => {
+      // TODO: 이력 보기 모달 구현
+      console.log('Viewing history for', row.memberName);
+      success(`${row.memberName}님의 이력 보기 기능은 준비 중입니다.`);
+    };
+
+    onMounted(() => {
+      fetchBalances();
+    });
+
+    return {
+      balances,
+      isLoading,
+      searchQuery,
+      selectedDepartment,
+      selectedYear,
+      availableYears,
+      departments,
+      filteredBalances,
+      fetchBalances,
+      exportToExcel,
+      adjustBalance,
+      viewHistory,
+    };
   }
-}
+};
 </script>
 
 <style scoped>
 .balance-management {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 .content-card {
@@ -96,6 +203,10 @@ export default {
   font-size: 18px;
   font-weight: 600;
   color: #2c3e50;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
 }
 .filter-section {
   padding: 20px 24px;
