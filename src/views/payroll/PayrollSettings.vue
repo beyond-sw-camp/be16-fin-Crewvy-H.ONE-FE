@@ -29,7 +29,16 @@
                 </el-form-item>
 
                 <el-form-item v-if="policyForm.paymentType === 'specific_day'" label="지급일(일)">
-                  <el-input-number v-model="policyForm.paymentDay" :min="1" :max="31" />
+                  <el-input-number 
+                    v-model="policyForm.paymentDay" 
+                    :min="1" 
+                    :max="31" 
+                    :precision="0"
+                    :step="1"
+                    :controls="true"
+                    @change="handlePaymentDayChange"
+                    @blur="handlePaymentDayBlur"
+                  />
                   <span class="hint">1~31 사이 숫자</span>
                 </el-form-item>
 
@@ -192,7 +201,7 @@
                   placeholder="선택하세요"
                   size="small"
                   style="width: 100%"
-                  :disabled="scope.row.isBasicRequired"
+                  :disabled="scope.row.isBasicRequired || activeTab === 'payment' || activeTab === 'deduction'"
                   :style="{ cursor: 'default' }"
                   @change="(value) => handleTypeChange(scope.row, value)"
                 >
@@ -290,7 +299,8 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import apiClient from '@/api/http'
-import { getAuthHeadersFromToken } from '@/utils/authUtils'
+import { getUserHeaders } from '@/utils/authUtils'
+import { jwtDecode } from 'jwt-decode'
 import { Plus, Document, RefreshLeft, Delete, Loading, Refresh } from '@element-plus/icons-vue'
 
 export default {
@@ -391,25 +401,12 @@ export default {
     }
   },
   methods: {
-    // 회사 ID 가져오기 (실제로는 사용자 세션이나 환경변수에서 가져와야 함)
-    getCompanyId() {
-      // TODO: 실제 구현에서는 사용자 세션이나 환경변수에서 가져와야 함
-      // 현재는 개발용으로 환경변수 또는 기본값 사용
-      return process.env.VUE_APP_COMPANY_ID || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-    },
-    
     // 항목명 옵션을 API에서 가져오기
     async loadItemOptions() {
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get(`/workforce-service/payrollItem/list`, {
-          params: { companyId: this.getCompanyId() }, // 특정 회사 ID로 요청 (백엔드에서 null 포함해서 응답)
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+          headers: userHeaders
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -451,15 +448,9 @@ export default {
       try {
         this.loading = true
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get(`/workforce-service/payrollItem/list`, {
-          params: { companyId: this.getCompanyId() },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+          headers: userHeaders
         })
         
         // API 응답에 따라 데이터 구조 조정
@@ -519,7 +510,8 @@ export default {
         console.error('급여 항목 로드 실패:', error)
         this.payrollItems = []
         this.originalPayrollItems = []
-        this.error('급여 항목을 불러오는데 실패했습니다.')
+        const errorMessage = error.response?.data?.message || '급여 항목을 불러오는데 실패했습니다.'
+        this.error(errorMessage)
       } finally {
         this.loading = false
       }
@@ -621,15 +613,10 @@ export default {
       }).then(async () => {
         try {
           // 헤더 설정
-          const authHeaders = getAuthHeadersFromToken()
-          
-          // axios delete 요청으로 RequestBody에 항목의 uuid 배열로 전송 (일괄 삭제 대응)
+          const userHeaders = getUserHeaders()
           await apiClient.delete(`/workforce-service/payrollItem`, {
             data: [item.uuid],
-            headers: authHeaders ? {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            } : {}
+            headers: userHeaders
           })
           
           // 백엔드 삭제 성공 시 로컬에서도 삭제
@@ -637,7 +624,8 @@ export default {
           this.success('항목이 삭제되었습니다.')
         } catch (error) {
           console.error('항목 삭제 실패:', error)
-          this.error('항목 삭제 중 오류가 발생했습니다.')
+          const errorMessage = error.response?.data?.message || '항목 삭제 중 오류가 발생했습니다.'
+          this.error(errorMessage)
         }
       }).catch(() => {
         this.info('삭제가 취소되었습니다.')
@@ -718,7 +706,6 @@ export default {
           // 새 항목인 경우 (uuid가 null)
           if (!item.uuid) {
             const itemData = {
-              companyId: this.getCompanyId(), // 회사 UUID
               salaryType: finalSalaryType,
               name: finalItemName,
               isActive: item.isActive ? 'TRUE' : 'FALSE',
@@ -747,16 +734,13 @@ export default {
         })
         
         // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
+        const userHeaders = getUserHeaders()
         
         // 새 항목 저장 (POST) - 각 항목을 단일 객체로 전송
         if (newItems.length > 0) {
           for (const newItem of newItems) {
             await apiClient.post(`/workforce-service/payrollItem`, newItem, {
-              headers: authHeaders ? {
-                'Authorization': authHeaders['Authorization'],
-                'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-              } : {}
+              headers: userHeaders
             })
           }
         }
@@ -764,10 +748,7 @@ export default {
         // 변경된 기존 항목 수정 (PUT)
         if (changedItems.length > 0) {
           await apiClient.put(`/workforce-service/payrollItem`, changedItems, {
-            headers: authHeaders ? {
-              'Authorization': authHeaders['Authorization'],
-              'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-            } : {}
+            headers: userHeaders
           })
         }
         
@@ -783,7 +764,8 @@ export default {
         await this.loadPayrollItems()
       } catch (error) {
         console.error('급여 항목 저장 실패:', error)
-        this.error('저장 중 오류가 발생했습니다.')
+        const errorMessage = error.response?.data?.message || '저장 중 오류가 발생했습니다.'
+        this.error(errorMessage)
       } finally {
         this.loading = false
       }
@@ -807,8 +789,9 @@ export default {
     // 급여 정책 로드
     async loadPolicy() {
       try {
+        const userHeaders = getUserHeaders()
         const res = await apiClient.get(`/workforce-service/salary-policy/list`, {
-          params: { companyId: this.getCompanyId() }
+          headers: userHeaders
         })
         let policy = null
         const d = res?.data
@@ -854,6 +837,44 @@ export default {
       }
     },
     
+    // 지급일 변경 시 검증
+    handlePaymentDayChange(value) {
+      this.$nextTick(() => {
+        this.validateAndAdjustPaymentDay(value)
+      })
+    },
+    
+    // 지급일 포커스 아웃 시 검증
+    handlePaymentDayBlur() {
+      this.$nextTick(() => {
+        this.validateAndAdjustPaymentDay(this.policyForm.paymentDay)
+      })
+    },
+    
+    // 지급일 값 검증 및 자동 조정
+    validateAndAdjustPaymentDay(value) {
+      if (value === null || value === undefined || value === '') {
+        this.policyForm.paymentDay = 1
+        this.warning('지급일은 1~31 사이의 숫자여야 합니다. 1로 설정되었습니다.')
+        return
+      }
+      
+      const numValue = Number(value)
+      if (isNaN(numValue)) {
+        this.policyForm.paymentDay = 1
+        this.warning('지급일은 숫자만 입력 가능합니다. 1로 설정되었습니다.')
+        return
+      }
+      
+      if (numValue < 1) {
+        this.policyForm.paymentDay = 1
+        this.warning('지급일은 1 이상이어야 합니다. 1로 자동 조정되었습니다.')
+      } else if (numValue > 31) {
+        this.policyForm.paymentDay = 31
+        this.warning('지급일은 31 이하여야 합니다. 31로 자동 조정되었습니다.')
+      }
+    },
+    
     // 정책 유효성 검사
     validatePolicy() {
       if (this.policyForm.paymentType === 'specific_day' && (!this.policyForm.paymentDay || this.policyForm.paymentDay < 1 || this.policyForm.paymentDay > 31)) {
@@ -881,6 +902,29 @@ export default {
       if (!this.validatePolicy()) return
       this.saving = true
       try {
+        // companyId 가져오기 (localStorage 또는 JWT 토큰에서)
+        let companyId = localStorage.getItem('companyId')
+        
+        // localStorage에 없으면 JWT 토큰에서 시도
+        if (!companyId) {
+          try {
+            const accessToken = localStorage.getItem('accessToken')
+            if (accessToken) {
+              const decodedToken = jwtDecode(accessToken)
+              companyId = decodedToken.companyId || decodedToken.company_id
+            }
+          } catch (e) {
+            console.warn('JWT 토큰에서 companyId를 가져올 수 없습니다:', e)
+          }
+        }
+        
+        if (!companyId) {
+          console.error('companyId를 찾을 수 없습니다. localStorage:', localStorage.getItem('companyId'))
+          this.error('회사 정보를 찾을 수 없습니다. 로그인 상태를 확인해주세요.')
+          this.saving = false
+          return
+        }
+
         // 백엔드 사양에 맞춘 매핑
         const payDayType = this.policyForm.paymentType === 'specific_day' ? 'SPECIFIC_DAY' : 'END_OF_MONTH'
         const holidayRule = this.policyForm.holidayPolicy === 'previous_day' ? 'PREPAID' : 'POSTPAID'
@@ -909,7 +953,7 @@ export default {
         }
 
         const payload = {
-          companyId: this.getCompanyId(),
+          companyId: companyId,
           payDayType: payDayType,
           paymentDay: this.policyForm.paymentType === 'specific_day' ? this.policyForm.paymentDay : 0,
           holidayRule: holidayRule,
@@ -920,11 +964,14 @@ export default {
           periodEndDay: periodEndDay
         }
 
-        const endpoint = this.policyExists ? 'update' : 'create'
-        await apiClient.post(`/workforce-service/salary-policy/${endpoint}`, payload)
+        const userHeaders = getUserHeaders()
+        await apiClient.put(`/workforce-service/salary-policy/update`, payload, {
+          headers: userHeaders
+        })
         this.success('급여 정책이 저장되었습니다.')
       } catch (e) {
-        this.error('정책 저장 중 오류가 발생했습니다.')
+        const errorMessage = e.response?.data?.message || '정책 저장 중 오류가 발생했습니다.'
+        this.error(errorMessage)
       } finally {
         this.saving = false
       }

@@ -31,6 +31,32 @@ import { ref, defineEmits, defineExpose, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import organizationService from '@/api/organizationService';
 
+// Helper function to build the tree
+const buildTree = (nodes) => {
+  const nodeMap = new Map();
+  const tree = [];
+
+  // First pass: create a map of nodes by their ID and add 'id' property
+  nodes.forEach(node => {
+    const id = node.organizationId;
+    const label = node.label;
+    nodeMap.set(id, { ...node, id, label, children: [] });
+  });
+
+  // Second pass: build the tree structure
+  nodeMap.forEach(node => {
+    if (node.parentId && nodeMap.has(node.parentId)) {
+      const parent = nodeMap.get(node.parentId);
+      parent.children.push(node);
+    } else {
+      tree.push(node);
+    }
+  });
+
+  return tree;
+};
+
+
 const visible = ref(false);
 const orgTree = ref([]);
 const defaultProps = { children: 'children', label: 'label' };
@@ -43,11 +69,17 @@ const emit = defineEmits(['organization-selected']);
 
 const fetchOrganizations = async () => {
   try {
-    const response = await organizationService.getOrganizationTreeForCreation();
+    const response = await organizationService.getOrganizationTree();
     if (response.data && Array.isArray(response.data.data)) {
-      orgTree.value = response.data.data;
+      // Filter out organizations where ynDel is true
+      const activeOrganizations = response.data.data.filter(org => !org.ynDel);
+      // Convert flat list to tree structure
+      const treeData = buildTree(activeOrganizations);
+      orgTree.value = treeData;
       // Expand top-level nodes by default
-      expandedKeys.value = orgTree.value.map(org => org.id);
+      if (treeData.length > 0) {
+        expandedKeys.value = treeData.map(org => org.id);
+      }
     } else {
       console.error("Fetched data is not in the expected format.", response.data);
       orgTree.value = []; // Ensure tree is empty on bad data

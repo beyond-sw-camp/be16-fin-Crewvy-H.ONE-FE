@@ -11,6 +11,7 @@
         <div class="snackbar__title" v-if="title">{{ title }}</div>
         <div class="snackbar__text">{{ message }}</div>
       </div>
+      <button v-if="action" class="snackbar__action-button" @click="handleActionClick">{{ action.text }}</button>
       <button class="snackbar__close" @click="close">
         <el-icon><Close /></el-icon>
       </button>
@@ -47,6 +48,10 @@ export default {
       type: String,
       default: 'top-center',
       validator: (value) => ['top-left', 'top-right', 'top-center', 'bottom-left', 'bottom-right'].includes(value)
+    },
+    action: {
+      type: Object,
+      default: null
     }
   },
   watch: {
@@ -59,6 +64,12 @@ export default {
   methods: {
     close() {
       this.$emit('close')
+    },
+    handleActionClick() {
+      if (this.action && typeof this.action.onClick === 'function') {
+        this.action.onClick();
+      }
+      this.close();
     },
     startTimer() {
       if (this.duration > 0) {
@@ -82,6 +93,7 @@ export default {
   transform: translateX(100%);
   opacity: 0;
   transition: all 0.3s ease;
+  word-break: keep-all;
 }
 
 .snackbar--top-center {
@@ -125,10 +137,9 @@ export default {
 
 .snackbar__content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 16px;
   gap: 12px;
-  text-align: center;
 }
 
 .snackbar__icon {
@@ -145,7 +156,9 @@ export default {
 .snackbar__message {
   flex: 1;
   min-width: 0;
-  text-align: center;
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .snackbar__title {
@@ -156,7 +169,10 @@ export default {
 
 .snackbar__text {
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .snackbar__close {
@@ -174,6 +190,21 @@ export default {
 
 .snackbar__close:hover {
   background-color: rgba(0, 0, 0, 0.1);
+}
+
+.snackbar__action-button {
+  background: transparent;
+  border: none;
+  color: #3b82f6; /* Or a color that fits the theme */
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.snackbar__action-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 /* Success */

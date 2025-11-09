@@ -138,6 +138,13 @@ const handleNotificationClick = async (notification) => {
         console.error('NT009 알림 처리 중 팀 목표 ID를 가져오는 데 실패했습니다:', error);
       }
       break;
+      case 'NT010':
+      try {
+        url = `/resource/reservation`;
+      } catch (error) {
+        console.error('NT010 알림 처리 중 예약ID를 가져오는 데 실패했습니다:', error);
+      }
+      break;
     default:
       console.log(`알 수 없는 알림 타입: ${type}`);
       break;

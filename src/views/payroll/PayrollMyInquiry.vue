@@ -25,7 +25,7 @@
                 <el-date-picker
                   v-model="inquiryPeriod"
                   type="month"
-                  placeholder="전체 조회 (미선택 시)"
+                  placeholder="전체 조회"
                   format="YYYY-MM"
                   value-format="YYYY-MM"
                   clearable
@@ -63,7 +63,7 @@
           <el-table-column prop="status" label="상태" min-width="100" align="center">
             <template #default="scope">
               <el-tag :type="getStatusType(scope.row.status)">
-                {{ scope.row.status }}
+                {{ convertStatus(scope.row.status) }}
               </el-tag>
             </template>
           </el-table-column>
@@ -76,6 +76,7 @@
 <script>
 import { useSnackbar } from '@/composables/useSnackbar'
 import apiClient from '@/api/http'
+import { getUserHeaders } from '@/utils/authUtils'
 
 export default {
   name: 'PayrollMyInquiry',
@@ -120,34 +121,9 @@ export default {
       try {
         this.loading = true
         
-        const companyId = localStorage.getItem('companyId') || 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-        const memberId = localStorage.getItem('memberId')
-        
-        if (!memberId) {
-          this.error('사용자 정보를 찾을 수 없습니다.')
-          this.loading = false
-          return
-        }
-        
-        // 헤더 설정
-        const accessToken = localStorage.getItem('accessToken')
-        const memberPositionId = localStorage.getItem('memberPositionId')
-        
-        const headers = {}
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-        }
-        if (memberPositionId) {
-          headers['X-User-MemberPositionId'] = memberPositionId
-        }
-        
-        // 처음에는 전체 조회 (yearMonth 파라미터 없이)
+        const userHeaders = getUserHeaders()
         const response = await apiClient.get('/workforce-service/salary/member', {
-          params: {
-            companyId: companyId,
-            memberId: memberId
-          },
-          headers: headers
+          headers: userHeaders
         })
         
         const apiData = response.data?.data || response.data || []
@@ -181,7 +157,7 @@ export default {
             totalDeduction: item.totalDeduction || 0,
             netPay: item.netPay || 0,
             payDate: item.paymentDate || item.payDate || '',
-            status: '지급대기' // 고정값
+            status: item.status
           }
         }) : []
         
@@ -211,9 +187,9 @@ export default {
     
     // 상태 타입 반환
     getStatusType(status) {
-      if (status === '지급완료') {
+      if (status === 'PAID') {
         return 'success'
-      } else if (status === '지급대기') {
+      } else if (status === 'PENDING') {
         return 'warning'
       }
       return ''
@@ -264,7 +240,7 @@ export default {
                   <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.totalDeduction.toLocaleString()}원</td>
                   <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${item.netPay.toLocaleString()}원</td>
                   <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.payDate}</td>
-                  <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.status}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${this.convertStatus(item.status)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -339,7 +315,7 @@ export default {
             item.totalDeduction,
             item.netPay,
             item.payDate,
-            item.status
+            this.convertStatus(item.status)
           ])
         })
         
@@ -442,7 +418,7 @@ export default {
                   <td>${item.totalDeduction.toLocaleString()}원</td>
                   <td class="net-pay">${item.netPay.toLocaleString()}원</td>
                   <td>${item.payDate}</td>
-                  <td>${item.status}</td>
+                  <td>${this.convertStatus(item.status)}</td>
                 </tr>
               `).join('')}
             </tbody>

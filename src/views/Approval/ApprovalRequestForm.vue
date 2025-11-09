@@ -17,8 +17,8 @@
               </el-form-item>
 
               <el-row v-for="(row, rowIndex) in formSchema.rows" :key="rowIndex" :gutter="20">
-                <el-col v-for="field in row" :key="field.id" :span="24 / row.length">
-                  <el-form-item :label="field.label" :required="field.required">
+                <el-col v-for="field in row" :key="field.id" :span="field.type === 'grid' ? 24 : 24 / row.length">
+                  <el-form-item v-if="field.type !== 'grid' && shouldShowField(field)" :label="field.label" :required="field.required">
                     <!-- Text Input -->
                     <el-input
                       v-if="field.type === 'text'"
@@ -42,18 +42,36 @@
                       :placeholder="field.placeholder"
                       style="width: 100%;"
                     />
+                    <!-- DateTime Picker -->
+                    <el-date-picker
+                      v-if="field.type === 'datetime'"
+                      v-model="formData[field.id]"
+                      type="datetime"
+                      :placeholder="field.placeholder"
+                      style="width: 100%;"
+                      format="YYYY-MM-DD HH:mm:ss"
+                      value-format="YYYY-MM-DDTHH:mm:ss"
+                    />
                     <!-- Number Input -->
                     <el-input-number
                       v-if="field.type === 'number'"
                       v-model="formData[field.id]"
                       :placeholder="field.placeholder"
                       style="width: 100%;"
+                      :readonly="field.readonly"
                     />
                     <!-- Tel Input -->
                     <el-input
                       v-if="field.type === 'tel'"
                       v-model="formData[field.id]"
                       type="tel"
+                      :placeholder="field.placeholder"
+                    />
+                    <!-- Email Input -->
+                    <el-input
+                      v-if="field.type === 'email'"
+                      v-model="formData[field.id]"
+                      type="email"
                       :placeholder="field.placeholder"
                     />
                     <!-- Select Input -->
@@ -70,6 +88,95 @@
                         :value="option"
                       />
                     </el-select>
+                  </el-form-item>
+                  <!-- Grid 필드는 별도 처리 -->
+                  <el-form-item v-if="field.type === 'grid'" :label="field.label" :required="field.required">
+                    <div class="grid-field-container">
+                      <el-table
+                        :data="formData[field.id] || []"
+                        border
+                        style="width: 100%"
+                      >
+                        <el-table-column
+                          v-for="column in field.columns"
+                          :key="column.id"
+                          :prop="column.id"
+                          :label="column.label"
+                          :width="getColumnWidth(column)"
+                          header-align="center"
+                          :align="column.id === 'amount' || column.id === 'estimatedUnitPrice' || column.id === 'estimatedTotalPrice' ? 'right' : undefined"
+                        >
+                          <template #default="scope">
+                            <!-- Text Input -->
+                            <el-input
+                              v-if="column.type === 'text'"
+                              v-model="scope.row[column.id]"
+                              :placeholder="column.placeholder"
+                              size="small"
+                            />
+                            <!-- Number Input -->
+                            <el-input-number
+                              v-else-if="column.type === 'number'"
+                              v-model="scope.row[column.id]"
+                              :placeholder="column.placeholder"
+                              size="small"
+                              style="width: 100%;"
+                              :min="0"
+                              :precision="0"
+                              :readonly="column.readonly"
+                              :formatter="(value) => formatNumber(value)"
+                              :parser="(value) => parseNumber(value)"
+                              @change="handleGridAmountChange(field.id, column.id, field)"
+                            />
+                            <!-- Date Picker -->
+                            <el-date-picker
+                              v-else-if="column.type === 'date'"
+                              v-model="scope.row[column.id]"
+                              type="date"
+                              :placeholder="column.placeholder"
+                              size="small"
+                              style="width: 100%;"
+                              format="YYYY-MM-DD"
+                              value-format="YYYY-MM-DD"
+                            />
+                            <!-- Select Input -->
+                            <el-select
+                              v-else-if="column.type === 'select'"
+                              v-model="scope.row[column.id]"
+                              :placeholder="column.label"
+                              size="small"
+                              style="width: 100%;"
+                            >
+                              <el-option
+                                v-for="option in column.options"
+                                :key="option"
+                                :label="option"
+                                :value="option"
+                              />
+                            </el-select>
+                          </template>
+                        </el-table-column>
+                        <el-table-column label="관리" width="80" align="center" header-align="center">
+                          <template #default="scope">
+                            <el-button
+                              type="danger"
+                              size="small"
+                              @click="removeGridRow(field.id, scope.$index)"
+                            >
+                              <el-icon><Delete /></el-icon>
+                            </el-button>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                      <el-button
+                        type="primary"
+                        size="small"
+                        style="margin-top: 10px;"
+                        @click="addGridRow(field)"
+                      >
+                        행 추가
+                      </el-button>
+                    </div>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -142,13 +249,14 @@ import { useSnackbar } from '@/composables/useSnackbar';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/api/http';
 import ApprovalLineEditorModal from '@/components/approval/ApprovalLineEditorModal.vue';
-import { UploadFilled } from '@element-plus/icons-vue';
+import { UploadFilled, Delete } from '@element-plus/icons-vue';
 
 export default {
   name: 'ApprovalRequestForm',
   components: {
     ApprovalLineEditorModal,
     UploadFilled,
+    Delete,
   },
   setup() {
     const { success, error } = useSnackbar();
@@ -156,6 +264,7 @@ export default {
     const route = useRoute();
     const documentId = ref(null); // For the template
     const draftApprovalId = ref(null); // For the specific draft instance being edited
+    const requestId = ref(null); // For linking to attendance request
     const formSchema = ref(null);
     const formData = ref({});
     const formTitle = ref('');
@@ -183,7 +292,7 @@ export default {
       }
     };
 
-    const initializeFormData = (schema, userInfo) => {
+    const initializeFormData = (schema, userInfo, requestData = null) => {
       const data = {};
       if (schema && schema.rows) {
         schema.rows.forEach(row => {
@@ -196,41 +305,60 @@ export default {
               } else if (field.id === 'name') {
                 data[field.id] = userInfo.memberName;
               } else {
-                data[field.id] = null;
+                // grid 타입 필드는 배열로 초기화
+                if (field.type === 'grid') {
+                  data[field.id] = [];
+                } else {
+                  data[field.id] = null;
+                }
               }
             } else {
-              data[field.id] = null;
+              // grid 타입 필드는 배열로 초기화
+              if (field.type === 'grid') {
+                data[field.id] = [];
+              } else {
+                data[field.id] = null;
+              }
             }
           });
         });
       }
+      
+      // request 데이터가 있으면 id와 매칭하여 데이터 채우기
+      if (requestData) {
+        Object.keys(requestData).forEach(key => {
+          if (key in data) {
+            data[key] = requestData[key];
+          }
+        });
+      }
+      
       formData.value = data;
     };
 
-    const fetchFormSchema = async (id, userInfo) => {
+    const fetchFormSchema = async (id, userInfo, requestId = null) => {
       try {
-        // requestId가 있으면 query parameter로 전달
-        const requestId = route.query.requestId;
-        const url = requestId
-          ? `/workforce-service/approval/get-document/${id}?requestId=${requestId}`
-          : `/workforce-service/approval/get-document/${id}`;
-
-        const response = await apiClient.get(url);
+        const params = {};
+        if (requestId) {
+          params.requestId = requestId;
+        }
+        const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`, { params });
         const doc = response.data.data;
         formTitle.value = doc.documentName;
-        if (doc.metadata) {
-          formSchema.value = doc.metadata.schema;
-          initializeFormData(doc.metadata.schema, userInfo);
 
-          // Request 데이터가 있으면 formData에 매핑
-          if (doc.request) {
-            // requestType, requestUnit, startDate, endDate, reason, workLocation 매핑
-            if (doc.request.requestType) formData.value['requestType'] = doc.request.requestType;
-            if (doc.request.requestUnit) formData.value['requestUnit'] = doc.request.requestUnit;
-            if (doc.request.startDate) formData.value['startDate'] = doc.request.startDate;
-            if (doc.request.endDate) formData.value['endDate'] = doc.request.endDate;
-            if (doc.request.reason) formData.value['reason'] = doc.request.reason;
-            if (doc.request.workLocation) formData.value['workLocation'] = doc.request.workLocation;
+        // request 데이터 추출
+        const requestData = doc.request || null;
+
+        if (doc.metadata) {
+          // metadata.metadata.schema 구조 확인
+          const schema = doc.metadata.metadata?.schema || doc.metadata.schema;
+          if (schema) {
+            formSchema.value = schema;
+            initializeFormData(schema, userInfo, requestData);
+          } else {
+            // metadata가 직접 schema인 경우
+            formSchema.value = doc.metadata.schema;
+            initializeFormData(doc.metadata.schema, userInfo, requestData);
           }
         }
         if (doc.policy && doc.policy.length > 0) {
@@ -334,13 +462,18 @@ export default {
 
       const approvalIdFromRoute = route.params.id;
       const documentIdFromRoute = route.params.documentId;
+      const requestIdFromQuery = route.query.requestId;
+
+      if (requestIdFromQuery) {
+        requestId.value = requestIdFromQuery;
+      }
 
       if (approvalIdFromRoute) {
         draftApprovalId.value = approvalIdFromRoute;
         fetchDraftData(approvalIdFromRoute, memberInfo.value);
       } else if (documentIdFromRoute) {
         documentId.value = documentIdFromRoute;
-        fetchFormSchema(documentIdFromRoute, memberInfo.value);
+        fetchFormSchema(documentIdFromRoute, memberInfo.value, requestIdFromQuery);
       }
     });
 
@@ -411,6 +544,10 @@ export default {
         approvalData.approvalId = draftApprovalId.value;
       }
 
+      if (requestId.value) {
+        approvalData.requestId = requestId.value;
+      }
+
       try {
         const response = await apiClient.post('/workforce-service/approval/create-approval', approvalData);
         const newApprovalId = response.data.data.approvalId;
@@ -440,6 +577,10 @@ export default {
 
       if (draftApprovalId.value) {
         approvalData.approvalId = draftApprovalId.value;
+      }
+
+      if (requestId.value) {
+        approvalData.requestId = requestId.value;
       }
 
       try {
@@ -476,6 +617,217 @@ export default {
       currentApprovalLine.value = newLine;
     };
 
+    const addGridRow = (field) => {
+      if (!formData.value[field.id]) {
+        formData.value[field.id] = [];
+      }
+      const newRow = {};
+      field.columns.forEach(column => {
+        newRow[column.id] = null;
+      });
+      formData.value[field.id].push(newRow);
+      // 행 추가 후 계산 (구매품의서의 경우)
+      calculateGridRowTotal(field.id, field);
+    };
+
+    // 필드 스키마 찾기 헬퍼 함수
+    const findFieldSchema = (fieldId) => {
+      if (!formSchema.value) return null;
+      
+      for (const row of formSchema.value.rows) {
+        for (const field of row) {
+          if (field.id === fieldId && field.type === 'grid') {
+            return field;
+          }
+        }
+      }
+      return null;
+    };
+
+    const removeGridRow = (fieldId, index) => {
+      if (formData.value[fieldId] && formData.value[fieldId].length > index) {
+        formData.value[fieldId].splice(index, 1);
+        // 행 삭제 후 합계 재계산
+        // 지출결의서인지 구매품의서인지 확인하여 적절한 계산 함수 호출
+        const fieldSchema = findFieldSchema(fieldId);
+        if (fieldSchema) {
+          const hasAmountColumn = fieldSchema.columns?.some(col => col.id === 'amount');
+          const hasEstimatedTotalPriceColumn = fieldSchema.columns?.some(col => col.id === 'estimatedTotalPrice');
+          
+          if (hasAmountColumn) {
+            calculateTotalAmount(fieldId);
+          } else if (hasEstimatedTotalPriceColumn) {
+            calculateTotalEstimatedAmount(fieldId);
+          }
+        }
+      }
+    };
+
+    // Grid 필드의 amount 합계를 totalAmount에 자동 계산 (지출결의서용)
+    const calculateTotalAmount = (gridFieldId) => {
+      if (!formSchema.value || !formData.value[gridFieldId]) return;
+
+      // 스키마에서 totalAmount 필드 찾기
+      let totalAmountField = null;
+      formSchema.value.rows.forEach(row => {
+        row.forEach(field => {
+          if (field.id === 'totalAmount') {
+            totalAmountField = field;
+          }
+        });
+      });
+
+      if (!totalAmountField) return;
+
+      // grid 필드에서 amount 컬럼 찾기
+      let amountColumnId = null;
+      formSchema.value.rows.forEach(row => {
+        row.forEach(field => {
+          if (field.id === gridFieldId && field.type === 'grid' && field.columns) {
+            const amountColumn = field.columns.find(col => col.id === 'amount');
+            if (amountColumn) {
+              amountColumnId = 'amount';
+            }
+          }
+        });
+      });
+
+      if (!amountColumnId) return;
+
+      // amount 합계 계산
+      const gridData = formData.value[gridFieldId] || [];
+      const total = gridData.reduce((sum, row) => {
+        const amount = row[amountColumnId];
+        return sum + (amount ? Number(amount) : 0);
+      }, 0);
+
+      // totalAmount 필드에 합계 설정
+      formData.value.totalAmount = total;
+    };
+
+    // Grid 행의 예상 금액 계산 (구매품의서용: 수량 * 단가)
+    const calculateGridRowTotal = (gridFieldId, fieldSchema) => {
+      if (!formData.value[gridFieldId]) return;
+
+      const gridData = formData.value[gridFieldId] || [];
+      const quantityCol = fieldSchema.columns?.find(col => col.id === 'quantity');
+      const unitPriceCol = fieldSchema.columns?.find(col => col.id === 'estimatedUnitPrice');
+      const totalPriceCol = fieldSchema.columns?.find(col => col.id === 'estimatedTotalPrice');
+
+      if (!quantityCol || !unitPriceCol || !totalPriceCol) return;
+
+      // 각 행의 예상 금액 계산 (수량 * 단가)
+      gridData.forEach(row => {
+        const quantity = row[quantityCol.id] ? Number(row[quantityCol.id]) : 0;
+        const unitPrice = row[unitPriceCol.id] ? Number(row[unitPriceCol.id]) : 0;
+        row[totalPriceCol.id] = quantity * unitPrice;
+      });
+
+      // 총 예상 금액 계산
+      calculateTotalEstimatedAmount(gridFieldId);
+    };
+
+    // Grid 필드의 예상 금액 합계를 총 예상 금액에 자동 계산 (구매품의서용)
+    const calculateTotalEstimatedAmount = (gridFieldId) => {
+      if (!formSchema.value || !formData.value[gridFieldId]) return;
+
+      // 스키마에서 totalEstimatedAmount 필드 찾기
+      let totalEstimatedAmountField = null;
+      formSchema.value.rows.forEach(row => {
+        row.forEach(field => {
+          if (field.id === 'totalEstimatedAmount') {
+            totalEstimatedAmountField = field;
+          }
+        });
+      });
+
+      if (!totalEstimatedAmountField) return;
+
+      // grid 필드에서 estimatedTotalPrice 컬럼 찾기
+      let totalPriceColumnId = null;
+      formSchema.value.rows.forEach(row => {
+        row.forEach(field => {
+          if (field.id === gridFieldId && field.type === 'grid' && field.columns) {
+            const totalPriceColumn = field.columns.find(col => col.id === 'estimatedTotalPrice');
+            if (totalPriceColumn) {
+              totalPriceColumnId = 'estimatedTotalPrice';
+            }
+          }
+        });
+      });
+
+      if (!totalPriceColumnId) return;
+
+      // estimatedTotalPrice 합계 계산
+      const gridData = formData.value[gridFieldId] || [];
+      const total = gridData.reduce((sum, row) => {
+        const totalPrice = row[totalPriceColumnId];
+        return sum + (totalPrice ? Number(totalPrice) : 0);
+      }, 0);
+
+      // totalEstimatedAmount 필드에 합계 설정
+      formData.value.totalEstimatedAmount = total;
+    };
+
+    // Grid의 값 변경 시 호출
+    const handleGridAmountChange = (gridFieldId, columnId, fieldSchema) => {
+      if (columnId === 'amount') {
+        // 지출결의서: amount 변경 시 totalAmount 계산
+        calculateTotalAmount(gridFieldId);
+      } else if (columnId === 'quantity' || columnId === 'estimatedUnitPrice') {
+        // 구매품의서: 수량 또는 단가 변경 시 행의 예상 금액 계산
+        calculateGridRowTotal(gridFieldId, fieldSchema);
+      } else if (columnId === 'estimatedTotalPrice') {
+        // 구매품의서: 예상 금액 변경 시 총 예상 금액 계산
+        calculateTotalEstimatedAmount(gridFieldId);
+      }
+    };
+
+    // 필드 표시 여부 확인 (showIf 조건 처리)
+    const shouldShowField = (field) => {
+      // showIf 조건이 없으면 항상 표시
+      if (!field.showIf) {
+        return true;
+      }
+
+      // showIf 조건 확인
+      const { field: conditionField, value: conditionValue } = field.showIf;
+      
+      // 조건 필드의 값이 조건 값과 일치하는지 확인
+      const fieldValue = formData.value[conditionField];
+      return fieldValue === conditionValue;
+    };
+
+    // 컬럼 너비 계산
+    const getColumnWidth = (column) => {
+      if (column.type === 'date') {
+        return '150';
+      } else if (column.type === 'number') {
+        // amount, estimatedUnitPrice, estimatedTotalPrice 등의 금액 컬럼은 더 넓게
+        if (column.id === 'amount' || column.id === 'estimatedUnitPrice' || column.id === 'estimatedTotalPrice') {
+          return '180';
+        }
+        return '120';
+      }
+      return undefined;
+    };
+
+    // 숫자 천 단위 구분 포맷팅
+    const formatNumber = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return '';
+      }
+      return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    // 천 단위 구분 제거하여 숫자로 변환
+    const parseNumber = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+      return Number(String(value).replace(/,/g, ''));
+    };
+
     return {
       documentId,
       draftApprovalId,
@@ -490,6 +842,13 @@ export default {
       currentApprovalLine,
       updateApprovalLine,
       fileList,
+      addGridRow,
+      removeGridRow,
+      handleGridAmountChange,
+      shouldShowField,
+      getColumnWidth,
+      formatNumber,
+      parseNumber,
     };
   },
 };
@@ -584,5 +943,19 @@ export default {
   display: flex;
   justify-content: flex-end;
   margin-top: 24px;
+}
+
+.grid-field-container {
+  width: 100%;
+}
+
+.grid-field-container .el-table {
+  margin-bottom: 10px;
+}
+
+.empty-grid {
+  text-align: center;
+  padding: 20px;
+  color: #909399;
 }
 </style>

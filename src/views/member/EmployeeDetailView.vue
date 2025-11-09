@@ -346,7 +346,6 @@ const fetchEmployeeDetails = async (id) => {
       employee.value = response.data.data;
     }
   } catch (err) {
-    console.error('직원 상세 정보를 불러오는 데 실패했습니다:', err);
     if (err.response && err.response.status === 403) {
       error('해당 직원의 정보에 접근할 권한이 없습니다.');
       router.back();
@@ -420,12 +419,9 @@ const printToPdf = async () => {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    console.log('Starting PDF generation...'); // Log before html2pdf call
     try {
       await html2pdf().set(opt).from(element).save();
-      console.log('PDF generation completed successfully.'); // Log after successful generation
     } catch (pdfError) {
-      console.error('PDF 생성 중 오류 발생:', pdfError);
       error('PDF 생성 중 오류가 발생했습니다. 콘솔을 확인해주세요.');
     } finally {
       // Ensure tabs header is shown again, even if PDF generation fails

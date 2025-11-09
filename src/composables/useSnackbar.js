@@ -16,7 +16,8 @@ export function useSnackbar() {
       title: options.title || '',
       message: options.message || '',
       duration: options.duration || 4000,
-      position: options.position || 'top-center'
+      position: options.position || 'top-center',
+      action: options.action || null, // Add this line
     })
 
     snackbars.value.push(snackbar)

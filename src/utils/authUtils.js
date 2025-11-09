@@ -17,3 +17,31 @@ export const getAuthHeadersFromToken = () => {
     return null;
   }
 };
+
+// UUID와 memberPositionId만 가져오는 헬퍼 함수
+export const getUserHeaders = () => {
+  const accessToken = localStorage.getItem('accessToken');
+  const companyId = localStorage.getItem('companyId');
+  
+  const headers = {};
+  
+  if (accessToken) {
+    try {
+      const decodedToken = jwtDecode(accessToken);
+      if (decodedToken.uuid) {
+        headers['X-User-UUID'] = decodedToken.uuid;
+      }
+      if (decodedToken.memberPositionId) {
+        headers['X-User-MemberPositionId'] = decodedToken.memberPositionId;
+      }
+    } catch (error) {
+      console.error("Error decoding access token:", error);
+    }
+  }
+  
+  if (companyId) {
+    headers['X-User-CompanyId'] = companyId;
+  }
+  
+  return headers;
+};

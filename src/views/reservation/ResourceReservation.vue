@@ -2034,9 +2034,8 @@ export default {
         return
       }
       
-      // 예약 시간 검증
+      // 예약 시간 검증 (validateReservationTime 내부에서 이미 구체적인 에러 메시지를 표시함)
       if (!this.validateReservationTime()) {
-        this.error('예약 시간을 확인해주세요.')
         return
       }
 
@@ -2149,27 +2148,21 @@ export default {
       })
     },
     validateReservationTime() {
-      const { startTime, endTime, resourceId } = this.reservationForm
+      const { startTime, endTime } = this.reservationForm
       
+      // 시작 시간과 종료 시간이 모두 입력되었는지 확인
       if (!startTime || !endTime) {
+        this.error('시작 시간과 종료 시간을 모두 선택해주세요.')
         return false
       }
 
       const start = new Date(`2000-01-01 ${startTime}`)
       const end = new Date(`2000-01-01 ${endTime}`)
       
+      // 시작 시간이 종료 시간보다 빠른지 확인
       if (start >= end) {
+        this.error('종료 시간은 시작 시간보다 늦어야 합니다.')
         return false
-      }
-
-      // 자원별 최대 예약 시간 검증
-      const resource = this.resources.find(r => r.id == resourceId)
-      if (resource && resource.maxHours) {
-        const duration = (end - start) / (1000 * 60 * 60) // 시간 단위
-        if (duration > resource.maxHours) {
-          this.error(`최대 예약 시간은 ${resource.maxHours}시간입니다.`)
-          return false
-        }
       }
 
       // 예약된 시간대와의 충돌 검사

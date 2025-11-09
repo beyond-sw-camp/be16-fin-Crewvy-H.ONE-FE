@@ -10,7 +10,7 @@
           <el-icon><Plus /></el-icon>
           <span style="margin-left: 8px;">결재 신청</span>
         </el-button>
-        <el-button @click="goToTemplateList">
+        <el-button @click="goToTemplateList" v-if="hasApprovalReadPermission">
           <el-icon><Document /></el-icon>
           <span style="margin-left: 8px;">템플릿 관리</span>
         </el-button>
@@ -84,28 +84,26 @@
               <h3>대기 중인 결재</h3>
 
             </div>
+
+            <div class="approval-list-header">
+              <div class="approval-col title">제목</div>
+              <div class="approval-col position">직책</div>
+              <div class="approval-col name">이름</div>
+              <div class="approval-col date">작성일</div>
+              <div class="approval-col actions">상세</div>
+            </div>
             
             <div class="approval-list">
               <div class="approval-item" v-for="approval in pendingApprovalsList" :key="approval.approvalId">
-                <div class="approval-info">
-                  <div class="approval-header">
-                    <div class="approval-title">{{ approval.title }}</div>
-                  </div>
-                  <div class="approval-details">
-                    <span class="approval-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
-                    <span class="approval-type"><strong>문서:</strong> {{ approval.documentName }}</span>
-                  </div>
-                </div>
-                <div class="approval-right-section">
-                  <div class="approval-top-row">
-                    <div class="approval-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</div>
-                  </div>
-                  <div class="approval-actions">
-                    <el-button size="small" @click="viewDetails(approval)">
-                      <el-icon><View /></el-icon>
-                      상세
-                    </el-button>
-                  </div>
+                <div class="approval-col title">{{ approval.title }}</div>
+                <div class="approval-col position">{{ approval.requesterPosition }}</div>
+                <div class="approval-col name">{{ approval.requesterName }}</div>
+                <div class="approval-col date">{{ approval.createAt ? approval.createAt.substring(0, 10) : '' }}</div>
+                <div class="approval-col actions">
+                  <el-button size="small" @click="viewDetails(approval)">
+                    <el-icon><View /></el-icon>
+                    상세
+                  </el-button>
                 </div>
               </div>
               <div v-if="pendingApprovalsList.length === 0" class="empty-state">
@@ -129,21 +127,22 @@
             <div class="section-header">
               <h3>내 결재 신청</h3>
             </div>
+
+            <div class="approval-list-header">
+              <div class="approval-col title">제목</div>
+              <div class="approval-col position">직책</div>
+              <div class="approval-col name">이름</div>
+              <div class="approval-col date">작성일</div>
+              <div class="approval-col actions">상세</div>
+            </div>
             
             <div v-if="showMyRequestsTable" class="request-list">
               <div class="request-item" v-for="request in myRequests" :key="request.approvalId">
-                <div class="request-info">
-                  <div class="request-header">
-                    <div class="request-title">{{ request.title }}</div>
-                  </div>
-                  <div class="request-details">
-                    <span class="request-requester"><strong>기안자:</strong> {{ request.requesterName }} ({{ request.requesterPosition }})</span>
-                    <span class="request-document-name"><strong>문서:</strong> {{ request.documentName }}</span>
-                    <span class="request-status"><strong>상태:</strong> {{ getKoreanStatus(request.status) }}</span>
-                    <span class="request-date"><strong>기안일:</strong> {{ request.createAt ? request.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
-                  </div>
-                </div>
-                <div class="request-actions" style="margin-left: 16px;">
+                <div class="approval-col title">{{ request.title }}</div>
+                <div class="approval-col position">{{ request.requesterPosition }}</div>
+                <div class="approval-col name">{{ request.requesterName }}</div>
+                <div class="approval-col date">{{ request.createAt ? request.createAt.substring(0, 10) : '' }}</div>
+                <div class="approval-col actions">
                   <el-button size="small" @click="viewRequestDetails(request)">
                     <el-icon><View /></el-icon>
                     상세
@@ -187,33 +186,26 @@
                 </el-select>
               </div>
             </div>
+
+            <div class="approval-list-header">
+              <div class="approval-col title">제목</div>
+              <div class="approval-col position">직책</div>
+              <div class="approval-col name">이름</div>
+              <div class="approval-col date">작성일</div>
+              <div class="approval-col actions">상세</div>
+            </div>
             
             <div class="completed-list">
               <div class="completed-item" v-for="approval in completedList" :key="approval.approvalId">
-                <div class="completed-info">
-                  <div class="completed-header">
-                    <div class="completed-title">{{ approval.title }}</div>
-                  </div>
-                  <div class="completed-details">
-                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
-                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
-                  </div>
-                </div>
-                <div class="completed-meta-actions">
-                  <div class="completed-meta-actions-row">
-                    <div class="completed-meta">
-                      <el-tag :type="getStatusType(approval.status)" size="small">
-                        {{ getKoreanStatus(approval.status) }}
-                      </el-tag>
-                      <span class="completed-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
-                    </div>
-                    <div class="completed-actions">
-                      <el-button size="small" @click="viewCompletedDetails(approval)">
-                        <el-icon><View /></el-icon>
-                        상세
-                      </el-button>
-                    </div>
-                  </div>
+                <div class="approval-col title">{{ approval.title }}</div>
+                <div class="approval-col position">{{ approval.requesterPosition }}</div>
+                <div class="approval-col name">{{ approval.requesterName }}</div>
+                <div class="approval-col date">{{ approval.createAt ? approval.createAt.substring(0, 10) : '' }}</div>
+                <div class="approval-col actions">
+                  <el-button size="small" @click="viewCompletedDetails(approval)">
+                    <el-icon><View /></el-icon>
+                    상세
+                  </el-button>
                 </div>
               </div>
               <div v-if="completedList.length === 0" class="empty-state">
@@ -236,32 +228,24 @@
             <div class="section-header">
               <h3>내 결재(완료)</h3>
             </div>
+            <div class="approval-list-header">
+              <div class="approval-col title">제목</div>
+              <div class="approval-col position">직책</div>
+              <div class="approval-col name">이름</div>
+              <div class="approval-col date">작성일</div>
+              <div class="approval-col actions">상세</div>
+            </div>
             <div class="completed-list">
               <div class="completed-item" v-for="approval in myApprovalsCompletedList" :key="approval.approvalId">
-                <div class="completed-info">
-                  <div class="completed-header">
-                    <div class="completed-title">{{ approval.title }}</div>
-                  </div>
-                  <div class="completed-details">
-                    <span class="completed-requester"><strong>기안자:</strong> {{ approval.requesterName }} ({{ approval.requesterPosition }})</span>
-                    <span class="completed-type"><strong>문서:</strong> {{ approval.documentName }}</span>
-                  </div>
-                </div>
-                <div class="completed-meta-actions">
-                  <div class="completed-meta-actions-row">
-                    <div class="completed-meta">
-                      <el-tag :type="getStatusType(approval.status)" size="small">
-                        {{ getKoreanStatus(approval.status) }}
-                      </el-tag>
-                      <span class="completed-date">{{ approval.createAt ? approval.createAt.substring(0, 16).replace('T', ' ') : '' }}</span>
-                    </div>
-                    <div class="completed-actions">
-                      <el-button size="small" @click="viewCompletedDetails(approval)">
-                        <el-icon><View /></el-icon>
-                        상세
-                      </el-button>
-                    </div>
-                  </div>
+                <div class="approval-col title">{{ approval.title }}</div>
+                <div class="approval-col position">{{ approval.requesterPosition }}</div>
+                <div class="approval-col name">{{ approval.requesterName }}</div>
+                <div class="approval-col date">{{ approval.createAt ? approval.createAt.substring(0, 10) : '' }}</div>
+                <div class="approval-col actions">
+                  <el-button size="small" @click="viewCompletedDetails(approval)">
+                    <el-icon><View /></el-icon>
+                    상세
+                  </el-button>
                 </div>
               </div>
               <div v-if="myApprovalsCompletedList.length === 0" class="empty-state">
@@ -335,8 +319,9 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
 import apiClient from '@/api/http';
 import { useSnackbar } from '@/composables/useSnackbar';
 import ApprovalTemplateSelectorModal from '@/components/approval/ApprovalTemplateSelectorModal.vue';
@@ -351,6 +336,7 @@ export default {
   setup() {
     const { success, error, warning, info } = useSnackbar();
     const router = useRouter();
+    const store = useStore();
 
     const activeTab = ref('pending');
     const showTemplateSelector = ref(false);
@@ -359,6 +345,12 @@ export default {
     const selectedStatus = ref('');
     const dateRange = ref([]);
     const showMyRequestsTable = ref(true);
+
+    // 권한 체크
+    const hasApprovalReadPermission = computed(() => {
+      const permissions = store.state.auth.permissions || [];
+      return permissions.includes('approval:READ:COMPANY');
+    });
 
     // Summary card data
     const pendingApprovals = ref(0);
@@ -647,6 +639,7 @@ export default {
       continueWriting,
       deleteTemporary,
       goToTemplateList,
+      hasApprovalReadPermission,
 
       pendingTotalPages,
       pendingCurrentPage,
@@ -803,17 +796,37 @@ export default {
   gap: 16px;
 }
 
+.approval-list-header {
+  display: flex;
+  padding: 0 20px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: center;
+}
+
 .approval-item, .request-item, .completed-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   padding: 20px;
   background: white;
   border-radius: 12px;
   border: 1px solid #e9ecef;
   transition: all 0.3s ease;
   margin-bottom: 16px;
+  text-align: center;
 }
+
+.approval-col {
+  padding: 0 10px;
+}
+
+.approval-col.title { flex: 5; text-align: left; }
+.approval-col.position { flex: 2; }
+.approval-col.name { flex: 2; }
+.approval-col.date { flex: 3; }
+.approval-col.actions { flex: 1; }
 
 .approval-item:hover, .request-item:hover, .completed-item:hover {
   transform: translateY(-2px);

@@ -386,7 +386,8 @@ export default {
         }
       } catch (err) {
         console.error('지급일 조회 실패:', err)
-        this.error('지급일을 불러오는데 실패했습니다.')
+        const errorMessage = err.response?.data?.message || '지급일을 불러오는데 실패했습니다.'
+        this.error(errorMessage)
       }
     },
     getSummaries({ columns, data }) {
@@ -525,9 +526,11 @@ export default {
         // 급여 정보 조회
         const memberPositionId = localStorage.getItem('memberPositionId')
         const response = await apiClient.post(`/workforce-service/salary/calculate`, {
-          companyId: companyId,
-          yearMonth: yearMonth
+          companyId: companyId
         }, {
+          params: {
+            yearMonth: yearMonth
+          },
           headers: {
             ...(memberPositionId ? { 'X-User-MemberPositionId': memberPositionId } : {})
           }
@@ -555,7 +558,8 @@ export default {
           this.warning('조회된 급여 정보가 없습니다.')
         }
       } catch (err) {
-        this.error('급여 정보 조회에 실패했습니다.')
+        const errorMessage = err.response?.data?.message || '급여 정보 조회에 실패했습니다.'
+        this.error(errorMessage)
         this.payrollData = []
       } finally {
         this.loading = false
@@ -669,7 +673,8 @@ export default {
         await this.searchPayroll()
       } catch (err) {
         console.error('급여 저장 실패:', err)
-        this.error('급여 정보 저장에 실패했습니다.')
+        const errorMessage = err.response?.data?.message || '급여 정보 저장에 실패했습니다.'
+        this.error(errorMessage)
       } finally {
         this.loading = false
       }
