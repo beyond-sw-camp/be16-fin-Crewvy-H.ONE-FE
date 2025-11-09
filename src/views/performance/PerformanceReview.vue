@@ -3,7 +3,7 @@
     <!-- Header Section -->
     <div class="header">
       <div class="header-text">
-        <h1 class="title">성과 평가</h1>
+        <h1 class="title">평과 관리</h1>
         <p class="subtitle">구성원의 성과를 공정하게 평가하고 피드백을 제공하세요</p>
       </div>
     </div>
@@ -496,7 +496,7 @@ export default {
 .review-tabs :deep(.el-tabs__header) {
   margin: 0;
   padding: 0 24px;
-  background: #f5f7fa;
+  background: white;
 }
 
 .review-tabs :deep(.el-tabs__nav-wrap::after) {

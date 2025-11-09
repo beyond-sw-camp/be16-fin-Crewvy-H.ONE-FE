@@ -680,9 +680,13 @@
 
 <style scoped>
 .policy-assignment {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+}
+
+.policy-assignment :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
 }
 .card-header {
   display: flex;
@@ -698,7 +702,7 @@
 .org-tree {
   margin-top: 10px;
   border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border-radius: var(--surface-radius);
   padding: 10px;
   max-height: 400px;
   overflow-y: auto;
@@ -722,6 +726,9 @@
 .selection-info {
   margin-top: 15px;
   background-color: #f4f4f5;
+  border-radius: var(--surface-radius);
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  padding: 16px;
 }
 .selection-header {
     display: flex;

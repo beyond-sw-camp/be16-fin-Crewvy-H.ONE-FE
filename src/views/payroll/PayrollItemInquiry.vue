@@ -448,6 +448,16 @@ export default {
   margin-bottom: 20px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -468,7 +478,7 @@ export default {
   margin-bottom: 20px;
   padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .inquiry-filters :deep(.el-form-item) {

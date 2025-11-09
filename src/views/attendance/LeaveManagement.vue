@@ -232,14 +232,13 @@ export default {
 
 <style scoped>
 .leave-management {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .content-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: var(--surface-bg);
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
 
