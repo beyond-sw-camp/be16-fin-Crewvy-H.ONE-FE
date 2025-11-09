@@ -26,6 +26,9 @@
                   v-model="statementPeriod"
                   type="month"
                   placeholder="명세서 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="handleStatementPeriodChange"
                 />
               </el-form-item>
             </el-col>
@@ -147,6 +150,11 @@ export default {
       return employees.sort()
     }
   },
+  watch: {
+    selectedEmployee() {
+      this.loadStatementData()
+    }
+  },
   methods: {
     // 급여 명세서 데이터 로드
     async loadStatementData() {
@@ -221,6 +229,9 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    handleStatementPeriodChange() {
+      this.loadStatementData()
     },
     
     printStatement() {

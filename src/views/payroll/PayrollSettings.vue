@@ -711,8 +711,6 @@ export default {
               isActive: item.isActive ? 'TRUE' : 'FALSE',
               description: item.description,
               isTaxable: item.isTaxable ? 'TRUE' : 'FALSE',
-              nonTaxableLimit: item.nonTaxableLimit || 0,
-              calculationCode: null
             }
             newItems.push(itemData)
           } else {
@@ -739,7 +737,7 @@ export default {
         // 새 항목 저장 (POST) - 각 항목을 단일 객체로 전송
         if (newItems.length > 0) {
           for (const newItem of newItems) {
-            await apiClient.post(`/workforce-service/payrollItem`, newItem, {
+            await apiClient.post(`/workforce-service/payrollItem/create`, newItem, {
               headers: userHeaders
             })
           }
@@ -747,7 +745,7 @@ export default {
         
         // 변경된 기존 항목 수정 (PUT)
         if (changedItems.length > 0) {
-          await apiClient.put(`/workforce-service/payrollItem`, changedItems, {
+          await apiClient.put(`/workforce-service/payrollItem/update`, changedItems, {
             headers: userHeaders
           })
         }

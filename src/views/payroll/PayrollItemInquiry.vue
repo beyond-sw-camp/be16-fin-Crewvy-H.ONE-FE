@@ -26,6 +26,9 @@
                   v-model="inquiryPeriod"
                   type="month"
                   placeholder="조회 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="handleInquiryPeriodChange"
                 />
               </el-form-item>
             </el-col>
@@ -205,6 +208,11 @@ export default {
     },
     
   },
+  watch: {
+    inquiryPeriod() {
+      this.loadSummaryData()
+    }
+  },
   methods: {
     // 항목별 요약 데이터 로드
     async loadSummaryData() {
@@ -267,6 +275,9 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    handleInquiryPeriodChange() {
+      this.loadSummaryData()
     },
     
     // 행 클릭 핸들러
