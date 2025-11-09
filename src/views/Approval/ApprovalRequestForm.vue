@@ -209,12 +209,29 @@ export default {
 
     const fetchFormSchema = async (id, userInfo) => {
       try {
-        const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`);
+        // requestId가 있으면 query parameter로 전달
+        const requestId = route.query.requestId;
+        const url = requestId
+          ? `/workforce-service/approval/get-document/${id}?requestId=${requestId}`
+          : `/workforce-service/approval/get-document/${id}`;
+
+        const response = await apiClient.get(url);
         const doc = response.data.data;
         formTitle.value = doc.documentName;
         if (doc.metadata) {
           formSchema.value = doc.metadata.schema;
           initializeFormData(doc.metadata.schema, userInfo);
+
+          // Request 데이터가 있으면 formData에 매핑
+          if (doc.request) {
+            // requestType, requestUnit, startDate, endDate, reason, workLocation 매핑
+            if (doc.request.requestType) formData.value['requestType'] = doc.request.requestType;
+            if (doc.request.requestUnit) formData.value['requestUnit'] = doc.request.requestUnit;
+            if (doc.request.startDate) formData.value['startDate'] = doc.request.startDate;
+            if (doc.request.endDate) formData.value['endDate'] = doc.request.endDate;
+            if (doc.request.reason) formData.value['reason'] = doc.request.reason;
+            if (doc.request.workLocation) formData.value['workLocation'] = doc.request.workLocation;
+          }
         }
         if (doc.policy && doc.policy.length > 0) {
           const sortedPolicy = doc.policy.sort((a, b) => a.index - b.index);
@@ -380,6 +397,14 @@ export default {
         contents: formData.value,
         lineDtoList: lineDtoList,
       };
+
+      // requestId가 query parameter로 전달된 경우 포함
+      const requestId = route.query.requestId;
+      if (requestId) {
+        approvalData.requestId = requestId;
+        console.log('Including requestId:', requestId);
+      }
+
       console.log(approvalData);
 
       if (draftApprovalId.value) {

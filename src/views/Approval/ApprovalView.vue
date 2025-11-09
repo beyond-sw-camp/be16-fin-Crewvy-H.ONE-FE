@@ -148,7 +148,7 @@
                     <el-icon><View /></el-icon>
                     상세
                   </el-button>
-                </div>
+                </div>so
               </div>
               <div v-if="myRequests.length === 0" class="empty-state">
                 <p>결재 내역이 없습니다.</p>
