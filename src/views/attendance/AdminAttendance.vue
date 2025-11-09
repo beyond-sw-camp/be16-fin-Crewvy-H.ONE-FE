@@ -81,7 +81,7 @@
               </el-button>
             </div>
             <div class="attendance-table">
-              <el-table :data="filteredAttendanceData" v-loading="isLoading" style="width: 100%">
+              <el-table :data="attendanceData" v-loading="isLoading" style="width: 100%">
                 <el-table-column prop="employeeName" label="이름" width="120" />
                 <el-table-column prop="department" label="부서" width="150" />
                 <el-table-column prop="date" label="날짜" width="150" />
@@ -101,18 +101,32 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <div v-if="attendanceTotalPages > 1" class="pagination-container">
+                <el-pagination
+                  background
+                  layout="prev, pager, next"
+                  :total="attendanceTotalElements"
+                  :page-size="attendancePageSize"
+                  v-model:current-page="attendanceCurrentPage"
+                  @current-change="handleAttendancePageChange"
+                />
+              </div>
             </div>
           </div>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="연차 현황" name="balance">
+      <el-tab-pane label="휴가 현황" name="balance">
         <div v-if="activeTab === 'balance'">
           <div class="table-card">
             <div class="card-header">
-              <h3>연차 현황 관리</h3>
+              <h3>휴가 현황 관리</h3>
               <div style="display: flex; gap: 12px;">
-                <el-button type="success" @click="runMonthlyAccrualBatch" :loading="monthlyBatchLoading">
+                <el-button type="info" @click="goToLeaveDetail">
+                  <el-icon><View /></el-icon>
+                  <span style="margin-left: 8px;">휴가현황 상세보기</span>
+                </el-button>
+                <el-button type="success" @click="runMonthlyAccrualBatch" :loading="monthlyBatchLoading" :disabled="!isMonthlyBatchEnabled">
                   <el-icon><Calendar /></el-icon>
                   <span style="margin-left: 8px;">월별 연차 배치 실행</span>
                 </el-button>
@@ -124,11 +138,17 @@
             </div>
 
             <div class="filter-section">
-              <el-select v-model="balanceYearFilter" placeholder="년도 선택" style="width: 140px;">
-                <el-option :label="String(new Date().getFullYear())" :value="new Date().getFullYear()" />
-                <el-option :label="String(new Date().getFullYear() - 1)" :value="new Date().getFullYear() - 1" />
+              <el-select v-model="policyTypeFilter" placeholder="유형 선택" clearable style="width: 180px;">
+                <el-option label="전체" value="" />
+                <el-option label="연차유급휴가" value="PTC001" />
+                <el-option label="출산전후휴가" value="PTC002" />
+                <el-option label="배우자 출산휴가" value="PTC003" />
+                <el-option label="육아휴직" value="PTC004" />
+                <el-option label="가족돌봄휴가" value="PTC005" />
+                <el-option label="생리휴가" value="PTC006" />
               </el-select>
-              <el-select v-model="yearsOfServiceFilter" placeholder="근속년수" clearable style="width: 180px;">
+              <el-select v-model="yearsOfServiceFilter" placeholder="근속년수" clearable style="width: 150px;">
+                <el-option label="전체" value="" />
                 <el-option label="1년 미만" value="<1" />
                 <el-option label="1년 이상" value=">=1" />
                 <el-option label="3년 이상" value=">=3" />
@@ -152,7 +172,7 @@
             </div>
 
             <div class="balance-table">
-              <el-table :data="filteredBalanceData" v-loading="balanceLoading" style="width: 100%">
+              <el-table :data="balanceData" v-loading="balanceLoading" style="width: 100%">
                 <el-table-column prop="memberName" label="이름" width="120" />
                 <el-table-column prop="organizationName" label="부서" width="150" />
                 <el-table-column prop="titleName" label="직책" width="120" />
@@ -166,21 +186,28 @@
                     {{ calculateYearsOfService(scope.row.joinDate) }}년
                   </template>
                 </el-table-column>
+                <el-table-column label="전월 근속률" width="120" align="center">
+                  <template #default="scope">
+                    <span :class="{ 'low-attendance': scope.row.previousMonthAttendanceRate < 80 }">
+                      {{ scope.row.previousMonthAttendanceRate ? scope.row.previousMonthAttendanceRate.toFixed(1) : '0.0' }}%
+                    </span>
+                    <el-tag v-if="scope.row.previousMonthAttendanceRate < 80" type="danger" size="small" style="margin-left: 4px;">미달</el-tag>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="policyTypeName" label="유형" width="140" />
-                <el-table-column prop="year" label="년도" width="80" />
                 <el-table-column label="부여" width="80" align="right">
                   <template #default="scope">
-                    {{ scope.row.totalGranted || 0 }}일
+                    {{ (scope.row.totalGranted || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
                 <el-table-column label="사용" width="80" align="right">
                   <template #default="scope">
-                    {{ scope.row.totalUsed || 0 }}일
+                    {{ (scope.row.totalUsed || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
                 <el-table-column label="잔여" width="80" align="right">
                   <template #default="scope">
-                    {{ scope.row.remaining || 0 }}일
+                    {{ (scope.row.remainingBalance || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
                 <el-table-column label="상태" width="100">
@@ -195,46 +222,20 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <div v-if="balanceTotalPages > 1" class="pagination-container">
+                <el-pagination
+                  background
+                  layout="prev, pager, next"
+                  :total="balanceTotalElements"
+                  :page-size="balancePageSize"
+                  v-model:current-page="balanceCurrentPage"
+                  @current-change="handleBalancePageChange"
+                />
+              </div>
             </div>
           </div>
         </div>
       </el-tab-pane>
-
-                  <el-tab-pane label="배치 관리" name="batch">
-                    <div class="batch-management">
-                      <el-card>
-                        <template #header>
-                          <h3>연차 자동 발생 배치</h3>
-                        </template>
-            
-                        <el-descriptions :column="2" border>
-                          <el-descriptions-item label="실행 주기">
-                            매월 1일 새벽 3시 (자동)
-                          </el-descriptions-item>
-                          <el-descriptions-item label="다음 실행">
-                            {{ getNextBatchDate() }}
-                          </el-descriptions-item>
-                          <el-descriptions-item label="발생 규칙" :span="2">
-                            • 1년 미만: 매월 1일씩 발생 (최대 11일)<br />
-                            • 1년 이상: 매년 1월 1일 발생 (15일 + 2년마다 1일, 최대 25일)
-                          </el-descriptions-item>
-                        </el-descriptions>
-            
-                        <div style="margin-top: 20px;">
-                          <el-button
-                            type="primary"
-                            @click="runAnnualLeaveAccrualBatch"
-                            :loading="batchLoading"
-                          >
-                            수동 실행 (테스트용)
-                          </el-button>
-                          <el-button @click="viewBatchHistory">
-                            실행 이력 조회
-                          </el-button>
-                        </div>
-                      </el-card>
-                    </div>
-                  </el-tab-pane>
                 </el-tabs>
             
                 <!-- 연차 수정 다이얼로그 -->
@@ -287,7 +288,7 @@
                     </el-form-item>
                     <el-form-item label="상태">
                       <el-select v-model="editingRecord.status" placeholder="상태 선택">
-                        <el-option label="정상 근무" value="정상 근무" />
+                        <el-option label="정상 출근" value="정상 출근" />
                         <el-option label="지각" value="지각" />
                         <el-option label="조퇴" value="조퇴" />
                         <el-option label="연차" value="연차" />
@@ -330,19 +331,21 @@
             
             <script>
             import { ref, computed, onMounted, nextTick, watch} from 'vue';
+            import { useRouter } from 'vue-router';
             import * as XLSX from 'xlsx';
             import { Bar } from 'vue-chartjs';
             import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
             import { useSnackbar } from '@/composables/useSnackbar';
-            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance } from '@/api/attendance';
-            import { Download, Search, Refresh, Tools, Calendar } from '@element-plus/icons-vue';
+            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch } from '@/api/attendance';
+            import { Download, Search, Refresh, Tools, Calendar, View } from '@element-plus/icons-vue';
 
             ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
             export default {
               name: 'AdminAttendance',
-              components: { Bar, Download, Search, Refresh, Tools, Calendar },
+              components: { Bar, Download, Search, Refresh, Tools, Calendar, View },
               setup() {
+                const router = useRouter();
                 const { success, info, error } = useSnackbar();
 
                 const barChart = ref(null);
@@ -352,14 +355,17 @@
                 const correctionLoading = ref(false);
                 const monthlyBatchLoading = ref(false);
 
-                // 연차 현황 관련 상태
+                // 휴가 현황 관련 상태
                 const balanceData = ref([]);
                 const balanceLoading = ref(false);
                 const balanceSearchQuery = ref('');
-                const balanceYearFilter = ref(new Date().getFullYear());
+                const policyTypeFilter = ref('');  // 유형 필터
                 const yearsOfServiceFilter = ref('');
                 const balanceEditDialogVisible = ref(false);
                 const editingBalance = ref(null);
+                const balanceCurrentPage = ref(1);
+                const balancePageSize = ref(20);
+                const balanceTotalElements = ref(0);
     const selectedDate = ref(new Date().toISOString().slice(0, 10));
     const searchQuery = ref('');
     const editDialogVisible = ref(false);
@@ -367,6 +373,9 @@
     const isLoading = ref(false);
 
     const attendanceData = ref([]);
+    const attendanceCurrentPage = ref(1);
+    const attendancePageSize = ref(20);
+    const attendanceTotalElements = ref(0);
 
     const filteredAttendanceData = computed(() => {
       return attendanceData.value.filter(item => {
@@ -377,26 +386,28 @@
       });
     });
 
+    const attendanceTotalPages = computed(() => Math.ceil(attendanceTotalElements.value / attendancePageSize.value));
+
     const summaryStats = computed(() => {
         const data = filteredAttendanceData.value;
         return {
             total: data.length,
-            onTime: data.filter(item => item.status === '정상 근무').length,
+            onTime: data.filter(item => item.status === '정상 출근').length,
             late: data.filter(item => item.status === '지각').length,
-            leave: data.filter(item => item.status.includes('휴가')).length,
+            leave: data.filter(item => item.status.includes('휴가') || item.status.includes('연차') || item.status.includes('반차')).length,
         };
     });
 
     const chartData = computed(() => ({
-      labels: ['정상 근무', '지각', '조퇴', '휴가', '출장', '결근', '미출근'],
+      labels: ['정상 출근', '지각', '조퇴', '휴가/연차', '출장', '결근', '미출근'],
       datasets: [{
         label: '직원 수',
-        backgroundColor: ['#67C23A', '#E6A23C', '#409EFF', '#909399', '#17A2B8', '#F56C6C', '#6C757D'],
+        backgroundColor: ['#67C23A', '#E6A23C', '#F39C12', '#909399', '#17A2B8', '#F56C6C', '#6C757D'],
         data: [
-          attendanceData.value.filter(item => item.status === '정상 근무').length,
+          attendanceData.value.filter(item => item.status === '정상 출근').length,
           attendanceData.value.filter(item => item.status === '지각').length,
           attendanceData.value.filter(item => item.status === '조퇴').length,
-          attendanceData.value.filter(item => item.status.includes('휴가')).length,
+          attendanceData.value.filter(item => item.status.includes('휴가') || item.status.includes('연차') || item.status.includes('반차')).length,
           attendanceData.value.filter(item => item.status === '출장').length,
           attendanceData.value.filter(item => item.status === '결근').length,
           attendanceData.value.filter(item => item.status === '미출근').length,
@@ -454,9 +465,10 @@
     });
 
     const getStatusTagType = (status) => {
-      if (status === '정상 근무') return 'success';
+      if (status === '정상 출근') return 'success';
       if (status === '지각') return 'warning';
-      if (status.includes('휴가')) return 'info';
+      if (status === '조퇴') return 'warning';
+      if (status.includes('휴가') || status.includes('연차') || status.includes('반차')) return 'info';
       if (status === '출장') return '';
       if (status === '결근') return 'danger';
       if (status === '미출근') return '';
@@ -485,7 +497,7 @@
       try {
         // 상태 문자열을 AttendanceStatus 코드값으로 매핑
         const statusMap = {
-          '정상 근무': 'AS001',        // NORMAL_WORK
+          '정상 출근': 'AS001',        // NORMAL_WORK
           '지각': 'AS001',              // NORMAL_WORK (지각은 isLate=true로 표현)
           '조퇴': 'AS001',              // NORMAL_WORK (조퇴는 isEarlyLeave=true로 표현)
           '연차': 'AS101',              // ANNUAL_LEAVE
@@ -545,17 +557,25 @@
       try {
         const response = await getTeamAttendanceStatus({
           startDate: selectedDate.value,
-          endDate: selectedDate.value
+          endDate: selectedDate.value,
+          page: attendanceCurrentPage.value - 1,
+          size: attendancePageSize.value
         });
 
         // Page 객체에서 content 추출
         const data = response.content || [];
+        attendanceTotalElements.value = response.totalElements || 0;
 
         // 백엔드 응답을 프론트엔드 형식으로 변환 (이제 한글은 백엔드에서 전달)
         attendanceData.value = data.map((item) => {
           let displayStatus = item.status || '-';
-          if (displayStatus === '정상근무' && item.isLate) {
+          // 정상 출근이지만 지각인 경우
+          if (displayStatus === '정상 출근' && item.isLate) {
             displayStatus = '지각';
+          }
+          // 정상 출근이지만 조퇴인 경우
+          else if (displayStatus === '정상 출근' && item.isEarlyLeave) {
+            displayStatus = '조퇴';
           }
 
           return {
@@ -586,7 +606,18 @@
 
     const exportToExcel = () => {
       info('근태 현황을 엑셀로 내보냅니다.');
-      const worksheet = XLSX.utils.json_to_sheet(filteredAttendanceData.value);
+      const exportData = filteredAttendanceData.value.map(item => ({
+        이름: item.employeeName,
+        부서: item.department,
+        날짜: item.date,
+        상태: item.status,
+        출근시간: item.clockIn,
+        퇴근시간: item.clockOut,
+        근무시간: item.workHours,
+        요청유형: item.requestType || '-',
+        신청사유: item.requestReason || '-'
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '근태 현황');
       XLSX.writeFile(workbook, '근태_현황.xlsx');
@@ -629,40 +660,33 @@
       return years;
     };
 
-    // 연차 데이터 필터링
-    const filteredBalanceData = computed(() => {
-      return balanceData.value.filter(item => {
-        // 검색 필터
-        const matchesSearch = !balanceSearchQuery.value ||
-                              item.memberName.includes(balanceSearchQuery.value) ||
-                              (item.organizationName && item.organizationName.includes(balanceSearchQuery.value));
-
-        // 근속년수 필터
-        let matchesYears = true;
-        if (yearsOfServiceFilter.value && item.joinDate) {
-          const years = calculateYearsOfService(item.joinDate);
-          if (yearsOfServiceFilter.value === '<1') {
-            matchesYears = years < 1;
-          } else if (yearsOfServiceFilter.value.startsWith('>=')) {
-            const minYears = parseInt(yearsOfServiceFilter.value.substring(2));
-            matchesYears = years >= minYears;
-          }
-        }
-
-        return matchesSearch && matchesYears;
-      });
+    // 월별 배치 버튼 활성화 조건
+    const isMonthlyBatchEnabled = computed(() => {
+      return yearsOfServiceFilter.value === '<1';
     });
 
-    // 연차 현황 조회
+    const balanceTotalPages = computed(() => Math.ceil(balanceTotalElements.value / balancePageSize.value));
+
+    // 휴가 현황 조회
     const fetchBalanceData = async () => {
       balanceLoading.value = true;
       try {
-        const response = await getLeaveBalanceStatus({ year: balanceYearFilter.value });
-        balanceData.value = response || [];
-        success(`연차 현황을 조회했습니다. (총 ${balanceData.value.length}건)`);
+        const currentYear = new Date().getFullYear();
+        const response = await getLeaveBalanceStatus({
+          year: currentYear,
+          page: balanceCurrentPage.value - 1,
+          size: balancePageSize.value,
+          searchQuery: balanceSearchQuery.value || undefined,
+          policyTypeCode: policyTypeFilter.value || undefined,
+          yearsOfService: yearsOfServiceFilter.value || undefined
+        });
+        balanceData.value = response.content || [];
+        balanceTotalElements.value = response.totalElements || 0;
+        success(`${currentYear}년 휴가 현황을 조회했습니다. (총 ${balanceTotalElements.value}건)`);
       } catch (err) {
-        error(err.message || '연차 데이터를 불러오는 데 실패했습니다.');
+        error(err.message || '휴가 데이터를 불러오는 데 실패했습니다.');
         balanceData.value = [];
+        balanceTotalElements.value = 0;
       } finally {
         balanceLoading.value = false;
       }
@@ -691,26 +715,26 @@
       }
     };
 
-    // 연차 엑셀 내보내기
+    // 휴가 엑셀 내보내기
     const exportBalanceToExcel = () => {
-      info('연차 현황을 엑셀로 내보냅니다.');
-      const exportData = filteredBalanceData.value.map(item => ({
+      info('휴가 현황을 엑셀로 내보냅니다.');
+      const currentYear = new Date().getFullYear();
+      const exportData = balanceData.value.map(item => ({
         이름: item.memberName,
         부서: item.organizationName || '-',
         직책: item.titleName || '-',
         입사일: item.joinDate || '-',
-        근속년수: calculateYearsOfService(item.joinDate),
+        근속년수: `${calculateYearsOfService(item.joinDate)}년`,
         유형: item.policyTypeName,
-        년도: item.year,
-        부여: item.totalGranted,
-        사용: item.totalUsed,
-        잔여: item.remaining,
+        부여: `${(item.totalGranted || 0).toFixed(1)}일`,
+        사용: `${(item.totalUsed || 0).toFixed(1)}일`,
+        잔여: `${(item.remainingBalance || 0).toFixed(1)}일`,
         상태: item.isUsable === false ? '사용불가' : '정상'
       }));
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, '연차 현황');
-      XLSX.writeFile(workbook, `연차_현황_${balanceYearFilter.value}.xlsx`);
+      XLSX.utils.book_append_sheet(workbook, worksheet, '휴가 현황');
+      XLSX.writeFile(workbook, `휴가_현황_${currentYear}.xlsx`);
       success('엑셀 내보내기가 완료되었습니다.');
     };
 
@@ -718,9 +742,8 @@
     const runAttendanceCorrection = async () => {
       correctionLoading.value = true;
       try {
-        // TODO: 근태 보정 배치 API 호출
-        await new Promise(resolve => setTimeout(resolve, 1500)); // 임시 딜레이
-        success('근태 보정 배치가 성공적으로 실행되었습니다.');
+        await runAttendanceCorrectionBatch();
+        success('근태 보정 배치가 성공적으로 실행되었습니다. 미완료 퇴근이 자동 처리되었습니다.');
         // 실행 후 데이터 새로고침
         fetchAttendanceData();
       } catch (err) {
@@ -745,6 +768,22 @@
       }
     };
 
+    // 연차현황 상세보기 페이지로 이동
+    const goToLeaveDetail = () => {
+      router.push('/admin/leave-management');
+    };
+
+    // 페이지 변경 핸들러
+    const handleAttendancePageChange = (page) => {
+      attendanceCurrentPage.value = page;
+      fetchAttendanceData();
+    };
+
+    const handleBalancePageChange = (page) => {
+      balanceCurrentPage.value = page;
+      fetchBalanceData();
+    };
+
     // 컴포넌트 마운트 시 데이터 조회
     onMounted(() => {
       fetchAttendanceData();
@@ -753,6 +792,14 @@
     // 탭 변경 시 데이터 조회
     watch(activeTab, (tab) => {
       if (tab === 'balance' && balanceData.value.length === 0) {
+        fetchBalanceData();
+      }
+    });
+
+    // 휴가 현황 필터 변경 시 첫 페이지로 돌아가고 데이터 재조회
+    watch([balanceSearchQuery, policyTypeFilter, yearsOfServiceFilter], () => {
+      if (activeTab.value === 'balance') {
+        balanceCurrentPage.value = 1;
         fetchBalanceData();
       }
     });
@@ -780,13 +827,20 @@
       runAnnualLeaveAccrualBatch,
       getNextBatchDate,
       viewBatchHistory,
-      // 연차 현황
+      // 근태 현황 페이징
+      attendanceData,
+      attendanceCurrentPage,
+      attendancePageSize,
+      attendanceTotalElements,
+      attendanceTotalPages,
+      handleAttendancePageChange,
+      // 휴가 현황
       balanceData,
       balanceLoading,
       balanceSearchQuery,
-      balanceYearFilter,
+      policyTypeFilter,
       yearsOfServiceFilter,
-      filteredBalanceData,
+      isMonthlyBatchEnabled,
       balanceEditDialogVisible,
       editingBalance,
       calculateYearsOfService,
@@ -796,7 +850,14 @@
       exportBalanceToExcel,
       runAttendanceCorrection,
       monthlyBatchLoading,
-      runMonthlyAccrualBatch
+      runMonthlyAccrualBatch,
+      goToLeaveDetail,
+      // 휴가 현황 페이징
+      balanceCurrentPage,
+      balancePageSize,
+      balanceTotalElements,
+      balanceTotalPages,
+      handleBalancePageChange
     };
   }
 }
@@ -884,5 +945,20 @@
   gap: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.low-attendance {
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+.warning-text {
+  color: #f56c6c;
 }
 </style>
