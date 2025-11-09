@@ -220,7 +220,7 @@
                                           <script>
                                           import { ref, onMounted, watch, computed } from 'vue';
                                           import { useSnackbar } from '@/composables/useSnackbar';                                    import { getPolicies, createAssignment, getPolicyAssignments, deleteAssignment, deleteAssignments, revokeAssignments, reactivateAssignments } from '@/api/attendance';
-                                                            import organizationService from '@/api/organizationService';
+                                                            import apiClient from '@/api/http';
                                                             import { ElMessageBox } from 'element-plus';
                                                             import { OfficeBuilding, User, Check, Refresh, School, Pointer } from '@element-plus/icons-vue';
                                           
@@ -341,7 +341,8 @@
                                                                       });                  
                                                                 const fetchOrganizationTree = async () => {
                                                                   try {
-                                                                    const response = await organizationService.getOrganizationTreeWithMembers();
+                                                                    // 임시: search-service 대신 member-service 직접 호출 (Elasticsearch 미실행)
+                                                                    const response = await apiClient.get('/member-service/organization/tree-with-members');
                                                                     const rawTreeData = response.data?.data || response.data || [];
                                                                     const transformDataForTree = (nodes) => {
                                                                       return nodes.map(node => {
