@@ -752,6 +752,16 @@ export default {
   margin-bottom: 24px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 /* 필터 카드 스타일 */
 .filter-card {
   margin-bottom: 16px;
@@ -886,7 +896,7 @@ export default {
   font-weight: 400 !important;
   padding: 8px 16px !important;
   min-width: 80px !important;
-  border-radius: 4px !important;
+  border-radius: var(--surface-radius) !important;
   transition: all 0.2s ease !important;
 }
 
@@ -904,7 +914,7 @@ export default {
   font-weight: 500 !important;
   padding: 8px 16px !important;
   min-width: 80px !important;
-  border-radius: 4px !important;
+  border-radius: var(--surface-radius) !important;
   transition: all 0.2s ease !important;
 }
 
@@ -922,7 +932,7 @@ export default {
   font-weight: 500 !important;
   padding: 8px 16px !important;
   width: 100% !important;
-  border-radius: 4px !important;
+  border-radius: var(--surface-radius) !important;
   transition: all 0.2s ease !important;
 }
 
@@ -988,7 +998,7 @@ export default {
   width: 100%;
   border-collapse: collapse;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   table-layout: fixed;
@@ -1043,7 +1053,7 @@ export default {
 
 .payroll-employee-table {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
   overflow: hidden;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }

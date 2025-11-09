@@ -1136,6 +1136,12 @@ export default {
   margin-bottom: 20px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
 /* 필터 카드 스타일 */
 .filter-card {
   margin-bottom: 16px;
@@ -1184,7 +1190,7 @@ export default {
   margin-top: 12px;
   background: #f6f8fa;
   border: 1px solid #ebeef5;
-  border-radius: 6px;
+  border-radius: var(--surface-radius);
   padding: 10px 12px;
 }
 
@@ -1240,6 +1246,7 @@ export default {
 /* 테이블이 카드 너비에 맞도록 조정 */
 .content-section .el-card__body {
   padding: 20px;
+  border-radius: var(--surface-radius);
 }
 
 .table-wrap {
@@ -1300,7 +1307,7 @@ export default {
 /* Element UI 테이블 스타일 */
 .payroll-employee-table {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
   overflow: hidden;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }

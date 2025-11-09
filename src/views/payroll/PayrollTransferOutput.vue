@@ -478,7 +478,7 @@ export default {
             .print-instructions {
               background: #f0f8ff;
               border: 1px solid #0066cc;
-              border-radius: 5px;
+              border-radius: 8px;
               padding: 15px;
               margin-bottom: 20px;
               font-family: 'Malgun Gothic', sans-serif;
@@ -499,7 +499,7 @@ export default {
               color: white;
               border: none;
               padding: 10px 20px;
-              border-radius: 5px;
+              border-radius: 8px;
               cursor: pointer;
               font-size: 14px;
               margin-right: 10px;
@@ -554,7 +554,7 @@ export default {
             .print-instructions {
               background: #f0f8ff;
               border: 1px solid #0066cc;
-              border-radius: 5px;
+              border-radius: 8px;
               padding: 15px;
               margin-bottom: 20px;
               font-family: 'Malgun Gothic', sans-serif;
@@ -575,7 +575,7 @@ export default {
               color: white;
               border: none;
               padding: 10px 20px;
-              border-radius: 5px;
+              border-radius: 8px;
               cursor: pointer;
               font-size: 14px;
               margin-right: 10px;
@@ -1109,6 +1109,16 @@ export default {
   margin-bottom: 20px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -1129,7 +1139,7 @@ export default {
   margin-bottom: 20px;
   padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .transfer-filters :deep(.el-form-item) {

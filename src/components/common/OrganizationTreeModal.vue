@@ -69,22 +69,22 @@
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell contact">
-                      <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark"
+                      <el-tooltip :content="member.phoneNumber || '비공개'" placement="top" effect="dark"
                         :show-after="1000">
-                        <div class="cell-content truncate-text">{{ member.phoneNumber || 'N/A' }}</div>
+                        <div class="cell-content truncate-text">{{ member.phoneNumber || '비공개' }}</div>
                       </el-tooltip>
                     </div>
                     <div class="employee-list-cell email">
-                      <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
+                      <el-tooltip :content="member.email || '비공개'" placement="top" effect="dark" :show-after="1000">
                         <span class="cell-content">
                           <div class="email-content-wrapper">
                             <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
-                            <span>{{ member.email || 'N/A' }}</span>
+                            <span>{{ member.email || '비공개' }}</span>
                           </div>
                         </span>
                       </el-tooltip>
                     </div>
-                    <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
+                    <div class="employee-list-cell status">{{ member.memberStatus || '비공개' }}</div>
                   </div>
                 </div>
               </div>
@@ -152,21 +152,21 @@
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell contact">
-                    <el-tooltip :content="member.phoneNumber || 'N/A'" placement="top" effect="dark" :show-after="1000">
-                      <div class="cell-content truncate-text">{{ member.phoneNumber || 'N/A' }}</div>
+                    <el-tooltip :content="member.phoneNumber || '비공개'" placement="top" effect="dark" :show-after="1000">
+                      <div class="cell-content truncate-text">{{ member.phoneNumber || '비공개' }}</div>
                     </el-tooltip>
                   </div>
                   <div class="employee-list-cell email">
-                    <el-tooltip :content="member.email || 'N/A'" placement="top" effect="dark" :show-after="1000">
+                    <el-tooltip :content="member.email || '비공개'" placement="top" effect="dark" :show-after="1000">
                       <span class="cell-content">
                         <div class="email-content-wrapper">
                           <el-button :icon="CopyDocument" circle plain @click="copyToClipboard(member.email, '이메일')" />
-                          <span>{{ member.email || 'N/A' }}</span>
+                          <span>{{ member.email || '비공개' }}</span>
                         </div>
                       </span>
                     </el-tooltip>
                   </div>
-                  <div class="employee-list-cell status">{{ member.memberStatus || 'N/A' }}</div>
+                  <div class="employee-list-cell status">{{ member.memberStatus || '비공개' }}</div>
                 </div>
               </div>
             </div>
@@ -356,7 +356,7 @@ export default {
       this.closeModal();
     },
     copyToClipboard(text, type) {
-      if (!text || text === 'N/A') {
+      if (!text || text === '비공개') {
         this.error(`${type} 정보가 없어 복사할 수 없습니다.`);
         return;
       }
@@ -482,7 +482,8 @@ export default {
 
 .two-pane-container {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 500px;
 }
 
 /* Left Pane */
@@ -644,11 +645,11 @@ export default {
 
 /* Full-width Employee Search Pane */
 .full-width-search-pane {
-  height: 100%;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 500px;
   overflow-y: hidden;
-  /* Changed from auto */
   padding: 15px;
 }
 
@@ -658,6 +659,7 @@ export default {
   flex-direction: column;
   overflow-y: hidden;
   margin-top: 15px;
+  min-height: 0;
 }
 
 .email-content-wrapper {

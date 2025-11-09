@@ -2,9 +2,15 @@
   <div class="rule-block">
     <!-- 1. 연차유급휴가 (PTC001) -->
     <div v-if="policyTypeCode === 'PTC001'">
-      <el-form-item label="기본 부여 일수" required>
-        <el-input-number v-model="rule.defaultDays" :min="15" />
-        <span class="form-description">법정 최소: 15일</span>
+      <el-divider content-position="left">기준 설정</el-divider>
+      <el-form-item label="연차 발생 기준" required>
+        <el-select v-model="rule.standardType" placeholder="선택">
+          <el-option label="회계연도 기준 (1월 1일)" value="FISCAL_YEAR"></el-option>
+          <el-option label="입사일 기준" value="JOIN_DATE"></el-option>
+        </el-select>
+        <span class="form-description">
+          회계연도: 매년 1월 1일 일괄 부여 | 입사일: 입사 기념일에 부여
+        </span>
       </el-form-item>
       <el-form-item label="발생 유형">
         <el-select v-model="rule.accrualType" placeholder="선택">
@@ -12,10 +18,61 @@
           <el-option label="수동 관리" value="MANUAL"></el-option>
         </el-select>
       </el-form-item>
+
+      <el-divider content-position="left">1년 이상 근로자 설정</el-divider>
+      <el-form-item label="기본 부여 일수" required>
+        <el-input-number v-model="rule.baseAnnualLeaveForOverOneYear" :min="15" />
+        <span class="form-description">법정 최소: 15일</span>
+      </el-form-item>
+      <el-form-item label="연차 가산 규칙">
+        <div style="margin-bottom: 10px;">
+          <el-button size="small" @click="addAdditionalRule">가산 규칙 추가</el-button>
+        </div>
+        <div v-for="(additionalRule, index) in rule.additionalAnnualLeaveRules" :key="index" style="display: flex; gap: 10px; margin-bottom: 8px; align-items: center;">
+          <el-input-number v-model="additionalRule.afterYears" :min="1" placeholder="근속년수" style="width: 120px;" />
+          <span>년차부터</span>
+          <el-input-number v-model="additionalRule.additionalDays" :min="0" :step="1" :precision="1" placeholder="추가일수" style="width: 120px;" />
+          <span>일 추가</span>
+          <el-button size="small" type="danger" @click="removeAdditionalRule(index)">삭제</el-button>
+        </div>
+        <span class="form-description">
+          예: 3년차부터 1일 추가 → 매년 근속년수에 따라 가산
+        </span>
+      </el-form-item>
+      <el-form-item label="최대 연차 한도" required>
+        <el-input-number v-model="rule.maximumAnnualLeaveLimit" :min="15" />
+        <span class="form-description">법정 최대: 25일</span>
+      </el-form-item>
+
+      <el-divider content-position="left">1년 미만 근로자 설정</el-divider>
+      <el-form-item label="월별 연차 발생 사용">
+        <el-switch v-model="rule.firstYearRule.monthlyAccrualEnabled" />
+        <span class="form-description">매월 1일 자동 발생 (최대 11일)</span>
+      </el-form-item>
+      <el-form-item v-if="rule.firstYearRule.monthlyAccrualEnabled" label="월별 발생 일수">
+        <el-input-number v-model="rule.firstYearRule.monthlyAccrualDays" :min="0" :max="11" :step="0.5" :precision="1" />
+        <span class="form-description">기본: 1일</span>
+      </el-form-item>
       <el-form-item label="1년 미만 최대 발생 일수">
-        <el-input-number v-model="rule.firstYearMaxAccrual" :min="0" :max="11" />
+        <el-input-number v-model="rule.firstYearRule.maxAccrualFirstYear" :min="0" :max="11" />
         <span class="form-description">법정 최대: 11일</span>
       </el-form-item>
+
+      <el-divider content-position="left">이월 설정</el-divider>
+      <el-form-item label="1년 이상 연차 이월 허용">
+        <el-switch v-model="rule.overOneYearRule.carryOverEnabled" />
+        <span class="form-description">사용하지 않은 연차를 다음 연도로 이월</span>
+      </el-form-item>
+      <el-form-item v-if="rule.overOneYearRule.carryOverEnabled" label="이월 가능 일수">
+        <el-input-number v-model="rule.overOneYearRule.carryOverLimitDays" :min="0" />
+        <span class="form-description">최대 며칠까지 이월 가능</span>
+      </el-form-item>
+      <el-form-item v-if="rule.overOneYearRule.carryOverEnabled" label="이월 연차 만료 기간 (개월)">
+        <el-input-number v-model="rule.overOneYearRule.carryOverExpirationMonths" :min="1" :max="12" />
+        <span class="form-description">예: 3개월 → 익년 3월 31일까지 사용</span>
+      </el-form-item>
+
+      <el-divider content-position="left">신청 관련 설정</el-divider>
       <el-form-item label="최소 신청 단위">
         <el-select v-model="rule.minimumRequestUnit" placeholder="선택" @change="updateAllowedRequestUnits">
           <el-option label="일" value="DAY"></el-option>
@@ -45,7 +102,7 @@
     <div v-else-if="policyTypeCode === 'PTC002'">
       <el-form-item label="기본 부여 일수" required>
         <el-input-number v-model="rule.defaultDays" :min="90" :max="150" />
-        <span class="form-description">일반 90일, 다태아 120일</span>
+        <span class="form-description">법정 최소: 90일 (일반 90일, 다태아 120일)</span>
       </el-form-item>
       <el-form-item label="신청 마감일 (N일 전)">
         <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
@@ -78,7 +135,7 @@
     <div v-else-if="policyTypeCode === 'PTC003'">
       <el-form-item label="기본 부여 일수" required>
         <el-input-number v-model="rule.defaultDays" :min="10" :max="20" />
-        <span class="form-description">법정: 10일</span>
+        <span class="form-description">법정 최소: 10일</span>
       </el-form-item>
       <el-form-item label="출산일 기준 사용 기한 (일)">
         <el-input-number v-model="rule.maxDaysFromEventDate" :min="0" />
@@ -192,18 +249,18 @@
 
     <!-- 6. 생리휴가 (PTC006) -->
     <div v-else-if="policyTypeCode === 'PTC006'">
-      <el-form-item label="월간 부여 일수" required>
-        <el-input-number v-model="rule.defaultDays" :min="1" :max="3" />
-        <span class="form-description">법정: 월 1일</span>
+      <el-form-item label="연간 부여 일수" required>
+        <el-input-number v-model="rule.defaultDays" :min="12" :max="36" />
+        <span class="form-description">법정 최소: 12일 (월 1일 × 12개월)</span>
       </el-form-item>
       <el-divider content-position="left">사용 제한 설정 (법정 필수)</el-divider>
       <el-form-item label="사용 제한 주기">
         <el-input value="월간" disabled />
-        <span class="form-description">생리휴가는 월 단위로 제한됩니다</span>
+        <span class="form-description">생리휴가는 월 단위로 사용 제한됩니다</span>
       </el-form-item>
       <el-form-item label="월간 최대 사용 일수" required>
         <el-input-number v-model="rule.maxDaysPerPeriod" :min="1" :max="3" />
-        <span class="form-description">법정: 월 1일 (부여 일수와 동일하게 설정 권장)</span>
+        <span class="form-description">법정: 월 1일 이상 (부여 일수 / 12와 동일하게 설정 권장)</span>
       </el-form-item>
       <el-form-item label="신청 마감일 (N일 전)">
         <el-input-number v-model="rule.requestDeadlineDays" :min="0" />
@@ -237,7 +294,7 @@
 </template>
 
 <script>
-import { computed, watch } from 'vue';
+import { computed, watch, onMounted } from 'vue';
 
 export default {
   name: 'LeaveRuleBlock',
@@ -251,6 +308,67 @@ export default {
       get: () => props.modelValue,
       set: (value) => emit('update:modelValue', value)
     });
+
+    /**
+     * 중첩 객체 초기화 (PTC001 연차유급휴가)
+     */
+    const initializeNestedObjects = () => {
+      if (props.policyTypeCode === 'PTC001') {
+        // additionalAnnualLeaveRules 초기화
+        if (!rule.value.additionalAnnualLeaveRules) {
+          rule.value.additionalAnnualLeaveRules = [];
+        }
+
+        // firstYearRule 초기화
+        if (!rule.value.firstYearRule) {
+          rule.value.firstYearRule = {
+            monthlyAccrualEnabled: false,
+            monthlyAccrualDays: 1.0,
+            maxAccrualFirstYear: 11
+          };
+        }
+
+        // overOneYearRule 초기화
+        if (!rule.value.overOneYearRule) {
+          rule.value.overOneYearRule = {
+            carryOverEnabled: false,
+            carryOverLimitDays: 0,
+            carryOverExpirationMonths: 3
+          };
+        }
+
+        // 기본값 설정
+        if (!rule.value.standardType) {
+          rule.value.standardType = 'FISCAL_YEAR';
+        }
+        if (!rule.value.baseAnnualLeaveForOverOneYear) {
+          rule.value.baseAnnualLeaveForOverOneYear = 15;
+        }
+        if (!rule.value.maximumAnnualLeaveLimit) {
+          rule.value.maximumAnnualLeaveLimit = 25;
+        }
+      }
+    };
+
+    /**
+     * 가산 규칙 추가
+     */
+    const addAdditionalRule = () => {
+      if (!rule.value.additionalAnnualLeaveRules) {
+        rule.value.additionalAnnualLeaveRules = [];
+      }
+      rule.value.additionalAnnualLeaveRules.push({
+        afterYears: 3,
+        additionalDays: 1.0
+      });
+    };
+
+    /**
+     * 가산 규칙 삭제
+     */
+    const removeAdditionalRule = (index) => {
+      rule.value.additionalAnnualLeaveRules.splice(index, 1);
+    };
 
     /**
      * 최소 신청 단위에 따라 allowedRequestUnits 자동 설정
@@ -286,6 +404,10 @@ export default {
         } else if (newTypeCode === 'PTC006') {
           rule.value.limitPeriod = 'MONTHLY';
         }
+        // PTC001일 때 중첩 객체 초기화
+        if (newTypeCode === 'PTC001') {
+          initializeNestedObjects();
+        }
       },
       { immediate: true }
     );
@@ -308,8 +430,14 @@ export default {
       { immediate: true }
     );
 
+    onMounted(() => {
+      initializeNestedObjects();
+    });
+
     return {
       rule,
+      addAdditionalRule,
+      removeAdditionalRule,
       updateAllowedRequestUnits
     };
   }

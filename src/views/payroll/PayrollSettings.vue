@@ -1019,6 +1019,18 @@ export default {
   margin-top: 24px;
 }
 
+.policy-section :deep(.el-card),
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.policy-section :deep(.el-card__body),
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 .content-section :deep(.el-card__body) {
   padding-top: 0;
 }
@@ -1040,7 +1052,7 @@ export default {
   color: #606266;
   background: #f5f7fa;
   padding: 4px 12px;
-  border-radius: 12px;
+  border-radius: var(--surface-radius);
 }
 
 .table-wrapper {

@@ -3,7 +3,7 @@
     <!-- 사이드바 -->
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <div class="logo" @click="sidebarCollapsed ? toggleSidebar() : null" :class="{ 'clickable': sidebarCollapsed }">
+        <div class="logo" @click="handleLogoClick" :class="{ clickable: true }">
           <div class="logo-icon">
             <img src="@/assets/H.ONE-no-text.png" alt="H.ONE Logo" class="logo-image" />
           </div>
@@ -81,18 +81,12 @@
           <el-menu-item index="/leave-request">
             <span>휴가/출장 신청</span>
           </el-menu-item>
-          <el-menu-item index="/shared-calendar">
-            <span>공유 캘린더</span>
-          </el-menu-item>
-          <el-sub-menu index="attendance-admin">
+          <el-sub-menu index="attendance-admin" v-if="hasAttendanceReadCompany">
             <template #title>
               <span>관리자 메뉴</span>
             </template>
             <el-menu-item index="/admin/attendance">
               <span>근태 현황</span>
-            </el-menu-item>
-            <el-menu-item index="/admin/leave-management">
-              <span>연차 현황</span>
             </el-menu-item>
             <el-menu-item index="/admin/policy-management">
               <span>정책 관리</span>
@@ -102,9 +96,6 @@
             </el-menu-item>
             <el-menu-item index="/admin/work-location-management">
               <span>근무지 관리</span>
-            </el-menu-item>
-            <el-menu-item index="/admin/audit-log">
-              <span>감사 로그</span>
             </el-menu-item>
           </el-sub-menu>
         </el-sub-menu>
@@ -123,7 +114,7 @@
             <span>내 목표 관리</span>
           </el-menu-item>
           <el-menu-item index="/performance/review">
-            <span>평가</span>
+            <span>평가 관리</span>
           </el-menu-item>
         </el-sub-menu>
 
@@ -199,14 +190,6 @@
           </el-icon>
           <span>전자결재</span>
         </el-menu-item>
-
-        <el-menu-item index="/board">
-          <el-icon>
-            <List />
-          </el-icon>
-          <span>게시판</span>
-        </el-menu-item>
-
         <template v-if="hasEmployeeReadCompanyOrSystem">
           <el-sub-menu index="resource">
             <template #title>
@@ -300,7 +283,9 @@
 
       <!-- 페이지 컨텐츠 -->
       <div class="content">
-        <router-view />
+        <div class="page-container">
+          <router-view />
+        </div>
       </div>
     </div>
 
@@ -857,6 +842,9 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
       hasEmployeeReadDepartment() {
         return this.$store.getters['auth/hasEmployeeReadDepartment'];
       },
+      hasAttendanceReadCompany() {
+        return this.$store.getters['auth/hasAttendanceReadCompany'];
+      },
       userAvatarUrl() {
         return this.user?.avatar || this.defaultAvatarSvg;
       },
@@ -1025,6 +1013,14 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
         }, 500);
       },
       ...mapMutations(['removeNotification']),
+      handleLogoClick() {
+        if (this.sidebarCollapsed) {
+          this.toggleSidebar();
+        }
+        if (this.$route.path !== '/') {
+          this.$router.push('/');
+        }
+      },
       toggleSidebar() {
         this.sidebarCollapsed = !this.sidebarCollapsed
       },
@@ -1062,7 +1058,6 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
           '/chat': '채팅',
           '/meeting': '화상회의',
           '/approval': '전자결재',
-          '/board': '게시판',
           '/resource': '예약',
           '/resource/reservation': '예약하기',
           '/resource/management': '자원 관리'
@@ -1932,8 +1927,15 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
 
 .content {
   flex: 1;
-  padding: 24px;
   overflow-y: auto;
+}
+
+.page-container {
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .organization-dialog .el-dialog__body {
