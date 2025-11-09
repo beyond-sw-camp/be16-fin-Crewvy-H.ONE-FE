@@ -388,9 +388,8 @@ export default {
 
 <style scoped>
 .global-search {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
   font-family: 'Noto Sans KR', sans-serif;
   color: #333;
 }

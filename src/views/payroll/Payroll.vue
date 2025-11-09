@@ -346,9 +346,7 @@ export default {
 
 <style scoped>
 .payroll {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
+  width: 100%;
 }
 
 .page-header {
@@ -383,10 +381,10 @@ export default {
 }
 
 .payroll-card {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: var(--surface-bg);
+  padding: var(--surface-padding);
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -400,7 +398,7 @@ export default {
 .card-icon {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--surface-radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -432,9 +430,9 @@ export default {
 }
 
 .payroll-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: var(--surface-bg);
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
 

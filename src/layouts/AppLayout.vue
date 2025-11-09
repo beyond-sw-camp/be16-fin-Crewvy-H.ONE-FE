@@ -114,7 +114,7 @@
             <span>내 목표 관리</span>
           </el-menu-item>
           <el-menu-item index="/performance/review">
-            <span>평가</span>
+            <span>평가 관리</span>
           </el-menu-item>
         </el-sub-menu>
 
@@ -283,7 +283,9 @@
 
       <!-- 페이지 컨텐츠 -->
       <div class="content">
-        <router-view />
+        <div class="page-container">
+          <router-view />
+        </div>
       </div>
     </div>
 
@@ -1925,8 +1927,15 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
 
 .content {
   flex: 1;
-  padding: 24px;
   overflow-y: auto;
+}
+
+.page-container {
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .organization-dialog .el-dialog__body {

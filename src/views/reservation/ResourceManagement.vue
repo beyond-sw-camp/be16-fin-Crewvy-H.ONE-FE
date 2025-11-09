@@ -1427,7 +1427,7 @@ export default {
               통계 요약
             </h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: 10px; border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">📈</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">이용률</div>
@@ -1435,7 +1435,7 @@ export default {
                 <div style="font-size: 20px; font-weight: 700; color: #409eff; margin-bottom: 4px;">${this.statistics.usageRate}%</div>
                 <div style="font-size: 10px; color: #909399;">실제 이용된 예약 비율</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: 10px; border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">🕐</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">Peak Time</div>
@@ -1443,7 +1443,7 @@ export default {
                 <div style="font-size: 18px; font-weight: 700; color: #67c23a; margin-bottom: 4px;">${this.statistics.peakTime || '데이터 없음'}</div>
                 <div style="font-size: 10px; color: #909399;">가장 많이 예약된 시간대</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: 10px; border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">⚠️</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">No Show</div>
@@ -1451,7 +1451,7 @@ export default {
                 <div style="font-size: 20px; font-weight: 700; color: #e6a23c; margin-bottom: 4px;">${this.statistics.noShow}건</div>
                 <div style="font-size: 10px; color: #909399;">예약 후 미사용 건수</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: 10px; border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">📄</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">총 예약</div>
@@ -1691,8 +1691,7 @@ export default {
 
 <style scoped>
 .resource-management {
-  max-width: 1220px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .page-header {
