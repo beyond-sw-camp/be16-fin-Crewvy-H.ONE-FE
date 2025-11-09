@@ -2,7 +2,7 @@
   <div class="leave-management">
     <div class="content-card">
       <div class="card-header">
-        <h3>연차 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
+        <h3>휴가 사용률 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
         <div style="display: flex; gap: 12px;">
           <el-date-picker
             v-model="selectedYear"
@@ -30,35 +30,67 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
+        <el-select v-model="departmentFilter" placeholder="부서 선택" clearable style="width: 180px;">
+          <el-option label="전체" value="" />
+          <el-option v-for="dept in uniqueDepartments" :key="dept" :label="dept" :value="dept" />
+        </el-select>
+        <el-select v-model="policyTypeFilter" placeholder="유형 선택" clearable style="width: 180px;">
+          <el-option label="전체" value="" />
+          <el-option label="연차유급휴가" value="PTC001" />
+          <el-option label="출산전후휴가" value="PTC002" />
+          <el-option label="배우자 출산휴가" value="PTC003" />
+          <el-option label="육아휴직" value="PTC004" />
+          <el-option label="가족돌봄휴가" value="PTC005" />
+          <el-option label="생리휴가" value="PTC006" />
+        </el-select>
         <el-button @click="fetchLeaveData" :loading="isLoading">
           <el-icon><Refresh /></el-icon>
           <span style="margin-left: 8px;">새로고침</span>
         </el-button>
       </div>
       <div class="leave-table">
-        <el-table :data="filteredLeaveData" v-loading="isLoading" style="width: 100%">
+        <el-table :data="processedLeaveData" v-loading="isLoading" style="width: 100%">
           <el-table-column prop="employeeName" label="이름" width="150" />
           <el-table-column prop="department" label="부서" width="180" />
-          <el-table-column prop="totalLeave" label="총 연차" width="120" />
-          <el-table-column prop="usedLeave" label="사용 연차" width="120" />
-          <el-table-column prop="remainingLeave" label="잔여 연차" width="120">
+          <el-table-column prop="policyTypeName" label="유형" width="150" />
+          <el-table-column label="총 부여" width="120" align="right">
             <template #default="scope">
-              <span style="font-weight: bold; color: #4f46e5;">{{ scope.row.remainingLeave }}</span>
+              {{ (scope.row.totalLeave || 0).toFixed(1) }}일
             </template>
           </el-table-column>
-          <el-table-column label="연차 사용률">
+          <el-table-column label="사용" width="120" align="right">
+            <template #default="scope">
+              {{ (scope.row.usedLeave || 0).toFixed(1) }}일
+            </template>
+          </el-table-column>
+          <el-table-column label="잔여" width="120" align="right">
+            <template #default="scope">
+              <span style="font-weight: bold; color: #4f46e5;">{{ (scope.row.remainingLeave || 0).toFixed(1) }}일</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="사용률" min-width="200">
             <template #default="scope">
               <el-progress :percentage="scope.row.usageRate" :color="getUsageRateColor(scope.row.usageRate)" />
             </template>
           </el-table-column>
         </el-table>
+        <div v-if="totalPages > 1" class="pagination-container">
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="totalElements"
+            :page-size="pageSize"
+            v-model:current-page="currentPage"
+            @current-change="handlePageChange"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, onActivated } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { useSnackbar } from '@/composables/useSnackbar';
 import { getLeaveBalanceStatus } from '@/api/attendance';
@@ -71,33 +103,56 @@ export default {
     const { success, info, error } = useSnackbar();
 
     const searchQuery = ref('');
+    const departmentFilter = ref('');
+    const policyTypeFilter = ref('');
     const isLoading = ref(false);
     const selectedYear = ref(new Date().getFullYear().toString());
     const leaveData = ref([]);
+    const currentPage = ref(1);
+    const pageSize = ref(20);
+    const totalElements = ref(0);
 
-    // 백엔드 API로부터 연차 데이터 조회 (권한 기반 자동 범위 결정)
+    // 백엔드 API로부터 휴가 데이터 조회 (권한 기반 자동 범위 결정)
     const fetchLeaveData = async () => {
       isLoading.value = true;
       try {
-        const response = await getLeaveBalanceStatus({ year: parseInt(selectedYear.value) });
+        const response = await getLeaveBalanceStatus({
+          year: parseInt(selectedYear.value),
+          page: currentPage.value - 1,
+          size: pageSize.value,
+          searchQuery: searchQuery.value || undefined,
+          policyTypeCode: policyTypeFilter.value || undefined,
+          yearsOfService: undefined  // 이 화면에서는 근속년수 필터 없음
+        });
 
         // 백엔드 응답을 프론트엔드 형식으로 변환
-        leaveData.value = response.map((item) => ({
+        const content = response.content || [];
+        leaveData.value = content.map((item) => ({
           id: item.memberId,
           employeeName: item.memberName || '-',
           department: item.organizationName || '-',
+          policyTypeCode: item.policyTypeCode,
+          policyTypeName: item.policyTypeName || '-',
           totalLeave: item.totalGranted || 0,
           usedLeave: item.totalUsed || 0,
         }));
 
-        success(`연차 현황을 조회했습니다. (${response.length}명)`);
+        totalElements.value = response.totalElements || 0;
+        success(`휴가 사용률 현황을 조회했습니다. (총 ${totalElements.value}건)`);
       } catch (err) {
-        error(err.message || '연차 현황을 불러오는 데 실패했습니다.');
+        error(err.message || '휴가 사용률 현황을 불러오는 데 실패했습니다.');
         leaveData.value = [];
+        totalElements.value = 0;
       } finally {
         isLoading.value = false;
       }
     };
+
+    // 고유 부서 목록 추출
+    const uniqueDepartments = computed(() => {
+      const departments = new Set(leaveData.value.map(item => item.department).filter(d => d !== '-'));
+      return Array.from(departments).sort();
+    });
 
     const processedLeaveData = computed(() => {
       return leaveData.value.map(item => ({
@@ -107,14 +162,7 @@ export default {
       }));
     });
 
-    const filteredLeaveData = computed(() => {
-      return processedLeaveData.value.filter(item => {
-        const matchesSearch = !searchQuery.value ||
-                              item.employeeName.includes(searchQuery.value) ||
-                              item.department.includes(searchQuery.value);
-        return matchesSearch;
-      });
-    });
+    const totalPages = computed(() => Math.ceil(totalElements.value / pageSize.value));
 
     const getUsageRateColor = (rate) => {
       if (rate > 80) return '#f56c6c'; // Danger
@@ -123,12 +171,26 @@ export default {
     };
 
     const exportToExcel = () => {
-      info('연차 현황을 엑셀로 내보냅니다.');
-      const worksheet = XLSX.utils.json_to_sheet(filteredLeaveData.value);
+      info('휴가 사용률 현황을 엑셀로 내보냅니다.');
+      const exportData = processedLeaveData.value.map(item => ({
+        이름: item.employeeName,
+        부서: item.department,
+        유형: item.policyTypeName,
+        '총 부여': `${item.totalLeave.toFixed(1)}일`,
+        사용: `${item.usedLeave.toFixed(1)}일`,
+        잔여: `${item.remainingLeave.toFixed(1)}일`,
+        '사용률(%)': item.usageRate
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, '연차 현황');
-      XLSX.writeFile(workbook, '연차_현황.xlsx');
+      XLSX.utils.book_append_sheet(workbook, worksheet, '휴가 사용률');
+      XLSX.writeFile(workbook, `휴가_사용률_${selectedYear.value}.xlsx`);
       success('엑셀 내보내기가 완료되었습니다.');
+    };
+
+    const handlePageChange = (page) => {
+      currentPage.value = page;
+      fetchLeaveData();
     };
 
     // 컴포넌트 마운트 시 데이터 조회
@@ -141,14 +203,28 @@ export default {
       fetchLeaveData();
     });
 
+    // 필터 변경 시 첫 페이지로 돌아가고 데이터 재조회
+    watch([searchQuery, departmentFilter, policyTypeFilter, selectedYear], () => {
+      currentPage.value = 1;
+      fetchLeaveData();
+    });
+
     return {
       searchQuery,
+      departmentFilter,
+      policyTypeFilter,
       selectedYear,
       isLoading,
-      filteredLeaveData,
+      uniqueDepartments,
+      processedLeaveData,
       getUsageRateColor,
       exportToExcel,
       fetchLeaveData,
+      currentPage,
+      pageSize,
+      totalElements,
+      totalPages,
+      handlePageChange,
     };
   }
 }
@@ -192,5 +268,11 @@ export default {
 
 .leave-table {
   padding: 0 24px 24px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
 }
 </style>

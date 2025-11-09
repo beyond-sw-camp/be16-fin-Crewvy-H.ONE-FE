@@ -81,15 +81,12 @@
           <el-menu-item index="/leave-request">
             <span>휴가/출장 신청</span>
           </el-menu-item>
-          <el-sub-menu index="attendance-admin">
+          <el-sub-menu index="attendance-admin" v-if="hasAttendanceReadCompany">
             <template #title>
               <span>관리자 메뉴</span>
             </template>
             <el-menu-item index="/admin/attendance">
               <span>근태 현황</span>
-            </el-menu-item>
-            <el-menu-item index="/admin/leave-management">
-              <span>연차 현황</span>
             </el-menu-item>
             <el-menu-item index="/admin/policy-management">
               <span>정책 관리</span>
@@ -958,6 +955,9 @@ export default {
     },
     hasEmployeeReadDepartment() {
       return this.$store.getters['auth/hasEmployeeReadDepartment'];
+    },
+    hasAttendanceReadCompany() {
+      return this.$store.getters['auth/hasAttendanceReadCompany'];
     },
     userAvatarUrl() {
       return this.user?.avatar || this.defaultAvatarSvg;

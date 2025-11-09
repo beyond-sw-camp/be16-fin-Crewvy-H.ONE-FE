@@ -149,14 +149,16 @@
               <h3>보유 휴가 정책</h3>
             </div>
 
-            <div class="balance-cards" v-if="allBalances.length > 0">
-              <div class="balance-card" v-for="balance in allBalances" :key="balance.balanceTypeCode?.codeValue" :class="{ 'balance-disabled': !balance.isUsable }">
+            <div class="balance-cards" v-if="usableBalances.length > 0">
+              <div
+                class="balance-card"
+                v-for="balance in usableBalances"
+                :key="balance.balanceTypeCode?.codeValue"
+                @click="goToLeaveRequestWithPolicy(balance.balanceTypeCode?.codeValue)"
+              >
                 <div class="balance-header">
                   <h4>{{ balance.balanceTypeCode?.codeName || '알 수 없음' }}</h4>
                   <div class="balance-tags">
-                    <el-tag v-if="!balance.isUsable" type="danger" size="small">
-                      사용 불가
-                    </el-tag>
                     <el-tag :type="balance.isPaid ? 'success' : 'info'" size="small">
                       {{ balance.isPaid ? '유급' : '무급' }}
                     </el-tag>
@@ -343,8 +345,16 @@ export default {
         const balances = await getMyAllBalances();
         allBalances.value = balances || [];
 
+        console.log('🔍 [DEBUG] 보유 휴가 정책 조회 결과:', balances);
+        console.log('🔍 [DEBUG] allBalances.value:', allBalances.value);
+        console.log('🔍 [DEBUG] usableBalances 필터링 전:', allBalances.value.map(b => ({
+          name: b.balanceTypeCode?.codeName,
+          isUsable: b.isUsable,
+          totalGranted: b.totalGranted
+        })));
+
         // 연차(ANNUAL_LEAVE) 정보를 balanceInfo에 설정 (기존 호환성 유지)
-        const annualLeave = balances.find(b => b.balanceTypeCode?.codeValue === 'ANNUAL_LEAVE');
+        const annualLeave = balances.find(b => b.balanceTypeCode?.codeValue === 'PTC001');
         if (annualLeave) {
           balanceInfo.value = {
             remaining: annualLeave.remaining || 0,
@@ -353,7 +363,7 @@ export default {
           };
         }
       } catch (err) {
-        console.error('잔여 휴가를 불러오는 데 실패했습니다.');
+        console.error('❌ [ERROR] 잔여 휴가를 불러오는 데 실패했습니다:', err);
       }
     };
 
@@ -366,16 +376,24 @@ export default {
           fullPolicy: policy
         });
       } catch (err) {
-        console.error('적용된 정책을 불러오는 데 실패했습니다.');
+        console.error('⚠️ [WARNING] 기본근무 정책을 불러오는 데 실패했습니다. (정책 할당이 필요합니다)', err);
+        // 정책이 없어도 페이지는 정상 작동해야 함
+        effectivePolicy.value = null;
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
       timer.value = setInterval(() => { currentTime.value = new Date().toLocaleTimeString(); }, 1000);
-      fetchTodayData();
-      fetchLeaveData();
-      fetchEffectivePolicy();
-      fetchBalance();
+
+      // 병렬로 데이터 로드 (하나가 실패해도 다른 것들은 계속 실행)
+      await Promise.allSettled([
+        fetchTodayData(),
+        fetchLeaveData(),
+        fetchEffectivePolicy(),
+        fetchBalance()
+      ]);
+
+      console.log('✅ [INFO] 페이지 초기화 완료');
     });
 
     onUnmounted(() => {
@@ -398,6 +416,15 @@ export default {
       }
     });
 
+    // 사용 가능한 휴가 정책만 필터링
+    const usableBalances = computed(() => {
+      const filtered = allBalances.value.filter(b => b.isUsable === true);
+      console.log('🔍 [DEBUG] usableBalances computed 결과:', filtered.map(b => ({
+        name: b.balanceTypeCode?.codeName,
+        isUsable: b.isUsable
+      })));
+      return filtered;
+    });
 
     // 휴게 규칙 타입이 MANUAL인 경우에만 휴게 버튼 활성화
     const isBreakManualMode = computed(() => {
@@ -518,6 +545,14 @@ export default {
       router.push('/leave-request');
     };
 
+    const goToLeaveRequestWithPolicy = (policyTypeCode) => {
+      if (!policyTypeCode) return;
+      router.push({
+        path: '/leave-request',
+        query: { policyType: policyTypeCode }
+      });
+    };
+
     const formatDate = (dateTimeString) => {
       if (!dateTimeString) return '';
       return dateTimeString.substring(0, 10);
@@ -543,10 +578,10 @@ export default {
     return {
       currentTime, workStatus, clockInTime, clockOutTime,
       totalWorkTime, workStatusText, recordEvent,
-      leaveRequests, leavePagination, handleLeavePageChange, goToLeaveRequest,
+      leaveRequests, leavePagination, handleLeavePageChange, goToLeaveRequest, goToLeaveRequestWithPolicy,
       Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check,
       balanceInfo,
-      formatDate, getVacationStatusType, allBalances, getProgressColor,
+      formatDate, getVacationStatusType, allBalances, usableBalances, getProgressColor,
       isBreakManualMode, effectivePolicy,
       monthlyWorkDays, totalMonthlyWorkHours
     };
@@ -631,7 +666,7 @@ export default {
   justify-content: center;
   font-size: 20px;
   color: white;
-  background: #4f46e5;
+  background: #409EFF;
 }
 
 .card-content {
@@ -722,7 +757,7 @@ export default {
 .time-value {
   font-size: 28px;
   font-weight: 600;
-  color: #4f46e5;
+  color: #409EFF;
 }
 
 /* 휴가 관리 탭 스타일 */
@@ -740,27 +775,16 @@ export default {
   border: 1px solid #e4e7ed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .balance-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.2);
+  border-color: #4f46e5;
 }
 
-.balance-card.balance-disabled {
-  opacity: 0.6;
-  background: #f5f7fa;
-  border-color: #dcdfe6;
-}
-
-.balance-card.balance-disabled:hover {
-  transform: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.balance-card.balance-disabled .stat-value {
-  color: #909399;
-}
+/* balance-disabled 스타일 제거 - v-show로 숨김 처리하므로 불필요 */
 
 .balance-header {
   display: flex;
