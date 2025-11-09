@@ -252,7 +252,7 @@ import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check } from '@element-plus/icons-vue';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { getMyLeaveRequests, recordAttendanceEvent, getMyTodayAttendance, getMyAllBalances, getMyEffectivePolicy } from '@/api/attendance';
+import { getMyLeaveRequests, recordAttendanceEvent, getMyTodayAttendance, getMyAllBalances, getMyEffectivePolicy, getMyMonthlyAttendance } from '@/api/attendance';
 
 export default {
   name: 'AttendancePage',
@@ -367,6 +367,31 @@ export default {
       }
     };
 
+    const fetchMonthlyData = async () => {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+
+        const monthlyAttendances = await getMyMonthlyAttendance({ year, month });
+
+        if (monthlyAttendances && monthlyAttendances.length > 0) {
+          // 근무일 수 계산 (ABSENT 제외)
+          const workDays = monthlyAttendances.filter(att => att.status !== 'ABSENT').length;
+          monthlyWorkDays.value = workDays;
+
+          // 총 근무시간 계산
+          const totalMinutes = monthlyAttendances.reduce((sum, att) => {
+            return sum + (att.workedMinutes || 0);
+          }, 0);
+          const totalHours = Math.floor(totalMinutes / 60);
+          totalMonthlyWorkHours.value = totalHours;
+        }
+      } catch (err) {
+        console.error('❌ [ERROR] 월별 근태 데이터를 불러오는 데 실패했습니다:', err);
+      }
+    };
+
     const fetchEffectivePolicy = async () => {
       try {
         const policy = await getMyEffectivePolicy();
@@ -390,7 +415,8 @@ export default {
         fetchTodayData(),
         fetchLeaveData(),
         fetchEffectivePolicy(),
-        fetchBalance()
+        fetchBalance(),
+        fetchMonthlyData()
       ]);
 
       console.log('✅ [INFO] 페이지 초기화 완료');
@@ -531,6 +557,10 @@ export default {
         }
 
         await fetchTodayData();
+        // 출퇴근 시 월별 통계도 업데이트
+        if (eventType === 'CLOCK_IN' || eventType === 'CLOCK_OUT') {
+          await fetchMonthlyData();
+        }
       } catch (err) {
         error(err.message || '근태 기록에 실패했습니다.');
       }
@@ -761,6 +791,17 @@ export default {
 }
 
 /* 휴가 관리 탭 스타일 */
+.section-header {
+  margin-bottom: 24px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
 .balance-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
