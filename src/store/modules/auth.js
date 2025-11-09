@@ -34,6 +34,9 @@ const getters = {
   hasEmployeeReadDepartment: (state) => {
     return state.permissions.includes('member:READ:DEPARTMENT');
   },
+  hasAttendanceReadCompany: (state) => {
+    return state.permissions.includes('attendance:READ:COMPANY');
+  },
 };
 
 export default {

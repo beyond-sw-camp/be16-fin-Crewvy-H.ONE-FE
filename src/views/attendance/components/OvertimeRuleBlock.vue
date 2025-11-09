@@ -1,17 +1,8 @@
 <template>
   <div class="rule-block">
-    <el-form-item label="연장근무 허용">
-      <el-switch v-model="rule.allowOvertime" />
-    </el-form-item>
     <el-form-item label="주간 최대 연장근무 한도 (분)">
       <el-input-number v-model="rule.maxWeeklyOvertimeMinutes" :min="0" :max="720" />
       <span class="form-description">법정 한도: 주 12시간 (720분)</span>
-    </el-form-item>
-    <el-form-item label="야간근무(22시~06시) 허용">
-      <el-switch v-model="rule.allowNightWork" />
-    </el-form-item>
-    <el-form-item label="휴일근무 허용">
-      <el-switch v-model="rule.allowHolidayWork" />
     </el-form-item>
     <el-form-item label="연장근무 가산율">
       <el-input-number v-model="rule.overtimeRate" :min="1.5" :step="0.1" :precision="2" />

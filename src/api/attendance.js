@@ -122,10 +122,11 @@ export const getMyAllBalances = () => workforceClient.get('/attendance/my/balanc
 export const getMyAssignedPolicies = () => workforceClient.get('/attendance/my/assigned-policies');
 
 /**
- * 팀원 근태 현황 조회 (오늘 날짜 기준)
+ * 팀원 근태 현황 조회
+ * @param {object} params - { startDate?: 'yyyy-MM-dd', endDate?: 'yyyy-MM-dd' } (날짜 미지정 시 오늘 날짜)
  * @returns {Promise<Array<object>>}
  */
-export const getTeamAttendanceStatus = () => workforceClient.get('/attendance/team/status');
+export const getTeamAttendanceStatus = (params) => workforceClient.get('/attendance/team/status', { params });
 
 /**
  * 연차 현황 조회 (권한에 따라 조회 범위 자동 결정)
@@ -161,3 +162,18 @@ export const approveDevice = (requestId) => workforceClient.post(`/requests/devi
 export const rejectDevice = (requestId) => workforceClient.post(`/requests/devices/${requestId}/reject`);
 
 export const runAnnualLeaveAccrualBatch = () => workforceClient.post('/batch/attendance/annual-leave-accrual');
+
+/**
+ * 근태 보정 배치 실행 (미완료 퇴근 자동 처리)
+ * @returns {Promise<void>}
+ */
+export const runAttendanceCorrectionBatch = () => workforceClient.post('/batch/attendance/auto-complete-clock-out');
+
+/**
+ * 근태 기록 수정 (관리자 전용)
+ * @param {string} dailyAttendanceId - 수정할 근태 기록 ID
+ * @param {object} data - UpdateDailyAttendanceReq
+ * @returns {Promise<void>}
+ */
+export const updateDailyAttendance = (dailyAttendanceId, data) =>
+  workforceClient.put(`/attendance/daily/${dailyAttendanceId}`, data);

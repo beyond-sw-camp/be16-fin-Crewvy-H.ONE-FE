@@ -345,10 +345,10 @@ export default {
         const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`, { params });
         const doc = response.data.data;
         formTitle.value = doc.documentName;
-        
+
         // request 데이터 추출
         const requestData = doc.request || null;
-        
+
         if (doc.metadata) {
           // metadata.metadata.schema 구조 확인
           const schema = doc.metadata.metadata?.schema || doc.metadata.schema;
@@ -530,6 +530,14 @@ export default {
         contents: formData.value,
         lineDtoList: lineDtoList,
       };
+
+      // requestId가 query parameter로 전달된 경우 포함
+      const requestId = route.query.requestId;
+      if (requestId) {
+        approvalData.requestId = requestId;
+        console.log('Including requestId:', requestId);
+      }
+
       console.log(approvalData);
 
       if (draftApprovalId.value) {

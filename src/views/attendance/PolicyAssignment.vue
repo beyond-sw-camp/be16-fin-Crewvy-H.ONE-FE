@@ -220,7 +220,7 @@
                                           <script>
                                           import { ref, onMounted, watch, computed } from 'vue';
                                           import { useSnackbar } from '@/composables/useSnackbar';                                    import { getPolicies, createAssignment, getPolicyAssignments, deleteAssignment, deleteAssignments, revokeAssignments, reactivateAssignments } from '@/api/attendance';
-                                                            import organizationService from '@/api/organizationService';
+                                                            import apiClient from '@/api/http';
                                                             import { ElMessageBox } from 'element-plus';
                                                             import { OfficeBuilding, User, Check, Refresh, School, Pointer } from '@element-plus/icons-vue';
                                           
@@ -341,7 +341,8 @@
                                                                       });                  
                                                                 const fetchOrganizationTree = async () => {
                                                                   try {
-                                                                    const response = await organizationService.getOrganizationTreeWithMembers();
+                                                                    // 임시: search-service 대신 member-service 직접 호출 (Elasticsearch 미실행)
+                                                                    const response = await apiClient.get('/member-service/organization/tree-with-members');
                                                                     const rawTreeData = response.data?.data || response.data || [];
                                                                     const transformDataForTree = (nodes) => {
                                                                       return nodes.map(node => {
@@ -422,7 +423,23 @@
                                                 }
                                                 isAssigning.value = true;
                                                 try {
-                                                  const checkedNodes = treeRef.value.getCheckedNodes();
+                                                  // 모든 체크된 키 가져오기
+                                                  const allCheckedKeys = treeRef.value.getCheckedKeys(false);
+
+                                                  // 부모도 체크된 노드는 제외 (직접 체크한 노드만 남김)
+                                                  const directlyCheckedKeys = allCheckedKeys.filter(key => {
+                                                    const node = treeRef.value.getNode(key);
+                                                    // 부모가 없으면 (최상위) 또는 부모가 체크 안 되어 있으면 직접 체크한 것
+                                                    if (!node.parent || node.parent.level === 0) return true; // 최상위 노드
+                                                    return !allCheckedKeys.includes(node.parent.data.id); // 부모가 체크 안 되어 있음
+                                                  });
+
+                                                  // 키로 노드 객체 찾기
+                                                  const checkedNodes = directlyCheckedKeys.map(key => treeRef.value.getNode(key).data);
+
+                                                  console.log('전체 체크된 노드:', allCheckedKeys.length);
+                                                  console.log('직접 체크한 노드:', checkedNodes.length);
+                                                  console.log('노드 상세:', checkedNodes.map(n => ({ id: n.id, label: n.mainLabel, type: n.type })));
 
                                                   // 조직과 멤버 노드 분리
                                                   const organizationNodes = checkedNodes.filter(node => node.type !== 'member');
@@ -464,9 +481,22 @@
                                                   });
 
                                                   const requestData = { assignments: assignmentsPayload };
-                                                  await createAssignment(requestData);
+                                                  const response = await createAssignment(requestData);
 
-                                                  success(`${form.value.policyIds.length}개 정책을 ${targetNodes.length}개 대상에 할당했습니다. (총 ${assignmentsPayload.length}건)`);
+                                                  // 백엔드에서 실제로 생성된 개수를 표시 (중복 제외)
+                                                  const actualCreatedCount = response?.length || response?.data?.length || 0;
+                                                  const skippedCount = assignmentsPayload.length - actualCreatedCount;
+
+                                                  if (actualCreatedCount === 0) {
+                                                    // 전부 중복인 경우 - 에러 메시지
+                                                    error(`이미 할당된 내역입니다. 선택한 모든 대상에 해당 정책이 이미 할당되어 있습니다. (${assignmentsPayload.length}건 중복)`);
+                                                  } else if (skippedCount > 0) {
+                                                    // 일부만 중복인 경우 - 성공 메시지에 스킵 건수 포함
+                                                    success(`정책 할당 완료: ${actualCreatedCount}건 생성, ${skippedCount}건 중복 스킵 (요청 ${assignmentsPayload.length}건)`);
+                                                  } else {
+                                                    // 모두 성공한 경우
+                                                    success(`${form.value.policyIds.length}개 정책을 ${targetNodes.length}개 대상에 할당했습니다. (총 ${actualCreatedCount}건)`);
+                                                  }
 
                                                   fetchAllAssignments();
                                                   resetForm();
@@ -479,7 +509,15 @@
                                           
                                               const handleDelete = async (assignmentId) => {
                                                 try {
-                                                  await ElMessageBox.confirm('이 할당을 영구적으로 삭제하시겠습니까?', '영구 삭제 경고', { type: 'error' });
+                                                  await ElMessageBox.confirm(
+                                                    '이 할당을 영구적으로 삭제하시겠습니까?\n\n주의: 이미 사용한 휴가 내역이 있으면 삭제할 수 없습니다.\n정책을 중단하려면 "해지(비활성화)"를 사용하세요.',
+                                                    '영구 삭제 경고',
+                                                    {
+                                                      type: 'error',
+                                                      confirmButtonText: '삭제',
+                                                      cancelButtonText: '취소'
+                                                    }
+                                                  );
                                                   await deleteAssignment(assignmentId);
                                                   success('정책 할당이 영구적으로 삭제되었습니다.');
                                                   fetchAllAssignments();
@@ -496,7 +534,15 @@
                                                   return;
                                                 }
                                                 try {
-                                                  await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 영구적으로 삭제하시겠습니까?`, '일괄 삭제 확인', { type: 'error' });
+                                                  await ElMessageBox.confirm(
+                                                    `선택된 ${selectedAssignments.value.length}개의 할당을 영구적으로 삭제하시겠습니까?\n\n주의: 이미 사용한 휴가 내역이 있으면 삭제할 수 없습니다.\n정책을 중단하려면 "해지(비활성화)"를 사용하세요.`,
+                                                    '일괄 삭제 확인',
+                                                    {
+                                                      type: 'error',
+                                                      confirmButtonText: '삭제',
+                                                      cancelButtonText: '취소'
+                                                    }
+                                                  );
                                                   const idsToDelete = selectedAssignments.value.map(item => item.policyAssignmentId);
                                                   await deleteAssignments(idsToDelete);
                                                   success('선택된 정책 할당이 삭제되었습니다.');
@@ -510,7 +556,15 @@
                                           
                                               const handleRevoke = async (assignmentId) => {
                                                 try {
-                                                  await ElMessageBox.confirm('이 정책 할당을 해지(비활성화)하시겠습니까?', '해지 확인', { type: 'warning' });
+                                                  await ElMessageBox.confirm(
+                                                    '이 정책 할당을 해지(비활성화)하시겠습니까?\n\n- 휴가 잔액이 사용 불가 상태로 변경됩니다.\n- 사용 내역은 유지되며, 추후 재활성할 수 있습니다.',
+                                                    '해지 확인',
+                                                    {
+                                                      type: 'warning',
+                                                      confirmButtonText: '해지',
+                                                      cancelButtonText: '취소'
+                                                    }
+                                                  );
                                                   await revokeAssignments([assignmentId]); // 일괄 API 재사용
                                                   success('정책 할당이 해지되었습니다.');
                                                   fetchAllAssignments();
@@ -527,7 +581,15 @@
                                                   return;
                                                 }
                                                 try {
-                                                  await ElMessageBox.confirm(`선택된 ${selectedAssignments.value.length}개의 할당을 해지하시겠습니까?`, '일괄 해지 확인', { type: 'warning' });
+                                                  await ElMessageBox.confirm(
+                                                    `선택된 ${selectedAssignments.value.length}개의 할당을 해지하시겠습니까?\n\n- 휴가 잔액이 사용 불가 상태로 변경됩니다.\n- 사용 내역은 유지되며, 추후 재활성할 수 있습니다.`,
+                                                    '일괄 해지 확인',
+                                                    {
+                                                      type: 'warning',
+                                                      confirmButtonText: '해지',
+                                                      cancelButtonText: '취소'
+                                                    }
+                                                  );
                                                   const idsToRevoke = selectedAssignments.value.map(item => item.policyAssignmentId);
                                                   await revokeAssignments(idsToRevoke);
                                                   success('선택된 정책 할당이 해지되었습니다.');

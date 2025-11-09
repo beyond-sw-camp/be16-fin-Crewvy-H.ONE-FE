@@ -37,11 +37,9 @@
     <el-form-item label="필수 인증 방식">
       <el-checkbox-group v-model="rule.requiredAuthTypes">
         <el-checkbox label="GPS">GPS 위치 인증</el-checkbox>
-        <el-checkbox label="IP">IP 주소 인증</el-checkbox>
-        <el-checkbox label="WIFI">WiFi 네트워크 인증</el-checkbox>
       </el-checkbox-group>
       <div class="form-help-text">
-        선택한 모든 인증 방식을 만족해야 출퇴근이 가능합니다. (AND 조건)
+        GPS 위치 기반 인증으로 출퇴근을 등록합니다.
       </div>
     </el-form-item>
 
@@ -70,17 +68,9 @@
             <el-icon><LocationFilled /></el-icon>
             <span>{{ location.address }}</span>
           </div>
-          <div class="location-detail" v-if="location.latitude && location.longitude">
+          <div class="location-detail" v-if="location.gpsRadius">
             <el-icon><Position /></el-icon>
-            <span>GPS: {{ location.latitude }}, {{ location.longitude }} (반경 {{ location.gpsRadius }}m)</span>
-          </div>
-          <div class="location-detail" v-if="location.ipAddress">
-            <el-icon><Connection /></el-icon>
-            <span>IP: {{ location.ipAddress }}</span>
-          </div>
-          <div class="location-detail" v-if="location.wifiSsid">
-            <el-icon><Connection /></el-icon>
-            <span>WiFi: {{ location.wifiSsid }}</span>
+            <span>GPS 반경: {{ location.gpsRadius }}m</span>
           </div>
         </el-card>
       </div>
@@ -102,15 +92,14 @@
 import { ref, computed, onMounted, watch} from 'vue';
 import { getActiveWorkLocations } from '@/api/attendance';
 import { ElMessage } from 'element-plus';
-import { CloseBold, LocationFilled, Position, Connection } from '@element-plus/icons-vue';
+import { CloseBold, LocationFilled, Position } from '@element-plus/icons-vue';
 
 export default {
   name: 'AuthRuleBlock',
   components: {
     CloseBold,
     LocationFilled,
-    Position,
-    Connection
+    Position
   },
   props: {
     modelValue: {
