@@ -14,6 +14,19 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  // Add memberPositionId header for member-service APIs
+  const memberPositionId = localStorage.getItem('memberPositionId')
+  if (memberPositionId) {
+    config.headers['X-User-MemberPositionId'] = memberPositionId
+  }
+
+  // Add UUID header for member-service APIs
+  const uuid = localStorage.getItem('uuid')
+  if (uuid) {
+    config.headers['X-User-UUID'] = uuid
+  }
+
   return config
 })
 

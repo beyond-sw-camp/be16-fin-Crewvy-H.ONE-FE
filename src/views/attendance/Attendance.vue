@@ -45,52 +45,6 @@
           <span class="time-value">{{ clockOutTime || '--:--:--' }}</span>
         </div>
       </div>
-
-      <!-- 휴게/외출 버튼 영역 -->
-      <div class="status-actions" v-if="workStatus !== 'BEFORE_WORK'">
-        <div class="status-label">근무 상태 관리</div>
-        <div class="status-buttons">
-          <!-- 휴게 토글 버튼 -->
-          <el-button
-            v-if="workStatus === 'WORKING' || workStatus === 'AWAY'"
-            @click="recordEvent('BREAK_START')"
-            type="warning"
-            plain
-          >
-            <el-icon><CoffeeCup /></el-icon>
-            <span style="margin-left: 6px;">휴게 시작</span>
-          </el-button>
-          <el-button
-            v-if="workStatus === 'ON_BREAK'"
-            @click="recordEvent('BREAK_END')"
-            type="success"
-            plain
-          >
-            <el-icon><Check /></el-icon>
-            <span style="margin-left: 6px;">휴게 종료</span>
-          </el-button>
-
-          <!-- 외출 토글 버튼 -->
-          <el-button
-            v-if="workStatus === 'WORKING' || workStatus === 'ON_BREAK'"
-            @click="recordEvent('GO_OUT')"
-            type="info"
-            plain
-          >
-            <el-icon><VideoPlay /></el-icon>
-            <span style="margin-left: 6px;">외출</span>
-          </el-button>
-          <el-button
-            v-if="workStatus === 'AWAY'"
-            @click="recordEvent('COME_BACK')"
-            type="primary"
-            plain
-          >
-            <el-icon><VideoPause /></el-icon>
-            <span style="margin-left: 6px;">복귀</span>
-          </el-button>
-        </div>
-      </div>
     </div>
 
     <!-- 근태 현황 카드 -->

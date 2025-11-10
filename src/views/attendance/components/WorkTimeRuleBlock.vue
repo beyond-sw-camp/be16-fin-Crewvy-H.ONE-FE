@@ -3,7 +3,7 @@
     <el-form-item label="근무 유형">
       <el-radio-group v-model="rule.type" @change="onTypeChange">
         <el-radio-button label="FIXED">고정 근무</el-radio-button>
-        <el-radio-button label="FLEXIBLE">시차 출퇴근</el-radio-button>
+        <el-radio-button label="FLEXIBLE" disabled>시차 출퇴근 (준비중)</el-radio-button>
         <!-- <el-radio-button label="DEEMED">간주 근무</el-radio-button> -->
       </el-radio-group>
     </el-form-item>
@@ -28,6 +28,7 @@
         <span class="unit-label">분</span>
         <div class="form-description">
           {{ workHoursDisplay }} ({{ rule.fixedWorkMinutes }}분)
+          <br>예: 9:00~18:00 근무, 휴게 1시간 → 8시간(480분) 입력
         </div>
       </el-form-item>
     </div>
