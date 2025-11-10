@@ -64,6 +64,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 @change="fetchAttendanceData"
+                :cell-class-name="getCellClassName"
               />
               <el-input
                 v-model="searchQuery"
@@ -336,7 +337,7 @@
             import { Bar } from 'vue-chartjs';
             import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
             import { useSnackbar } from '@/composables/useSnackbar';
-            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch, updateMemberBalance } from '@/api/attendance';
+            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch, updateMemberBalance, getHolidays } from '@/api/attendance';
             import { Download, Search, Refresh, Tools, Calendar, View } from '@element-plus/icons-vue';
 
             ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
@@ -376,6 +377,9 @@
     const attendanceCurrentPage = ref(1);
     const attendancePageSize = ref(20);
     const attendanceTotalElements = ref(0);
+
+    // 공휴일 데이터
+    const holidays = ref([]);
 
     const filteredAttendanceData = computed(() => {
       return attendanceData.value.filter(item => {
@@ -548,6 +552,49 @@
 
       } catch (err) {
         error(err.message || '근태 기록 수정에 실패했습니다.');
+      }
+    };
+
+    // 주말 체크 함수
+    const isWeekend = (date) => {
+      const day = date.getDay();
+      return day === 0 || day === 6; // 일요일(0) 또는 토요일(6)
+    };
+
+    // 공휴일 체크 함수
+    const isHoliday = (date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      return holidays.value.some(h => h.date === dateStr);
+    };
+
+    // 캘린더 셀 클래스 설정 (주말: 빨간 숫자, 공휴일: 빨간 원)
+    const getCellClassName = (date) => {
+      const targetDate = new Date(date);
+      if (isWeekend(targetDate)) {
+        return 'weekend-cell'; // 주말 (숫자만 빨간색)
+      }
+      if (isHoliday(targetDate)) {
+        return 'holiday-cell'; // 공휴일 (선택 시 빨간 원)
+      }
+      return '';
+    };
+
+    // 공휴일 조회 (1년치)
+    const fetchHolidays = async () => {
+      try {
+        const today = new Date();
+        const startDate = new Date(today.getFullYear(), 0, 1); // 올해 1월 1일
+        const endDate = new Date(today.getFullYear(), 11, 31); // 올해 12월 31일
+
+        const params = {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        };
+
+        holidays.value = await getHolidays(params);
+      } catch (err) {
+        console.error('공휴일 조회 실패:', err);
+        // 공휴일 조회 실패해도 계속 진행
       }
     };
 
@@ -802,6 +849,7 @@
     // 컴포넌트 마운트 시 데이터 조회
     onMounted(() => {
       fetchAttendanceData();
+      fetchHolidays();
     });
 
     // 탭 변경 시 데이터 조회
@@ -839,6 +887,7 @@
       handleSave,
       exportToExcel,
       fetchAttendanceData,
+      getCellClassName,
       runAnnualLeaveAccrualBatch,
       getNextBatchDate,
       viewBatchHistory,
@@ -975,5 +1024,23 @@
 
 .warning-text {
   color: #f56c6c;
+}
+
+/* 캘린더 주말 스타일 (숫자만 빨간색) */
+:deep(.weekend-cell) {
+  color: #f56c6c;
+}
+
+/* 캘린더 공휴일 스타일 (선택 시 파란색 원 → 빨간색 원) */
+:deep(.holiday-cell) {
+  color: #f56c6c;
+}
+
+:deep(.holiday-cell.in-range),
+:deep(.holiday-cell.start-date),
+:deep(.holiday-cell.end-date),
+:deep(.holiday-cell.selected) {
+  background-color: #f56c6c !important;
+  color: #fff !important;
 }
 </style>

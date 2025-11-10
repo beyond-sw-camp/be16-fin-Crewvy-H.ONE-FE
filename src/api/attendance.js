@@ -186,3 +186,10 @@ export const updateDailyAttendance = (dailyAttendanceId, data) =>
  */
 export const updateMemberBalance = (balanceId, data) =>
   workforceClient.put(`/attendance/leave-balance/${balanceId}`, data);
+
+/**
+ * 공휴일 조회 (캘린더용)
+ * @param {object} params - { startDate: 'yyyy-MM-dd', endDate: 'yyyy-MM-dd' }
+ * @returns {Promise<Array<object>>} - [{ date: 'yyyy-MM-dd', name: '공휴일명' }]
+ */
+export const getHolidays = (params) => workforceClient.get('/attendance/holidays', { params });
