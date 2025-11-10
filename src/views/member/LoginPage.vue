@@ -19,7 +19,9 @@
           </el-input>
         </el-form-item>
 
-
+        <el-form-item class="remember-me-container">
+          <el-checkbox v-model="rememberMe">아이디 저장</el-checkbox>
+        </el-form-item>
 
         <el-button type="primary" @click="handleLogin" class="login-button" :loading="loading">
           로그인
@@ -37,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import axios from 'axios';
@@ -49,17 +51,26 @@ const store = useStore();
 const { success, error } = useSnackbar();
 
 const formRef = ref(null);
-const passwordResetModal = ref(null); // Add ref for the modal
+const passwordResetModal = ref(null);
 const form = ref({
   email: '',
   password: ''
 });
+const rememberMe = ref(false);
 const rules = ref({
   email: [{ required: true, message: '이메일을 입력해주세요.', trigger: 'blur' }],
   password: [{ required: true, message: '비밀번호를 입력해주세요.', trigger: 'blur' }]
 });
 
 const loading = ref(false);
+
+onMounted(() => {
+  const savedEmail = localStorage.getItem('savedEmail');
+  if (savedEmail) {
+    form.value.email = savedEmail;
+    rememberMe.value = true;
+  }
+});
 
 const openPasswordResetModal = () => {
   passwordResetModal.value.open();
@@ -77,6 +88,12 @@ const handleLogin = async () => {
         });
 
         if (response.data && response.data.success) {
+          if (rememberMe.value) {
+            localStorage.setItem('savedEmail', form.value.email);
+          } else {
+            localStorage.removeItem('savedEmail');
+          }
+
           const { accessToken, refreshToken, userName, memberId, memberPositionId } = response.data.data;
 
           // 로컬 스토리지에 사용자 정보 저장
@@ -137,6 +154,11 @@ const handleLogin = async () => {
 
 .el-form-item {
   margin-bottom: 20px;
+}
+
+.remember-me-container {
+  margin-bottom: 10px; 
+  text-align: left;
 }
 
 .el-input {
