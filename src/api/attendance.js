@@ -177,3 +177,12 @@ export const runAttendanceCorrectionBatch = () => workforceClient.post('/batch/a
  */
 export const updateDailyAttendance = (dailyAttendanceId, data) =>
   workforceClient.put(`/attendance/daily/${dailyAttendanceId}`, data);
+
+/**
+ * 회원 연차 잔액 수정 (관리자 전용)
+ * @param {string} balanceId - 수정할 MemberBalance ID
+ * @param {object} data - { totalGranted: number, totalUsed: number }
+ * @returns {Promise<void>}
+ */
+export const updateMemberBalance = (balanceId, data) =>
+  workforceClient.put(`/attendance/leave-balance/${balanceId}`, data);

@@ -336,7 +336,7 @@
             import { Bar } from 'vue-chartjs';
             import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
             import { useSnackbar } from '@/composables/useSnackbar';
-            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch } from '@/api/attendance';
+            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch, updateMemberBalance } from '@/api/attendance';
             import { Download, Search, Refresh, Tools, Calendar, View } from '@element-plus/icons-vue';
 
             ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
@@ -699,19 +699,34 @@
     };
 
     // 연차 저장
-    const handleBalanceSave = () => {
+    const handleBalanceSave = async () => {
       if (editingBalance.value) {
-        const index = balanceData.value.findIndex(item => item.memberId === editingBalance.value.memberId);
-        if (index !== -1) {
-          // 잔여 재계산
-          editingBalance.value.remaining = editingBalance.value.totalGranted - editingBalance.value.totalUsed;
-          balanceData.value[index] = editingBalance.value;
+        try {
+          // 유효성 검증
+          if (editingBalance.value.totalUsed > editingBalance.value.totalGranted) {
+            error('사용일수가 부여일수를 초과할 수 없습니다.');
+            return;
+          }
+
+          // 백엔드 API 호출
+          await updateMemberBalance(editingBalance.value.balanceId, {
+            totalGranted: editingBalance.value.totalGranted,
+            totalUsed: editingBalance.value.totalUsed
+          });
+
+          // 로컬 상태 업데이트
+          const index = balanceData.value.findIndex(item => item.memberId === editingBalance.value.memberId);
+          if (index !== -1) {
+            editingBalance.value.remaining = editingBalance.value.totalGranted - editingBalance.value.totalUsed;
+            balanceData.value[index] = editingBalance.value;
+          }
+
           success('연차 정보가 성공적으로 수정되었습니다.');
-        } else {
-          error('연차 정보 수정에 실패했습니다.');
+          balanceEditDialogVisible.value = false;
+          editingBalance.value = null;
+        } catch (err) {
+          error(err.response?.data?.message || '연차 정보 수정에 실패했습니다.');
         }
-        balanceEditDialogVisible.value = false;
-        editingBalance.value = null;
       }
     };
 
