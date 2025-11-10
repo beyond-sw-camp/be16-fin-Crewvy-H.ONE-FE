@@ -75,6 +75,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 :disabled-date="getDisabledDate"
+                :cell-class-name="getCellClassName"
               />
               <span class="form-description">
                 * 선택한 기간의 각 날짜마다 1일 연장시간이 적용됩니다.
@@ -141,6 +142,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 :disabled-date="getDisabledDate"
+                :cell-class-name="getCellClassName"
               />
               <span v-if="deadlineHelpText" class="form-description">
                 {{ deadlineHelpText }}
@@ -166,6 +168,7 @@
                 format="YYYY-MM-DD HH:mm"
                 value-format="YYYY-MM-DDTHH:mm:ss"
                 :disabled-date="getDisabledDate"
+                :cell-class-name="getCellClassName"
               />
               <span v-if="deadlineHelpText" class="form-description">
                 {{ deadlineHelpText }}
@@ -237,7 +240,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances } from '@/api/attendance';
+import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances, getHolidays } from '@/api/attendance';
 import { Refresh } from '@element-plus/icons-vue';
 
 export default {
@@ -270,6 +273,9 @@ export default {
     const myRequests = ref([]);
     const pagination = ref({ page: 1, size: 10, total: 0 });
     const tableLoading = ref(false);
+
+    // --- 공휴일 데이터 ---
+    const holidays = ref([]);
 
     const leavePolicies = computed(() =>
       allPolicies.value.filter(p =>
@@ -373,17 +379,59 @@ export default {
       return unitMap[minUnit] || minUnit;
     };
 
-    // 날짜 선택 제한 함수 (requestDeadlineDays 및 사후 신청 규칙 적용)
+    // 주말 여부 확인
+    const isWeekend = (date) => {
+      const day = date.getDay();
+      return day === 0 || day === 6; // 0: 일요일, 6: 토요일
+    };
+
+    // 공휴일 체크 함수
+    const isHoliday = (date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      return holidays.value.some(h => h.date === dateStr);
+    };
+
+    // 캘린더 셀 클래스 설정 (주말: 빨간 숫자, 공휴일: 빨간 원)
+    const getCellClassName = (date) => {
+      const targetDate = new Date(date);
+      if (isWeekend(targetDate)) {
+        return 'weekend-cell'; // 주말 (숫자만 빨간색)
+      }
+      if (isHoliday(targetDate)) {
+        return 'holiday-cell'; // 공휴일 (선택 시 빨간 원)
+      }
+      return '';
+    };
+
+    // 날짜 선택 제한 함수 (requestDeadlineDays 및 사후 신청 규칙 적용 + 공휴일/주말 제한)
     const getDisabledDate = (date) => {
       if (!selectedPolicy.value) return false;
 
       const leaveRule = selectedPolicy.value.ruleDetails?.leaveRule;
-      if (!leaveRule) return false;
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
+
+      // 0. 연장근무/휴일근무/야간근무가 아닌 경우: 주말/공휴일 선택 불가
+      const isExtraWorkPolicy = requestType.value === 'extraWork' ||
+                                selectedPolicy.value.typeCode === 'PTC103' ||  // 연장근무
+                                selectedPolicy.value.typeCode === 'PTC104' ||  // 야간근무
+                                selectedPolicy.value.typeCode === 'PTC105';    // 휴일근무
+
+      if (!isExtraWorkPolicy) {
+        // 반차/시차: 해당 날짜가 주말/공휴일이면 선택 불가
+        if (form.value.requestUnit === 'HALF_DAY_AM' ||
+            form.value.requestUnit === 'HALF_DAY_PM' ||
+            form.value.requestUnit === 'TIME_OFF') {
+          if (isWeekend(targetDate) || isHoliday(targetDate)) {
+            return true; // 선택 불가
+          }
+        }
+        // 종일 휴가: 주말/공휴일도 선택 가능하지만 일수 계산에서는 제외됨
+      }
+
+      if (!leaveRule) return false;
 
       // 1. requestDeadlineDays: 휴가 시작일로부터 N일 전까지 신청 가능
       const requestDeadlineDays = leaveRule.requestDeadlineDays || 0;
@@ -566,20 +614,14 @@ export default {
       return null;
     });
 
-    // 주말 여부 확인
-    const isWeekend = (date) => {
-      const day = date.getDay();
-      return day === 0 || day === 6; // 0: 일요일, 6: 토요일
-    };
-
-    // 주말 제외한 실제 근무일 계산
+    // 주말/공휴일 제외한 실제 근무일 계산
     const calculateWorkingDays = (startDate, endDate) => {
       let workingDays = 0;
       const current = new Date(startDate);
       const end = new Date(endDate);
 
       while (current <= end) {
-        if (!isWeekend(current)) {
+        if (!isWeekend(current) && !isHoliday(current)) {
           workingDays++;
         }
         current.setDate(current.getDate() + 1);
@@ -744,9 +786,29 @@ export default {
       }
     };
 
+    // 공휴일 조회 (1년치)
+    const fetchHolidays = async () => {
+      try {
+        const today = new Date();
+        const startDate = new Date(today.getFullYear(), 0, 1); // 올해 1월 1일
+        const endDate = new Date(today.getFullYear(), 11, 31); // 올해 12월 31일
+
+        const params = {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        };
+
+        holidays.value = await getHolidays(params);
+      } catch (err) {
+        console.error('공휴일 조회 실패:', err);
+        // 공휴일 조회 실패해도 계속 진행
+      }
+    };
+
     onMounted(() => {
       fetchInitialData();
       fetchMyRequests();
+      fetchHolidays();
 
       // query parameter로 정책 타입이 전달된 경우 자동 선택
       const policyTypeCode = route.query.policyType;
@@ -953,6 +1015,7 @@ export default {
       balanceShortageWarning,
       childcarePolicies,
       getDisabledDate,
+      getCellClassName,
       deadlineHelpText,
     };
   },
@@ -1007,5 +1070,22 @@ export default {
 .form-help {
   color: #409EFF;
   font-style: italic;
+}
+
+/* 캘린더 주말 스타일 (숫자만 빨간색) */
+:deep(.weekend-cell) {
+  color: #f56c6c;
+}
+
+/* 캘린더 공휴일 스타일 (선택 시 파란색 원 → 빨간색 원) */
+:deep(.holiday-cell) {
+  color: #f56c6c;
+}
+
+:deep(.holiday-cell.in-range),
+:deep(.holiday-cell.start-date),
+:deep(.holiday-cell.end-date) {
+  background-color: #f56c6c !important;
+  color: #fff !important;
 }
 </style>
