@@ -355,6 +355,8 @@ export default {
 
 .content-section {
   margin-bottom: 30px;
+  border-radius: var(--surface-radius);
+  border: none;
 }
 
 .card-header {
@@ -428,6 +430,8 @@ export default {
 /* 급여 계산기 스타일 */
 .calculator-section {
   padding: 20px 0;
+  border-radius: var(--surface-radius);
+  border: none;
 }
 
 .input-section h3,
@@ -470,7 +474,7 @@ export default {
   background: #e3f2fd;
   margin-top: 8px;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 700;
   font-size: 16px;
   color: #1976d2;

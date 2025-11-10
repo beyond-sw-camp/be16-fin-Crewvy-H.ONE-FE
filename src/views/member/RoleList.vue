@@ -3,7 +3,15 @@
     <div class="page-header">
       <h1>역할 목록</h1>
       <div>
-        <el-switch v-if="canDeleteRole" v-model="showDeleted" inline-prompt active-text="삭제 포함" inactive-text="삭제 제외" style="margin-right: 16px;"/>
+        <el-switch
+          v-if="canDeleteRole"
+          v-model="showDeleted"
+          inline-prompt
+          active-text="삭제 포함"
+          inactive-text="삭제 제외"
+          class="toolbar-switch"
+          style="margin-right: 16px;"
+        />
         <el-button type="primary" @click="goToCreateRole" v-if="canCreateRole">
           <el-icon>
             <Plus />
@@ -234,6 +242,38 @@ onMounted(() => {
   font-weight: 600;
   color: #2c3e50;
   margin-bottom: 8px;
+}
+
+.page-header :deep(.toolbar-switch) {
+  --el-switch-width: 100px;
+  --el-switch-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+}
+
+.page-header :deep(.toolbar-switch .el-switch__core) {
+  width: var(--el-switch-width);
+  height: var(--el-switch-height);
+  border-radius: 16px;
+  padding: 2px;
+  position: relative;
+}
+
+.page-header :deep(.toolbar-switch .el-switch__action) {
+  width: calc(var(--el-switch-height) - 4px);
+  height: calc(var(--el-switch-height) - 4px);
+  transform: translateX(0) !important;
+  left: 2px;
+}
+
+.page-header :deep(.toolbar-switch.el-switch.is-checked .el-switch__action) {
+  left: calc(var(--el-switch-width) - var(--el-switch-height) + 2px);
+}
+
+.page-header :deep(.toolbar-switch .el-switch__label) {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .header-content p {

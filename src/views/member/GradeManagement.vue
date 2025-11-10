@@ -9,7 +9,15 @@
         <div class="card-header">
           <span>직급 목록</span>
           <div>
-            <el-switch v-if="canDeleteGrade" v-model="showDeleted" inline-prompt active-text="삭제 포함" inactive-text="삭제 제외" style="margin-right: 16px;"/>
+            <el-switch
+              v-if="canDeleteGrade"
+              v-model="showDeleted"
+              inline-prompt
+              active-text="삭제 포함"
+              inactive-text="삭제 제외"
+              class="toolbar-switch"
+              style="margin-right: 16px;"
+            />
             <el-button type="primary" @click="openAddModal" v-if="canCreateGrade">
               <el-icon style="margin-right: 8px">
                 <Plus />
@@ -283,6 +291,38 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-header :deep(.toolbar-switch) {
+  --el-switch-width: 100px;
+  --el-switch-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+}
+
+.card-header :deep(.toolbar-switch .el-switch__core) {
+  width: var(--el-switch-width);
+  height: var(--el-switch-height);
+  border-radius: 16px;
+  padding: 2px;
+  position: relative;
+}
+
+.card-header :deep(.toolbar-switch .el-switch__action) {
+  width: calc(var(--el-switch-height) - 4px);
+  height: calc(var(--el-switch-height) - 4px);
+  transform: translateX(0) !important;
+  left: 2px;
+}
+
+.card-header :deep(.toolbar-switch.el-switch.is-checked .el-switch__action) {
+  left: calc(var(--el-switch-width) - var(--el-switch-height) + 2px);
+}
+
+.card-header :deep(.toolbar-switch .el-switch__label) {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .card-header span {

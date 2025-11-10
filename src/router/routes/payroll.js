@@ -1,4 +1,3 @@
-import Payroll from '../../views/payroll/Payroll.vue'
 import PayrollContractInfo from '../../views/payroll/PayrollContractInfo.vue'
 import PayrollCalculation from '../../views/payroll/PayrollCalculation.vue'
 import PayrollActualCalculation from '../../views/payroll/PayrollActualCalculation.vue'
@@ -12,11 +11,6 @@ import PayrollElderlyIncentive from '../../views/payroll/PayrollElderlyIncentive
 import PayrollSettings from '../../views/payroll/PayrollSettings.vue'
 
 const routes = [
-  {
-    path: '/payroll',
-    name: 'Payroll',
-    component: Payroll
-  },
   {
     path: '/payroll/settings',
     name: 'PayrollSettings',

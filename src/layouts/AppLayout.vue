@@ -1027,12 +1027,12 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
       getPageTitle() {
         const titles = {
           '/': '대시보드',
-          '/organization': '직원 찾기',
+          '/organization': '조직 관리',
           '/employee': '직원 관리',
-          '/employee/titles': '직책 관리',
-          '/employee/grades': '직급 관리',
-          '/employee/roles': '역할 목록',
-          '/employee/roles/create': '역할 생성',
+          '/employee/title': '직책 관리',
+          '/employee/grade': '직급 관리',
+          '/employee/role': '역할 목록',
+          '/employee/role/create': '역할 생성',
           '/attendance': '내 근태 현황',
           '/leave-request': '휴가/출장 신청',
           '/shared-calendar': '공유 캘린더',
@@ -1060,7 +1060,11 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
           '/approval': '전자결재',
           '/resource': '예약',
           '/resource/reservation': '예약하기',
-          '/resource/management': '자원 관리'
+          '/resource/management': '자원 관리',
+          '/performance/team-goal/create' : '팀 목표 추가',
+          '/admin/policy-management' : '근태 정책 관리',
+          '/admin/policy-assignment' : '정책 할당',
+          '/admin/work-location-management' : '근무지 관리'
         }
         return titles[this.$route.path] || 'H.ONE'
       },

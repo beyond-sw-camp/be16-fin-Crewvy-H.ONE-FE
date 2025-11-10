@@ -194,13 +194,13 @@ export default {
   padding: var(--surface-padding) !important;
 }
 
-.el-dialog {
+.el-dialog.org-employee-modal {
   width: 800px !important;
   max-width: 800px !important;
   min-height: 500px !important;
 }
 
-.el-dialog__body {
+.el-dialog.org-employee-modal .el-dialog__body {
   min-height: calc(500px - 120px);
   overflow-y: auto;
 }
