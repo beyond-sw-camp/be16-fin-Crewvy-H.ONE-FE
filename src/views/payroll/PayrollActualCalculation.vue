@@ -11,14 +11,10 @@
     <!-- 검색 및 필터 영역 -->
     <div class="content-section">
       <el-card class="filter-card">
-        <div class="button-row">
-            <el-button @click="searchPayroll" class="action-btn">조회</el-button>
-            <el-button @click="savePayroll" class="action-btn">저장</el-button>
-            <el-button @click="printPayroll" class="primary-btn">인쇄</el-button>
-        </div>
-        <!-- 모든 필드와 계산하기 버튼을 한 행에 -->
-        <el-row class="search-row">
-          <el-col :span="3">
+        <div class="filter-toolbar">
+          <!-- 모든 필드와 계산하기 버튼을 한 행에 -->
+          <el-row class="search-row">
+          <el-col :span="4">
             <div class="search-item">
               <label>급여년월</label>
               <el-date-picker
@@ -28,7 +24,7 @@
                 format="YYYY.MM"
                 value-format="YYYY.MM"
                 size="small"
-                style="width: 100%"
+                style="width: 150px"
                 @change="onPayrollMonthChange"
               />
             </div>
@@ -43,7 +39,7 @@
                 format="YYYY.MM.DD"
                 value-format="YYYY.MM.DD"
                 size="small"
-            style="width: 100%"
+                style="width: 150px"
             readonly
               />
             </div>
@@ -94,16 +90,13 @@
               <el-button @click="calculatePayroll" class="calculate-btn">계산하기</el-button>
             </div>
           </el-col> -->
-        </el-row>
-        
-        <!-- 하단 버튼들 -->
-        <!-- <div class="button-section">
+          </el-row>
           <div class="button-row">
-            <el-button @click="adjustBonus" class="action-btn">상여조정</el-button>
-            <el-button @click="copyPayroll" class="action-btn">급여복사</el-button>
-            <el-button @click="annualLeavePayment" class="action-btn">연차지급</el-button>
+            <el-button @click="searchPayroll" class="action-btn">조회</el-button>
+            <el-button @click="savePayroll" class="action-btn">저장</el-button>
+            <el-button @click="printPayroll" class="primary-btn">인쇄</el-button>
           </div>
-        </div> -->
+        </div>
       </el-card>
     </div>
 
@@ -767,20 +760,21 @@ export default {
   margin-bottom: 16px;
 }
 
-.search-row {
-  margin-bottom: 20px;
+.filter-toolbar {
+  display: flex;
+  justify-content: space-between;
   align-items: flex-end;
-  width: 100% !important;
-  display: flex !important;
-  box-sizing: border-box;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-/* 검색 행 스타일 */
-.search-row :deep(.el-row) {
-  width: 100% !important;
+.search-row {
+  flex: 1 1 0;
+  align-items: flex-end;
+  display: flex !important;
+  box-sizing: border-box;
   margin: 0 !important;
+  gap: 0;
 }
 
 .search-row .el-col {
@@ -801,6 +795,7 @@ export default {
 .search-row .el-date-editor,
 .search-row .el-select {
   height: 32px !important;
+  width: 100%;
 }
 
 .search-row .el-input__inner,
@@ -880,8 +875,9 @@ export default {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .button-row:last-child {
@@ -896,7 +892,7 @@ export default {
   font-weight: 400 !important;
   padding: 8px 16px !important;
   min-width: 80px !important;
-  border-radius: var(--surface-radius) !important;
+  border-radius: 4px;
   transition: all 0.2s ease !important;
 }
 
@@ -914,7 +910,7 @@ export default {
   font-weight: 500 !important;
   padding: 8px 16px !important;
   min-width: 80px !important;
-  border-radius: var(--surface-radius) !important;
+  border-radius: 4px;
   transition: all 0.2s ease !important;
 }
 
