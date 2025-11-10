@@ -43,4 +43,4 @@ jobs:
       - name: deploy to s3
         run: aws s3 cp ./dist s3://hone.crewvy.cloud/ --recursive
       - name: invalidate cloudfront
-        run: aws cloudfront create-invalidation --distribution-id E3AG2P3192U54E --paths "/*"
+        run: aws cloudfront create-invalidation --distribution-id EY2RDOEKK555A --paths "/*"
