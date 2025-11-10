@@ -12,24 +12,10 @@
         <el-table :data="locations" v-loading="isLoading" border style="width: 100%" empty-text="등록된 근무지가 없습니다.">
           <el-table-column prop="name" label="장소명" width="200" />
           <el-table-column prop="address" label="주소" min-width="250" show-overflow-tooltip />
-          <el-table-column label="GPS 좌표" width="200">
-            <template #default="{ row }">
-              <span v-if="row.latitude && row.longitude">
-                {{ row.latitude.toFixed(6) }}, {{ row.longitude.toFixed(6) }}
-              </span>
-              <span v-else style="color: #909399;">미등록</span>
-            </template>
-          </el-table-column>
           <el-table-column label="GPS 반경" width="120" align="center">
             <template #default="{ row }">
               <span v-if="row.gpsRadius">{{ row.gpsRadius }}m</span>
               <span v-else style="color: #909399;">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="ipAddress" label="IP 주소" width="150" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span v-if="row.ipAddress">{{ row.ipAddress }}</span>
-              <span v-else style="color: #909399;">미등록</span>
             </template>
           </el-table-column>
           <el-table-column label="상태" width="100" align="center">
@@ -80,7 +66,7 @@
             <el-button @click="openAddressSearch" style="margin-left: 8px;">주소 검색</el-button>
           </div>
         </el-form-item>
-        <el-row :gutter="20">
+        <el-row :gutter="20" v-if="false">
           <el-col :span="12">
             <el-form-item label="위도 (Latitude)">
               <el-input-number
@@ -112,30 +98,6 @@
           <el-input-number v-model="locationForm.gpsRadius" :min="10" :max="10000" :step="10" controls-position="right" style="width: 200px;" />
           <span style="margin-left: 10px; color: #909399; font-size: 13px;">미터 (예: 100m)</span>
           <p class="form-help-text">해당 GPS 좌표를 중심으로 출퇴근을 인정할 거리를 미터 단위로 입력하세요.</p>
-        </el-form-item>
-        <el-form-item label="IP 주소">
-          <el-input
-            v-model="locationForm.ipAddress"
-            placeholder="예: 192.168.1.0/24 또는 192.168.1.100"
-            maxlength="100"
-          />
-          <p class="form-help-text">단일 IP 또는 CIDR 표기법 (예: 192.168.1.0/24)</p>
-        </el-form-item>
-        <el-form-item label="WiFi SSID">
-          <el-input
-            v-model="locationForm.wifiSsid"
-            placeholder="예: HONE-Dev-3F"
-            maxlength="100"
-          />
-          <p class="form-help-text">WiFi 네트워크 이름 (SSID). 모바일 기기 출퇴근 인증에 사용됩니다.</p>
-        </el-form-item>
-        <el-form-item label="WiFi BSSID (선택)">
-          <el-input
-            v-model="locationForm.wifiBssid"
-            placeholder="예: AA:BB:CC:DD:EE:FF"
-            maxlength="100"
-          />
-          <p class="form-help-text">WiFi MAC 주소 (BSSID). 더 정확한 인증이 필요한 경우 입력하세요.</p>
         </el-form-item>
         <el-form-item label="활성 상태" v-if="!isEditing">
           <el-switch v-model="locationForm.isActive" active-text="활성" inactive-text="비활성" />

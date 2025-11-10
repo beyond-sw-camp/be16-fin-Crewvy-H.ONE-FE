@@ -26,6 +26,9 @@
                   v-model="statementPeriod"
                   type="month"
                   placeholder="명세서 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="handleStatementPeriodChange"
                 />
               </el-form-item>
             </el-col>
@@ -147,6 +150,11 @@ export default {
       return employees.sort()
     }
   },
+  watch: {
+    selectedEmployee() {
+      this.loadStatementData()
+    }
+  },
   methods: {
     // 급여 명세서 데이터 로드
     async loadStatementData() {
@@ -221,6 +229,9 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    handleStatementPeriodChange() {
+      this.loadStatementData()
     },
     
     printStatement() {
@@ -403,6 +414,16 @@ export default {
   margin-bottom: 20px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -423,7 +444,7 @@ export default {
   margin-bottom: 20px;
   padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .statement-filters :deep(.el-form-item) {

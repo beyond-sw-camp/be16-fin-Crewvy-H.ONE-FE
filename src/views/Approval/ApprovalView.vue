@@ -85,7 +85,7 @@
 
             </div>
 
-            <div class="approval-list-header">
+            <div v-if="pendingApprovalsList.length > 0" class="approval-list-header">
               <div class="approval-col title">제목</div>
               <div class="approval-col position">직책</div>
               <div class="approval-col name">이름</div>
@@ -128,7 +128,7 @@
               <h3>내 결재 신청</h3>
             </div>
 
-            <div class="approval-list-header">
+            <div v-if="myRequests.length > 0" class="approval-list-header">
               <div class="approval-col title">제목</div>
               <div class="approval-col position">직책</div>
               <div class="approval-col name">이름</div>
@@ -147,7 +147,7 @@
                     <el-icon><View /></el-icon>
                     상세
                   </el-button>
-                </div>
+                </div>so
               </div>
               <div v-if="myRequests.length === 0" class="empty-state">
                 <p>결재 내역이 없습니다.</p>
@@ -169,25 +169,9 @@
           <div class="completed-approvals">
             <div class="section-header">
               <h3>완료된 결재</h3>
-              <div class="filter-options">
-                <el-date-picker
-                  v-model="dateRange"
-                  type="daterange"
-                  range-separator="~"
-                  start-placeholder="시작일"
-                  end-placeholder="종료일"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                />
-                <el-select v-model="selectedStatus" placeholder="상태 선택" style="width: 120px">
-                  <el-option label="전체" value="" />
-                  <el-option label="승인" value="approved" />
-                  <el-option label="반려" value="rejected" />
-                </el-select>
-              </div>
             </div>
 
-            <div class="approval-list-header">
+            <div v-if="completedList.length > 0" class="approval-list-header">
               <div class="approval-col title">제목</div>
               <div class="approval-col position">직책</div>
               <div class="approval-col name">이름</div>
@@ -228,7 +212,7 @@
             <div class="section-header">
               <h3>내 결재(완료)</h3>
             </div>
-            <div class="approval-list-header">
+            <div v-if="myApprovalsCompletedList.length > 0" class="approval-list-header">
               <div class="approval-col title">제목</div>
               <div class="approval-col position">직책</div>
               <div class="approval-col name">이름</div>
@@ -359,25 +343,8 @@ export default {
     const draftApprovals = ref(0);
     const myApprovalsCompleted = ref(0);
 
-    // Hardcoded data for demonstration (can be replaced with API calls)
-    const pendingApprovalsList = ref([
-        {
-          id: 1,
-          title: '월간 보고서',
-          type: '보고서',
-          requester: '김영희',
-          date: '2024-01-15',
-          priority: 'high',
-          amount: 0,
-          description: '1월 월간 성과 보고서입니다.',
-          steps: [
-            { name: '신청자', status: 'completed', statusText: '완료' },
-            { name: '팀장', status: 'current', statusText: '검토 중' },
-            { name: '부장', status: 'pending', statusText: '대기' },
-            { name: '임원', status: 'pending', statusText: '대기' }
-          ]
-        },
-    ]);
+    // Approval list data (will be filled by API calls)
+    const pendingApprovalsList = ref([]);
     const myRequests = ref([]); // This will be filled by the API call
     const temporarySaves = ref([]);
     const completedList = ref([]);

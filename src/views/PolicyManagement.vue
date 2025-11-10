@@ -19,8 +19,8 @@
               </template>
               <el-menu-item v-for="policy in group" :key="policy.policyId" :index="policy.policyId">
                 <el-icon><Document /></el-icon>
-                <span>{{ policy.name }}</span>
-                <el-tag v-if="policy.isActive" type="success" size="small" style="margin-left: 8px;">활성</el-tag>
+                <span class="policy-name">{{ policy.name }}</span>
+                <el-tag v-if="policy.isActive" type="success" size="small" class="policy-status-tag">활성</el-tag>
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -81,14 +81,29 @@ export default {
     const selectedPolicyId = ref(null);
 
     const policyTypeNames = {
-      leave: '연차 정책',
+      leave: '휴가 정책',
       work: '근무 정책',
       trip: '출장 정책',
+      overtime: '연장/야간/휴일 근무',
     };
 
     const groupedPolicies = computed(() => {
       return policies.value.reduce((acc, policy) => {
-        const type = policy.isBalanceDeductible ? 'leave' : 'work';
+        let type = 'work'; // 기본값
+
+        // typeCode 기준으로 분류
+        if (policy.typeCode) {
+          if (['PTC001', 'PTC002', 'PTC003', 'PTC004', 'PTC005', 'PTC006'].includes(policy.typeCode)) {
+            type = 'leave'; // 휴가 정책
+          } else if (policy.typeCode === 'PTC101') {
+            type = 'work'; // 기본 근무 정책
+          } else if (policy.typeCode === 'PTC102') {
+            type = 'trip'; // 출장 정책
+          } else if (['PTC103', 'PTC104', 'PTC105'].includes(policy.typeCode)) {
+            type = 'overtime'; // 연장/야간/휴일 근무
+          }
+        }
+
         (acc[type] = acc[type] || []).push(policy);
         return acc;
       }, {});
@@ -238,6 +253,22 @@ export default {
 
 .policy-menu .el-menu-item {
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.policy-menu .el-menu-item .policy-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.policy-menu .el-menu-item .policy-status-tag {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .policy-menu .el-menu-item.is-active {

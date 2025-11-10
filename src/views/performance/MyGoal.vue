@@ -53,81 +53,277 @@
     </div>
 
     <!-- Goal List Section with Filter -->
-    <el-card class="goals-container-card" shadow="never">
-      <!-- Filter Section -->
-      <div class="filter-section">
-        <el-tabs v-model="activeStatus" @tab-change="handleStatusChange" class="status-tabs">
-          <el-tab-pane label="승인" name="approved"></el-tab-pane>
-          <el-tab-pane label="요청" name="requested"></el-tab-pane>
-          <el-tab-pane label="반려" name="rejected"></el-tab-pane>
-          <el-tab-pane label="평가완료" name="complete"></el-tab-pane>
-        </el-tabs>
-      </div>
+    <div class="goals-tabs">
+      <el-tabs v-model="activeStatus" @tab-change="handleStatusChange" class="status-tabs">
+        <el-tab-pane label="승인" name="approved">
+          <div class="tab-pane-content" v-if="activeStatus === 'approved'">
+            <div class="goal-list">
+              <el-card 
+                v-for="goal in filteredGoals" 
+                :key="goal.goalId" 
+                class="goal-card" 
+                shadow="hover"
+                @click="goToDetail(goal.goalId)"
+              >
+                <div class="goal-card-header">
+                  <div class="goal-header-left">
+                    <el-icon class="goal-icon"><Flag /></el-icon>
+                    <h3 class="goal-title">{{ goal.title }}</h3>
+                  </div>
+                  <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">
+                    {{ getStatusLabel(goal.status) }}
+                  </el-tag>
+                </div>
+                
+                <div class="team-goal-info">
+                  <el-icon><Link /></el-icon>
+                  <span>팀 목표: {{ goal.teamGoalTitle }}</span>
+                </div>
 
-      <div class="goal-list">
-        <el-card 
-          v-for="goal in filteredGoals" 
-          :key="goal.goalId" 
-          class="goal-card" 
-          shadow="hover"
-          @click="goToDetail(goal.goalId)"
-        >
-          <div class="goal-card-header">
-            <div class="goal-header-left">
-              <el-icon class="goal-icon"><Flag /></el-icon>
-              <h3 class="goal-title">{{ goal.title }}</h3>
+                <p class="goal-description">{{ goal.contents }}</p>
+
+                <div class="goal-footer">
+                  <div class="goal-period">
+                    <el-icon><Calendar /></el-icon>
+                    <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
+                  </div>
+                  <div v-if="goal.grade" class="goal-grade">
+                    <el-icon><Medal /></el-icon>
+                    <span>{{ goal.grade }}</span>
+                  </div>
+                </div>
+
+                <template v-if="goal.status === 'REJECTED'">
+                  <el-divider></el-divider>
+                  <div class="card-actions">
+                    <el-button type="danger" plain size="small" @click.stop="viewRejectionReason(goal)">
+                      <el-icon><Warning /></el-icon>
+                      <span>반려 사유 보기</span>
+                    </el-button>
+                  </div>
+                </template>
+              </el-card>
+
+              <div v-if="filteredGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><FolderOpened /></el-icon>
+                <p class="empty-text">목표가 없습니다.</p>
+              </div>
             </div>
-            <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">
-              {{ getStatusLabel(goal.status) }}
-            </el-tag>
-          </div>
-          
-          <div class="team-goal-info">
-            <el-icon><Link /></el-icon>
-            <span>팀 목표: {{ goal.teamGoalTitle }}</span>
-          </div>
 
-          <p class="goal-description">{{ goal.contents }}</p>
-
-        <div class="goal-footer">
-          <div class="goal-period">
-            <el-icon><Calendar /></el-icon>
-            <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
+            <div v-if="totalMyGoalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next, jumper"
+                :total="totalMyGoalPages * 10"
+                v-model:current-page="currentMyGoalPage"
+                @current-change="handleMyGoalPageChange"
+              />
+            </div>
           </div>
-          <div v-if="goal.grade" class="goal-grade">
-            <el-icon><Medal /></el-icon>
-            <span>{{ goal.grade }}</span>
+        </el-tab-pane>
+
+        <el-tab-pane label="요청" name="requested">
+          <div class="tab-pane-content" v-if="activeStatus === 'requested'">
+            <div class="goal-list">
+              <el-card 
+                v-for="goal in filteredGoals" 
+                :key="goal.goalId" 
+                class="goal-card" 
+                shadow="hover"
+                @click="goToDetail(goal.goalId)"
+              >
+                <div class="goal-card-header">
+                  <div class="goal-header-left">
+                    <el-icon class="goal-icon"><Flag /></el-icon>
+                    <h3 class="goal-title">{{ goal.title }}</h3>
+                  </div>
+                  <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">
+                    {{ getStatusLabel(goal.status) }}
+                  </el-tag>
+                </div>
+                
+                <div class="team-goal-info">
+                  <el-icon><Link /></el-icon>
+                  <span>팀 목표: {{ goal.teamGoalTitle }}</span>
+                </div>
+
+                <p class="goal-description">{{ goal.contents }}</p>
+
+                <div class="goal-footer">
+                  <div class="goal-period">
+                    <el-icon><Calendar /></el-icon>
+                    <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
+                  </div>
+                  <div v-if="goal.grade" class="goal-grade">
+                    <el-icon><Medal /></el-icon>
+                    <span>{{ goal.grade }}</span>
+                  </div>
+                </div>
+
+                <template v-if="goal.status === 'REJECTED'">
+                  <el-divider></el-divider>
+                  <div class="card-actions">
+                    <el-button type="danger" plain size="small" @click.stop="viewRejectionReason(goal)">
+                      <el-icon><Warning /></el-icon>
+                      <span>반려 사유 보기</span>
+                    </el-button>
+                  </div>
+                </template>
+              </el-card>
+
+              <div v-if="filteredGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><FolderOpened /></el-icon>
+                <p class="empty-text">목표가 없습니다.</p>
+              </div>
+            </div>
+
+            <div v-if="totalMyGoalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next, jumper"
+                :total="totalMyGoalPages * 10"
+                v-model:current-page="currentMyGoalPage"
+                @current-change="handleMyGoalPageChange"
+              />
+            </div>
           </div>
-        </div>
+        </el-tab-pane>
 
-        <template v-if="goal.status === 'REJECTED'">
-          <el-divider></el-divider>
-          <div class="card-actions">
-            <el-button type="danger" plain size="small" @click.stop="viewRejectionReason(goal)">
-              <el-icon><Warning /></el-icon>
-              <span>반려 사유 보기</span>
-            </el-button>
+        <el-tab-pane label="반려" name="rejected">
+          <div class="tab-pane-content" v-if="activeStatus === 'rejected'">
+            <div class="goal-list">
+              <el-card 
+                v-for="goal in filteredGoals" 
+                :key="goal.goalId" 
+                class="goal-card" 
+                shadow="hover"
+                @click="goToDetail(goal.goalId)"
+              >
+                <div class="goal-card-header">
+                  <div class="goal-header-left">
+                    <el-icon class="goal-icon"><Flag /></el-icon>
+                    <h3 class="goal-title">{{ goal.title }}</h3>
+                  </div>
+                  <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">
+                    {{ getStatusLabel(goal.status) }}
+                  </el-tag>
+                </div>
+                
+                <div class="team-goal-info">
+                  <el-icon><Link /></el-icon>
+                  <span>팀 목표: {{ goal.teamGoalTitle }}</span>
+                </div>
+
+                <p class="goal-description">{{ goal.contents }}</p>
+
+                <div class="goal-footer">
+                  <div class="goal-period">
+                    <el-icon><Calendar /></el-icon>
+                    <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
+                  </div>
+                  <div v-if="goal.grade" class="goal-grade">
+                    <el-icon><Medal /></el-icon>
+                    <span>{{ goal.grade }}</span>
+                  </div>
+                </div>
+
+                <template v-if="goal.status === 'REJECTED'">
+                  <el-divider></el-divider>
+                  <div class="card-actions">
+                    <el-button type="danger" plain size="small" @click.stop="viewRejectionReason(goal)">
+                      <el-icon><Warning /></el-icon>
+                      <span>반려 사유 보기</span>
+                    </el-button>
+                  </div>
+                </template>
+              </el-card>
+
+              <div v-if="filteredGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><FolderOpened /></el-icon>
+                <p class="empty-text">목표가 없습니다.</p>
+              </div>
+            </div>
+
+            <div v-if="totalMyGoalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next, jumper"
+                :total="totalMyGoalPages * 10"
+                v-model:current-page="currentMyGoalPage"
+                @current-change="handleMyGoalPageChange"
+              />
+            </div>
           </div>
-        </template>
-        </el-card>
+        </el-tab-pane>
 
-        <div v-if="filteredGoals.length === 0" class="empty-state">
-          <el-icon class="empty-icon"><FolderOpened /></el-icon>
-          <p class="empty-text">목표가 없습니다.</p>
-        </div>
-      </div>
+        <el-tab-pane label="평가완료" name="complete">
+          <div class="tab-pane-content" v-if="activeStatus === 'complete'">
+            <div class="goal-list">
+              <el-card 
+                v-for="goal in filteredGoals" 
+                :key="goal.goalId" 
+                class="goal-card" 
+                shadow="hover"
+                @click="goToDetail(goal.goalId)"
+              >
+                <div class="goal-card-header">
+                  <div class="goal-header-left">
+                    <el-icon class="goal-icon"><Flag /></el-icon>
+                    <h3 class="goal-title">{{ goal.title }}</h3>
+                  </div>
+                  <el-tag :type="getStatusType(goal.status)" effect="dark" class="status-tag">
+                    {{ getStatusLabel(goal.status) }}
+                  </el-tag>
+                </div>
+                
+                <div class="team-goal-info">
+                  <el-icon><Link /></el-icon>
+                  <span>팀 목표: {{ goal.teamGoalTitle }}</span>
+                </div>
 
-      <!-- Pagination Section -->
-      <div v-if="totalMyGoalPages > 1" class="pagination-container">
-        <el-pagination
-          background
-          layout="prev, pager, next, jumper"
-          :total="totalMyGoalPages * 10"
-          v-model:current-page="currentMyGoalPage"
-          @current-change="handleMyGoalPageChange"
-        />
-      </div>
-    </el-card>
+                <p class="goal-description">{{ goal.contents }}</p>
+
+                <div class="goal-footer">
+                  <div class="goal-period">
+                    <el-icon><Calendar /></el-icon>
+                    <span>{{ goal.startDate }} ~ {{ goal.endDate }}</span>
+                  </div>
+                  <div v-if="goal.grade" class="goal-grade">
+                    <el-icon><Medal /></el-icon>
+                    <span>{{ goal.grade }}</span>
+                  </div>
+                </div>
+
+                <template v-if="goal.status === 'REJECTED'">
+                  <el-divider></el-divider>
+                  <div class="card-actions">
+                    <el-button type="danger" plain size="small" @click.stop="viewRejectionReason(goal)">
+                      <el-icon><Warning /></el-icon>
+                      <span>반려 사유 보기</span>
+                    </el-button>
+                  </div>
+                </template>
+              </el-card>
+
+              <div v-if="filteredGoals.length === 0" class="empty-state">
+                <el-icon class="empty-icon"><FolderOpened /></el-icon>
+                <p class="empty-text">목표가 없습니다.</p>
+              </div>
+            </div>
+
+            <div v-if="totalMyGoalPages > 1" class="pagination-container">
+              <el-pagination
+                background
+                layout="prev, pager, next, jumper"
+                :total="totalMyGoalPages * 10"
+                v-model:current-page="currentMyGoalPage"
+                @current-change="handleMyGoalPageChange"
+              />
+            </div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
 
     <el-dialog v-model="newGoalDialogVisible" title="팀 목표 선택" width="600px" class="team-goal-dialog">
         <div class="dialog-description">
@@ -406,7 +602,7 @@
 <style scoped>
 /* Container */
 .my-goal-container {
-  padding: 32px;
+  padding: 20px;
   background: #f5f7fa;
   min-height: 100vh;
 }
@@ -442,21 +638,9 @@
   padding: 14px 28px;
   font-size: 15px;
   font-weight: 600;
-  border-radius: 12px;
+  border-radius: 4px;
   border: none;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
   transition: all 0.3s ease;
-}
-
-.add-goal-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
-.add-goal-button:active {
-  transform: translateY(0);
 }
 
 .add-goal-button .el-icon {
@@ -473,9 +657,11 @@
 }
 
 .stat-card {
-  border-radius: 12px;
+  border-radius: var(--surface-radius);
   border: none;
   transition: all 0.3s ease;
+  background: var(--surface-bg);
+  box-shadow: var(--surface-shadow);
 }
 
 .stat-content {
@@ -529,41 +715,36 @@
   font-weight: 500;
 }
 
-/* Goals Container Card */
-.goals-container-card {
-  border-radius: 16px;
-  border: none;
-  margin-bottom: 24px;
+/* Goals Tabs */
+.goals-tabs {
   background: #ffffff;
-}
-
-.goals-container-card :deep(.el-card__body) {
-  padding: 24px;
-}
-
-/* Filter Section */
-.filter-section {
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
   margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f0f2f5;
 }
 
 .status-tabs {
-  flex: 1;
+  width: 100%;
 }
 
 .status-tabs :deep(.el-tabs__header) {
   margin: 0;
+  padding: 0 24px;
+  background: #ffffff;
 }
 
 .status-tabs :deep(.el-tabs__nav-wrap::after) {
-  height: 0;
+  height: 1px;
+  background-color: #e4e7ed;
 }
 
 .status-tabs :deep(.el-tabs__item) {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
-  color: #606266;
+  padding: 0 24px;
+  height: 56px;
+  line-height: 56px;
 }
 
 .status-tabs :deep(.el-tabs__item.is-active) {
@@ -573,6 +754,15 @@
 
 .status-tabs :deep(.el-tabs__active-bar) {
   background-color: #667eea;
+  height: 3px;
+}
+
+.status-tabs :deep(.el-tabs__content) {
+  padding: 0;
+}
+
+.tab-pane-content {
+  padding: 24px;
 }
 
 /* Goal List */
@@ -583,12 +773,13 @@
 }
 
 .goal-card {
-  border-radius: 10px;
+  border-radius: var(--surface-radius);
   border: 1px solid #e4e7ed;
   cursor: pointer;
   transition: all 0.3s ease;
   overflow: hidden;
-  background: #fafbfc;
+  background: var(--surface-bg);
+  box-shadow: var(--surface-shadow);
 }
 
 .goal-card :deep(.el-card__body) {
@@ -621,7 +812,7 @@
   color: #667eea;
   padding: 8px;
   background: rgba(102, 126, 234, 0.1);
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .goal-title {
@@ -818,7 +1009,7 @@
   cursor: pointer;
   border: 2px solid #e4e7ed;
   transition: all 0.3s ease;
-  border-radius: 12px;
+  border-radius: var(--surface-radius);
 }
 
 .dialog-team-goal-card:hover {
@@ -845,7 +1036,7 @@
   color: #667eea;
   padding: 10px;
   background: rgba(102, 126, 234, 0.1);
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .dialog-team-goal-title {

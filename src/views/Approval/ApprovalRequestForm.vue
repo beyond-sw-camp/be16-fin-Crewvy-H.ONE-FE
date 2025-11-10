@@ -229,6 +229,7 @@
     </div>
     <div class="form-actions">
         <el-button type="danger" v-if="draftApprovalId" @click="deleteDraft">삭제</el-button>
+        <el-button type="warning" v-if="requestId && !draftApprovalId" @click="cancelRequest">취소</el-button>
         <el-button @click="draftApproval">임시저장</el-button>
         <el-button type="primary" @click="submitApproval">결재요청</el-button>
       </div>
@@ -277,17 +278,26 @@ export default {
     const fetchMemberInfo = async () => {
       try {
         const memberPositionId = localStorage.getItem('memberPositionId');
-        if (!memberPositionId) return;
+        console.log('🔍 [ApprovalForm] localStorage memberPositionId:', memberPositionId);
+        if (!memberPositionId) {
+          console.warn('⚠️ [ApprovalForm] memberPositionId가 localStorage에 없습니다.');
+          return;
+        }
 
         const response = await apiClient.post('/member-service/member/position-list', {
           uuidList: [memberPositionId]
         });
 
+        console.log('📥 [ApprovalForm] member-service 응답:', response.data);
+
         if (response.data.data && response.data.data.length > 0) {
           memberInfo.value = response.data.data[0];
+          console.log('✅ [ApprovalForm] memberInfo 설정됨:', memberInfo.value);
+        } else {
+          console.warn('⚠️ [ApprovalForm] member-service 응답에 데이터가 없습니다.');
         }
       } catch (err) {
-        console.error('Failed to fetch member info:', err);
+        console.error('❌ [ApprovalForm] Failed to fetch member info:', err);
         error('회원 정보를 불러오는 데 실패했습니다.');
       }
     };
@@ -345,10 +355,10 @@ export default {
         const response = await apiClient.get(`/workforce-service/approval/get-document/${id}`, { params });
         const doc = response.data.data;
         formTitle.value = doc.documentName;
-        
+
         // request 데이터 추출
         const requestData = doc.request || null;
-        
+
         if (doc.metadata) {
           // metadata.metadata.schema 구조 확인
           const schema = doc.metadata.metadata?.schema || doc.metadata.schema;
@@ -437,8 +447,14 @@ export default {
           });
         }
 
-        if (draftData.lineList) {
-            currentApprovalLine.value = draftData.lineList;
+        if (draftData.lineList && draftData.lineList.length > 0) {
+          currentApprovalLine.value = draftData.lineList.map(line => ({
+            id: line.approverId,
+            name: line.approverName,
+            position: line.approverPosition,
+            department: line.approverOrganization,
+            memberPositionId: line.approverId // approverId를 memberPositionId로 사용
+          }));
         }
 
       } catch (err) {
@@ -450,14 +466,21 @@ export default {
     onMounted(async () => {
       await fetchMemberInfo();
 
+      console.log('🚀 [ApprovalForm] onMounted - memberInfo:', memberInfo.value);
+
       if (memberInfo.value) {
-        currentApprovalLine.value.push({
+        const approverData = {
           id: memberInfo.value.memberId,
           name: memberInfo.value.memberName,
           department: memberInfo.value.organizationName,
           position: memberInfo.value.titleName,
           memberPositionId: memberInfo.value.memberPositionId,
-        });
+        };
+        console.log('👤 [ApprovalForm] 결재선에 추가할 본인 정보:', approverData);
+        currentApprovalLine.value.push(approverData);
+        console.log('📋 [ApprovalForm] currentApprovalLine:', currentApprovalLine.value);
+      } else {
+        console.warn('⚠️ [ApprovalForm] memberInfo가 null입니다. 결재선에 본인을 추가할 수 없습니다.');
       }
 
       const approvalIdFromRoute = route.params.id;
@@ -530,6 +553,7 @@ export default {
         contents: formData.value,
         lineDtoList: lineDtoList,
       };
+
       console.log(approvalData);
 
       if (draftApprovalId.value) {
@@ -538,6 +562,7 @@ export default {
 
       if (requestId.value) {
         approvalData.requestId = requestId.value;
+        console.log('Including requestId:', requestId.value);
       }
 
       try {
@@ -556,8 +581,8 @@ export default {
 
     const draftApproval = async () => {
       const lineDtoList = currentApprovalLine.value.map((approver, index) => ({
-        memberId: approver.id,
-        lineIndex: index,
+        memberPositionId: approver.memberPositionId,
+        lineIndex: index + 1,
       }));
 
       const approvalData = {
@@ -598,9 +623,24 @@ export default {
           await apiClient.delete(`/workforce-service/approval/discard-approval/${draftApprovalId.value}`);
           success('문서가 삭제되었습니다.');
           router.push('/approval');
-        } catch (error) {
-          console.error('삭제 실패:', error);
+        } catch (err) {
+          console.error('삭제 실패:', err);
           error('삭제에 실패했습니다.');
+        }
+      }
+    };
+
+    const cancelRequest = async () => {
+      if (!requestId.value) return;
+
+      if (confirm('이 신청을 취소하시겠습니까? 작성한 내용이 모두 삭제됩니다.')) {
+        try {
+          await apiClient.delete(`/workforce-service/requests/${requestId.value}/cancel`);
+          success('신청이 취소되었습니다.');
+          router.push('/leave-request');
+        } catch (err) {
+          console.error('취소 실패:', err);
+          error('신청 취소에 실패했습니다.');
         }
       }
     };
@@ -823,6 +863,7 @@ export default {
     return {
       documentId,
       draftApprovalId,
+      requestId,
       formSchema,
       formData,
       formTitle,
@@ -830,6 +871,7 @@ export default {
       submitApproval,
       draftApproval,
       deleteDraft,
+      cancelRequest,
       showApprovalLineEditor,
       currentApprovalLine,
       updateApprovalLine,

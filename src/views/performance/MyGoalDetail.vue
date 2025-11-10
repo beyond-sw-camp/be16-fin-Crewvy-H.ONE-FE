@@ -6,7 +6,7 @@
         <div class="title-row">
           <h1 class="main-goal-title">{{ goalDetail.title }}</h1>
           <el-tag :type="getStatusType(goalDetail.status)" effect="dark" class="status-tag">
-            {{ goalDetail.status }}
+            {{ getStatusLabel(goalDetail.status) }}
           </el-tag>
         </div>
         <p class="goal-meta">
@@ -48,7 +48,7 @@
             <el-form-item label="목표 상세 내용">
                 <el-input v-model="goalDetail.contents" type="textarea" :rows="5" placeholder="목표 상세 내용을 입력하세요"></el-input>
             </el-form-item>
-            <el-form-item label="반려 사유" v-if="goalDetail.status === '반려'">
+            <el-form-item label="반려 사유" v-if="goalDetail.status === '반려' || goalDetail.status === 'REJECTED'">
                 <div class="rejection-reason">
                   <el-icon class="warning-icon"><Warning /></el-icon>
                   <p>{{ goalDetail.comment }}</p>
@@ -78,13 +78,31 @@
     </el-card>
 
     <!-- Evidence Card -->
-    <el-card class="card-section evidence-card" shadow="never" v-if="goalDetail.status !== '반려' && goalDetail.status !== '취소'">
+    <el-card class="card-section evidence-card" shadow="never" v-if="shouldShowEvidenceCard(goalDetail.status)">
         <template #header>
             <div class="card-header">
               <el-icon class="section-icon"><Folder /></el-icon>
               <span class="section-title">증적 자료</span>
             </div>
         </template>
+        
+        <!-- 기존 증적 목록 (제출된 증적이 있는 경우) -->
+        <div v-if="evidenceList && evidenceList.length > 0" class="evidence-list-section">
+          <h4 class="evidence-list-title">제출된 증적</h4>
+          <div class="evidence-list">
+            <div 
+              v-for="evidence in evidenceList" 
+              :key="evidence.evidenceId" 
+              class="evidence-item"
+              @click="handleEvidenceClick(evidence)"
+            >
+              <el-icon class="evidence-icon"><Document /></el-icon>
+              <span class="evidence-name">{{ getEvidenceFileName(evidence.evidenceUrl) }}</span>
+              <el-icon class="evidence-download-icon"><Link /></el-icon>
+            </div>
+          </div>
+        </div>
+        
         <el-upload
             ref="uploader"
             class="upload-demo"
@@ -107,7 +125,7 @@
     </el-card>
 
     <!-- Evaluation Result Section -->
-    <div class="evaluation-result-section" v-if="isFromReviewPage && goalDetail.status === '최종 평가 완료'">
+    <div class="evaluation-result-section" v-if="isFromReviewPage && isFinalEvaluated(goalDetail.status)">
       <div class="section-header">
         <el-icon class="section-icon"><Checked /></el-icon>
         <h2 class="section-title">평가 결과</h2>
@@ -153,11 +171,11 @@
     <!-- Actions Container -->
     <div class="actions-container">
         <el-button @click="goBack" class="cancel-button">취소</el-button>
-        <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!['요청', '승인', '평가 대기'].includes(goalDetail.status)" class="save-button">
+        <el-button v-if="!isFromReviewPage" type="primary" @click="saveChanges" :disabled="!canSave(goalDetail.status)" class="save-button">
           <el-icon><Select /></el-icon>
           <span>저장</span>
         </el-button>
-        <el-button v-if="isFromReviewPage" type="success" @click="selfEvaluateDialogVisible = true" :disabled="goalDetail.status !== '평가 대기'" class="evaluate-button">
+        <el-button v-if="isFromReviewPage" type="success" @click="selfEvaluateDialogVisible = true" :disabled="!canEvaluate(goalDetail.status)" class="evaluate-button">
           <el-icon><Edit /></el-icon>
           <span>본인 평가</span>
         </el-button>
@@ -237,6 +255,7 @@ export default {
       },
       fileList: [],
       filesToDelete: [],
+      evidenceList: [],
       scoringRubric: [
         { grade: 'A+', description: '' },
         { grade: 'A', description: '' },
@@ -271,6 +290,37 @@ export default {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    },
+    handleEvidenceClick(evidence) {
+      // 증적 클릭 시 새 탭에서 열기 또는 다운로드
+      if (evidence.evidenceUrl) {
+        window.open(evidence.evidenceUrl, '_blank');
+      }
+    },
+    getEvidenceFileName(url) {
+      // URL에서 파일명 추출
+      if (!url) return '알 수 없는 파일';
+      const urlParts = url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      
+      // 첫 번째 _ 뒤의 부분을 파일명으로 사용
+      const underscoreIndex = fileName.indexOf('_');
+      if (underscoreIndex !== -1 && underscoreIndex < fileName.length - 1) {
+        const actualFileName = fileName.substring(underscoreIndex + 1);
+        // URL 디코딩 (한글 파일명 처리)
+        try {
+          return decodeURIComponent(actualFileName);
+        } catch (e) {
+          return actualFileName;
+        }
+      }
+      
+      // _ 가 없으면 전체 파일명 사용
+      try {
+        return decodeURIComponent(fileName);
+      } catch (e) {
+        return fileName;
+      }
     },
     goBack() {
       // 평가 쪽에서 들어온 경우(from=review) 평가 목록으로, 그렇지 않으면 내 목표 관리로
@@ -353,6 +403,13 @@ export default {
         const response = await apiClient.get(`/workforce-service/performance/get-goal-detail/${goalId}`);
         this.goalDetail = response.data.data;
 
+        // 증적 목록 저장
+        if (response.data.data.evidenceList && Array.isArray(response.data.data.evidenceList)) {
+          this.evidenceList = response.data.data.evidenceList;
+        } else {
+          this.evidenceList = [];
+        }
+
         // Initialize selfEvaluation and managerEvaluation if they don't exist in the fetched data
         if (!this.goalDetail.selfEvaluation) {
           this.goalDetail.selfEvaluation = { grade: '', comment: '' };
@@ -362,7 +419,8 @@ export default {
         }
 
         // Fetch evaluation results if status is '최종 평가 완료' or '본인 평가 완료'
-        if (this.goalDetail.status === '최종 평가 완료' || this.goalDetail.status === '본인 평가 완료') {
+        const finalOrSelfEvaluated = ['최종 평가 완료', '본인 평가 완료', 'FINAL_EVALUATED', 'SELF_EVALUATED'];
+        if (finalOrSelfEvaluated.includes(this.goalDetail.status)) {
           try {
             const evaluationResponse = await apiClient.get(`/workforce-service/performance/find-evaluation/${goalId}`);
             if (evaluationResponse.data && evaluationResponse.data.data) {
@@ -396,6 +454,15 @@ export default {
       }
     },
     getStatusType(status) {
+      // 개인 목표 상태 (영어)
+      if (status === 'REQUESTED') return 'warning';     // 🟡 요청 - 주황색
+      if (status === 'APPROVED') return 'primary';      // 🔵 승인 - 파란색
+      if (status === 'REJECTED') return 'danger';       // 🔴 반려 - 빨간색
+      if (status === 'CANCELED') return 'info';         // ⚪ 취소 - 회색
+      if (status === 'PENDING_EVALUATION') return 'warning';       // 🟡 평가 대기 - 주황색
+      if (status === 'SELF_EVALUATED') return 'success';  // 🟢 본인 평가 완료 - 초록색
+      if (status === 'FINAL_EVALUATED') return 'success';  // 🟢 최종 평가 완료 - 초록색
+      
       // 개인 목표 상태 (한국어)
       if (status === '요청') return 'warning';            // 🟡 요청 - 주황색
       if (status === '승인') return 'primary';            // 🔵 승인 - 파란색
@@ -405,6 +472,40 @@ export default {
       if (status === '본인 평가 완료') return 'success';  // 🟢 본인 평가 완료 - 초록색
       if (status === '최종 평가 완료') return 'success';  // 🟢 최종 평가 완료 - 초록색 (본인 평가와 동일)
       return '';
+    },
+    getStatusLabel(status) {
+      // 영어 상태를 한국어로 변환
+      const labels = {
+        'REQUESTED': '요청',
+        'APPROVED': '승인',
+        'REJECTED': '반려',
+        'CANCELED': '취소',
+        'PENDING_EVALUATION': '평가 대기',
+        'SELF_EVALUATED': '본인 평가 완료',
+        'FINAL_EVALUATED': '최종 평가 완료'
+      };
+      // 한국어 상태는 그대로 반환, 영어 상태는 변환
+      return labels[status] || status;
+    },
+    shouldShowEvidenceCard(status) {
+      // 반려 또는 취소 상태가 아닌 경우에만 증적 카드 표시
+      const hiddenStatuses = ['반려', '취소', 'REJECTED', 'CANCELED'];
+      return !hiddenStatuses.includes(status);
+    },
+    canSave(status) {
+      // 저장 가능한 상태: 요청, 승인, 평가 대기
+      const saveableStatuses = ['요청', '승인', '평가 대기', 'REQUESTED', 'APPROVED', 'PENDING_EVALUATION'];
+      return saveableStatuses.includes(status);
+    },
+    canEvaluate(status) {
+      // 평가 가능한 상태: 평가 대기
+      const evaluableStatuses = ['평가 대기', 'PENDING_EVALUATION'];
+      return evaluableStatuses.includes(status);
+    },
+    isFinalEvaluated(status) {
+      // 최종 평가 완료 상태
+      const finalEvaluatedStatuses = ['최종 평가 완료', 'FINAL_EVALUATED'];
+      return finalEvaluatedStatuses.includes(status);
     },
     async handleSelfEvaluate() {
       if (!this.selfEvaluateForm.rating) {
@@ -607,6 +708,68 @@ export default {
 /* Evidence Card */
 .evidence-card {
   margin-bottom: 24px;
+}
+
+/* Evidence List Section */
+.evidence-list-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.evidence-list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0 0 16px 0;
+}
+
+.evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evidence-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.evidence-item:hover {
+  background-color: #ecf5ff;
+  border-color: #b3d8ff;
+  transform: translateX(4px);
+}
+
+.evidence-icon {
+  font-size: 20px;
+  color: #409eff;
+  flex-shrink: 0;
+}
+
+.evidence-name {
+  flex: 1;
+  font-size: 14px;
+  color: #606266;
+  word-break: break-all;
+}
+
+.evidence-download-icon {
+  font-size: 18px;
+  color: #909399;
+  flex-shrink: 0;
+  transition: color 0.3s ease;
+}
+
+.evidence-item:hover .evidence-download-icon {
+  color: #409eff;
 }
 
 .upload-demo {

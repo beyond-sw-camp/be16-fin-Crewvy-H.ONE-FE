@@ -474,8 +474,11 @@ export default {
 }
 
 .add-member-btn {
-  border-radius: 8px;
+  border-radius: 4px;
   font-weight: 500;
+  font-size: small;
+  width: 60px;
+  height: 25px;
 }
 
 /* Member Cards Scroll Area */
@@ -556,7 +559,7 @@ export default {
 }
 
 .remove-btn {
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .member-details {
@@ -599,24 +602,9 @@ export default {
   padding: 12px 32px;
   font-size: 15px;
   font-weight: 600;
-  border-radius: 10px;
-}
-
-.save-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
-  transition: all 0.3s ease;
-}
-
-.save-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 16px rgba(102, 126, 234, 0.5);
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
-.save-button:active {
-  transform: translateY(0);
+  border-radius: 4px;
+  width: 95px;
+  height: 30px;
 }
 
 /* Responsive Design */

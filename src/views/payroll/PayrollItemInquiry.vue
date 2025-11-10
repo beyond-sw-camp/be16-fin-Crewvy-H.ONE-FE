@@ -26,6 +26,9 @@
                   v-model="inquiryPeriod"
                   type="month"
                   placeholder="조회 기간 선택"
+                  format="YYYY-MM"
+                  value-format="YYYY-MM"
+                  @change="handleInquiryPeriodChange"
                 />
               </el-form-item>
             </el-col>
@@ -205,6 +208,11 @@ export default {
     },
     
   },
+  watch: {
+    inquiryPeriod() {
+      this.loadSummaryData()
+    }
+  },
   methods: {
     // 항목별 요약 데이터 로드
     async loadSummaryData() {
@@ -267,6 +275,9 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    handleInquiryPeriodChange() {
+      this.loadSummaryData()
     },
     
     // 행 클릭 핸들러
@@ -448,6 +459,16 @@ export default {
   margin-bottom: 20px;
 }
 
+.content-section :deep(.el-card) {
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
+  border: none;
+}
+
+.content-section :deep(.el-card__body) {
+  border-radius: var(--surface-radius);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -468,7 +489,7 @@ export default {
   margin-bottom: 20px;
   padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--surface-radius);
 }
 
 .inquiry-filters :deep(.el-form-item) {

@@ -75,9 +75,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="name" label="자원명" min-width="150" />
-        <el-table-column prop="reservationCategoryName" label="카테고리" width="120">
+        <el-table-column prop="reservationCategoryName" label="카테고리" width="140">
           <template #default="{ row }">
-            <el-tag :type="getCategoryTagTypeByName(row.reservationCategoryName)">
+            <el-tag :style="getCategoryTagStyle(row.reservationCategoryName)">
               {{ row.reservationCategoryName || '기타' }}
             </el-tag>
           </template>
@@ -314,11 +314,20 @@
 import { ElMessageBox } from 'element-plus'
 import { Plus, Search, Setting, DataAnalysis, Download } from '@element-plus/icons-vue'
 import { useSnackbar } from '@/composables/useSnackbar'
-import axios from 'axios'
-import { getAuthHeadersFromToken } from '@/utils/authUtils'
+import apiClient from '@/api'
+import { getUserHeaders } from '@/utils/authUtils'
 import Chart from 'chart.js/auto'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+
+const CATEGORY_COLOR_PALETTE = [
+  { background: '#f5f3ff', text: '#7c3aed' }, // 라벤더
+  { background: '#f1f5f9', text: '#64748b' }, // 슬레이트
+  { background: '#fff1f2', text: '#db2777' }, // 로즈
+  { background: '#fefce8', text: '#d97706' }, // 앰버
+  { background: '#e0e7ff', text: '#6366f1' }, // 인디고
+  { background: '#f0fdfa', text: '#14b8a6' }  // 민트/틸
+]
 
 export default {
   name: 'ResourceManagement',
@@ -427,7 +436,9 @@ export default {
         status: [
           { required: this.isEditMode, message: '상태를 선택해주세요', trigger: 'change' }
         ]
-      }
+      },
+      categoryColorCache: {},
+      categoryPaletteIndex: 0
     }
   },
   mounted() {
@@ -465,15 +476,10 @@ export default {
     async loadResourceList() {
       this.loading = true
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/list`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const { data } = await apiClient.get('/workforce-service/reservation/type/list', {
+          headers: userHeaders
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         // 응답을 화면 테이블 스키마로 매핑
@@ -503,6 +509,7 @@ export default {
           const nameB = b.name || ''
           return nameA.localeCompare(nameB, 'ko')
         })
+
       } catch (e) {
         this.error('자원 목록 조회 실패')
         // eslint-disable-next-line no-console
@@ -571,15 +578,11 @@ export default {
           }
         )
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
+        const userHeaders = getUserHeaders()
+
         // 실제 API 삭제 요청
-        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/delete/${resource.id}`, {
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        await apiClient.delete(`/workforce-service/reservation/type/delete/${resource.id}`, {
+          headers: userHeaders
         })
         
         // 삭제 후 목록을 다시 로드하여 최신 데이터 반영
@@ -603,12 +606,7 @@ export default {
         
         const selectedCategory = this.categories.find(cat => cat.value === this.resourceForm.category)
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        const requestHeaders = authHeaders ? {
-          'Authorization': authHeaders['Authorization'],
-          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-        } : {}
+        const requestHeaders = getUserHeaders()
         
         if (this.isEditMode) {
           // 수정
@@ -624,7 +622,7 @@ export default {
             reservationTypeStatus: this.resourceForm.status
           }
           
-          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData, {
+          await apiClient.put(`/workforce-service/reservation/type/update/${this.resourceForm.id}`, updateData, {
             headers: requestHeaders
           })
           
@@ -644,7 +642,7 @@ export default {
             description: this.resourceForm.description
           }
           
-          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/register`, createData, {
+          await apiClient.post('/workforce-service/reservation/type/register', createData, {
             headers: requestHeaders
           })
           
@@ -684,43 +682,96 @@ export default {
     },
     
     
-    // 카테고리 이름을 기반으로 태그 타입 반환
-    getCategoryTagTypeByName(categoryName) {
-      if (!categoryName) return 'info'
-      
-      const name = categoryName.toLowerCase()
-      
-      // 회의실 관련
-      if (name.includes('회의실') || name.includes('meeting') || 
-          name.includes('conference') || name.includes('room')) {
-        return 'primary'
+    // 카테고리 색상 관리
+    assignCategoryColors(categoryList = []) {
+      categoryList
+        .map(category => category?.name || category?.value || '')
+        .filter(name => !!name)
+        .forEach(name => {
+          this.ensureCategoryColor(name)
+        })
+    },
+    ensureCategoryColor(categoryName) {
+      if (!categoryName) return this.getDefaultCategoryColor()
+
+      const key = categoryName.trim().toLowerCase()
+      if (!key) return this.getDefaultCategoryColor()
+
+      if (!this.categoryColorCache[key]) {
+        if (this.categoryPaletteIndex < CATEGORY_COLOR_PALETTE.length) {
+          const paletteColor = CATEGORY_COLOR_PALETTE[this.categoryPaletteIndex]
+          this.categoryColorCache[key] = { ...paletteColor }
+          this.categoryPaletteIndex += 1
+        } else {
+          this.categoryColorCache[key] = this.generateRandomCategoryColor()
+        }
       }
-      // 차량 관련
-      else if (name.includes('차량') || name.includes('vehicle') || 
-               name.includes('car') || name.includes('법인차량') ||
-               name.includes('자동차')) {
-        return 'success'
+
+      return this.categoryColorCache[key]
+    },
+    generateRandomCategoryColor() {
+      const hue = Math.floor(Math.random() * 360)
+      const background = `hsl(${hue}, 85%, 92%)`
+      const text = `hsl(${hue}, 65%, 35%)`
+      return { background, text }
+    },
+    getDefaultCategoryColor() {
+      return { background: '#f4f4f5', text: '#52525b' }
+    },
+    getCategoryColor(categoryName) {
+      if (!categoryName) return this.getDefaultCategoryColor()
+      if (this.categories.length === 0) {
+        const normalized = categoryName.trim().toLowerCase()
+        if (this.categoryColorCache[normalized]) {
+          return this.categoryColorCache[normalized]
+        }
+        return this.getDefaultCategoryColor()
       }
-      // 장비 관련
-      else if (name.includes('장비') || name.includes('equipment') || 
-               name.includes('기자재') || name.includes('device') ||
-               name.includes('노트북') || name.includes('laptop')) {
-        return 'warning'
+      return this.ensureCategoryColor(categoryName)
+    },
+    getCategoryTagStyle(categoryName) {
+      const { background, text } = this.getCategoryColor(categoryName)
+      const borderColor = text.length === 7 ? `${text}33` : text
+      return {
+        backgroundColor: background,
+        color: text,
+        borderColor
       }
-      // 시설 관련
-      else if (name.includes('시설') || name.includes('facility') || 
-               name.includes('공간') || name.includes('space')) {
-        return 'info'
+    },
+    hexToRgba(hex, alpha = 1) {
+      if (!hex || typeof hex !== 'string') return hex
+      let sanitized = hex.replace('#', '')
+      if (sanitized.length === 3) {
+        sanitized = sanitized.split('').map(char => char + char).join('')
       }
-      // 기타
-      else if (name.includes('기타') || name.includes('other') || 
-               name.includes('etc')) {
-        return 'danger'
+      if (sanitized.length !== 6) return hex
+      const r = parseInt(sanitized.slice(0, 2), 16)
+      const g = parseInt(sanitized.slice(2, 4), 16)
+      const b = parseInt(sanitized.slice(4, 6), 16)
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    },
+    applyAlphaToColor(color, alpha = 1) {
+      if (!color) return color
+      if (color.startsWith('#')) {
+        return this.hexToRgba(color, alpha)
       }
-      // 기본값
-      else {
-        return 'info'
+      const rgbaMatch = color.match(/rgba?\(([^)]+)\)/)
+      if (rgbaMatch) {
+        const parts = rgbaMatch[1].split(',').map(part => part.trim())
+        if (parts.length >= 3) {
+          const [r, g, b] = parts
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`
+        }
       }
+      const hslMatch = color.match(/hsla?\(([^)]+)\)/)
+      if (hslMatch) {
+        const parts = hslMatch[1].split(',').map(part => part.trim())
+        if (parts.length >= 3) {
+          const [h, s, l] = parts
+          return `hsla(${h}, ${s}, ${l}, ${alpha})`
+        }
+      }
+      return color
     },
     
     // 상태 라벨 반환
@@ -795,22 +846,31 @@ export default {
     async loadCategories() {
       this.categorySaving = true
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/list`, {
-          params: { companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0' },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const { data } = await apiClient.get('/workforce-service/reservation/category/list', {
+          headers: userHeaders
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
+
+        // 카테고리 색상 초기화 후 재할당
+        this.categoryColorCache = {}
+        this.categoryPaletteIndex = 0
+
         this.categories = list.map(cat => ({
           id: cat.id || cat.categoryId || cat.uuid,
           name: cat.name,
           value: (cat.name || '').toLowerCase().replace(/\s+/g, '_')
         }))
+        this.assignCategoryColors(this.categories)
+
+        // 자원 목록에 이미 존재하는 카테고리 색상도 보장
+        this.resources.forEach(resource => {
+          const categoryName = resource.reservationCategoryName || resource.categoryName || ''
+          if (categoryName) {
+            this.getCategoryColor(categoryName)
+          }
+        })
         
       } catch (e) {
         this.error('카테고리 조회 실패')
@@ -823,14 +883,10 @@ export default {
 
     async loadStatusOptions() {
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const { data } = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/type/status-list`, {
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const { data } = await apiClient.get('/workforce-service/reservation/type/status-list', {
+          headers: userHeaders
         })
         const list = Array.isArray(data) ? data : (data?.data || [])
         
@@ -857,17 +913,12 @@ export default {
         
         this.categorySaving = true
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        const requestHeaders = authHeaders ? {
-          'Authorization': authHeaders['Authorization'],
-          'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-        } : {}
+        const requestHeaders = getUserHeaders()
         
         if (this.isCategoryEditMode) {
           // 수정: PUT /update/{id}
           const id = this.categories[this.editingCategoryIndex]?.id
-          await axios.put(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/update/${id}`, {
+          await apiClient.put(`/workforce-service/reservation/category/update/${id}`, {
             name: this.categoryForm.name
           }, {
             headers: requestHeaders
@@ -875,9 +926,8 @@ export default {
           this.success('카테고리가 수정되었습니다.')
         } else {
           // 추가: POST /register
-          await axios.post(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/register`, {
-            name: this.categoryForm.name,
-            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
+          await apiClient.post('/workforce-service/reservation/category/register', {
+            name: this.categoryForm.name
           }, {
             headers: requestHeaders
           })
@@ -923,14 +973,10 @@ export default {
           }
         )
         
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        await axios.delete(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/category/delete/${category.id}`, {
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        await apiClient.delete(`/workforce-service/reservation/category/delete/${category.id}`, {
+          headers: userHeaders
         })
         await this.loadCategories()
         this.success('카테고리가 삭제되었습니다.')
@@ -979,17 +1025,10 @@ export default {
     // 통계용 예약 데이터 로드
     async loadAllReservationsForStatistics() {
       try {
-        // 헤더 설정
-        const authHeaders = getAuthHeadersFromToken()
-        
-        const response = await axios.get(`${process.env.VUE_APP_API_BASE_URL}/workforce-service/reservation/list`, {
-          params: { 
-            companyId: 'd0ea5827-55f2-4338-9c6d-2a65fea18cb0'
-          },
-          headers: authHeaders ? {
-            'Authorization': authHeaders['Authorization'],
-            'X-User-MemberPositionId': authHeaders['X-User-MemberPositionId']
-          } : {}
+        const userHeaders = getUserHeaders()
+
+        const response = await apiClient.get('/workforce-service/reservation/list', {
+          headers: userHeaders
         })
         const list = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         
@@ -1080,8 +1119,6 @@ export default {
         reservations.forEach(r => {
           statusCounts[r.status] = (statusCounts[r.status] || 0) + 1
         })
-        console.log('예약 상태별 통계:', statusCounts)
-        console.log('이용 완료 예약 수:', usedReservations, '/ 전체:', totalReservations)
       }
       
       // No Show 계산 (BEFORE 상태의 예약 수)
@@ -1122,6 +1159,9 @@ export default {
       }
       
       const monthlyData = this.generateMonthlyData()
+      if (!monthlyData || !monthlyData.labels || monthlyData.labels.length === 0) {
+        return
+      }
       
       const ctx = this.$refs.monthlyChart?.getContext('2d')
       if (!ctx) return
@@ -1144,6 +1184,9 @@ export default {
             legend: {
               display: true,
               position: 'top'
+            },
+            filler: {
+              propagate: false
             }
           },
           scales: {
@@ -1173,6 +1216,9 @@ export default {
       }
       
       const categoryData = this.generateCategoryData()
+      if (!categoryData || !categoryData.labels || categoryData.labels.length === 0) {
+        return
+      }
       
       const ctx = this.$refs.resourceChart?.getContext('2d')
       if (!ctx) return
@@ -1190,11 +1236,23 @@ export default {
               font: {
                 size: 16,
                 weight: 'bold'
+              },
+              padding: {
+                top: 0,
+                bottom: 20
               }
             },
             legend: {
               display: true,
               position: 'right'
+            }
+          },
+          layout: {
+            padding: {
+              left: 40,
+              right: 0,
+              top: 12,
+              bottom: 12
             }
           }
         }
@@ -1231,6 +1289,7 @@ export default {
         datasets: [{
           label: '예약 수',
           data: counts,
+          fill: false,
           backgroundColor: 'rgba(79, 70, 229, 0.2)',
           borderColor: 'rgba(79, 70, 229, 1)',
           borderWidth: 2,
@@ -1263,45 +1322,21 @@ export default {
       const labels = Object.keys(resourceCounts)
       const data = Object.values(resourceCounts)
       
-      // 카테고리별 색상 매핑
-      const categoryColors = {
-        '회의실': 'rgba(79, 70, 229, 0.8)',
-        '차량': 'rgba(16, 185, 129, 0.8)',
-        '기타': 'rgba(245, 158, 11, 0.8)',
-        '알 수 없음': 'rgba(239, 68, 68, 0.8)'
+      if (labels.length === 0) {
+        return null
       }
-      
-      // 기본 색상 배열
-      const defaultColors = [
-        'rgba(139, 92, 246, 0.8)',
-        'rgba(236, 72, 153, 0.8)',
-        'rgba(6, 182, 212, 0.8)',
-        'rgba(34, 197, 94, 0.8)',
-        'rgba(251, 146, 60, 0.8)',
-        'rgba(168, 85, 247, 0.8)',
-        'rgba(20, 184, 166, 0.8)',
-        'rgba(244, 63, 94, 0.8)'
-      ]
-      
-      // 각 라벨에 대한 색상 생성
-      const backgroundColor = labels.map((label, index) => {
-        // 카테고리별 색상 우선 적용
-        for (const [category, color] of Object.entries(categoryColors)) {
-          if (label.includes(category)) {
-            return color
-          }
-        }
-        // 기본 색상 적용
-        return defaultColors[index % defaultColors.length]
-      })
+
+      const colors = labels.map(label => this.getCategoryColor(label))
+      const backgroundColor = colors.map(color => this.applyAlphaToColor(color.background, 0.9))
+      const borderColor = colors.map(color => this.applyAlphaToColor(color.text, 0.8))
       
       return {
         labels,
         datasets: [{
           data,
           backgroundColor,
-          borderColor: backgroundColor.map(color => color.replace('0.8', '1')),
-          borderWidth: 2
+          borderColor,
+          borderWidth: 1
         }]
       }
     },
@@ -1392,7 +1427,7 @@ export default {
               통계 요약
             </h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: 10px; border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #409eff; border-left: 4px solid #409eff; box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">📈</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">이용률</div>
@@ -1400,7 +1435,7 @@ export default {
                 <div style="font-size: 20px; font-weight: 700; color: #409eff; margin-bottom: 4px;">${this.statistics.usageRate}%</div>
                 <div style="font-size: 10px; color: #909399;">실제 이용된 예약 비율</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: 10px; border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #67c23a; border-left: 4px solid #67c23a; box-shadow: 0 2px 4px rgba(103, 194, 58, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">🕐</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">Peak Time</div>
@@ -1408,7 +1443,7 @@ export default {
                 <div style="font-size: 18px; font-weight: 700; color: #67c23a; margin-bottom: 4px;">${this.statistics.peakTime || '데이터 없음'}</div>
                 <div style="font-size: 10px; color: #909399;">가장 많이 예약된 시간대</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: 10px; border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #fff8f0 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #e6a23c; border-left: 4px solid #e6a23c; box-shadow: 0 2px 4px rgba(230, 162, 60, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">⚠️</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">No Show</div>
@@ -1416,7 +1451,7 @@ export default {
                 <div style="font-size: 20px; font-weight: 700; color: #e6a23c; margin-bottom: 4px;">${this.statistics.noShow}건</div>
                 <div style="font-size: 10px; color: #909399;">예약 후 미사용 건수</div>
               </div>
-              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: 10px; border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
+              <div style="background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); padding: 14px; border-radius: var(--surface-radius); border: 1px solid #909399; border-left: 4px solid #909399; box-shadow: 0 2px 4px rgba(144, 147, 153, 0.1);">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <span style="font-size: 20px;">📄</span>
                   <div style="font-size: 12px; font-weight: 500; color: #606266;">총 예약</div>
@@ -1656,8 +1691,7 @@ export default {
 
 <style scoped>
 .resource-management {
-  max-width: 1220px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .page-header {

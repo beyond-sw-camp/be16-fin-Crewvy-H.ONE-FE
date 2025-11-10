@@ -137,7 +137,8 @@ export default {
 
 .snackbar__content {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
   gap: 12px;
 }
@@ -156,7 +157,7 @@ export default {
 .snackbar__message {
   flex: 1;
   min-width: 0;
-  text-align: left;
+  text-align: center;
   word-break: keep-all;
   overflow-wrap: break-word;
 }

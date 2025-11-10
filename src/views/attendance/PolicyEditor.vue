@@ -67,13 +67,12 @@
 
       <div class="rule-block-actions" v-if="policy.typeCode">
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('workTimeRule') && !policy.ruleDetails.workTimeRule" @click="addBlock('workTimeRule')">+ 근무 시간</el-button>
-        <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('authRule') && !policy.ruleDetails.authRule" @click="addBlock('authRule')">+ 인증</el-button>
+        <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('authRule') && !policy.ruleDetails.authRule" @click="addBlock('authRule')">+ 근무지</el-button>
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('breakRule') && !policy.ruleDetails.breakRule" @click="addBlock('breakRule')">+ 휴게</el-button>
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('latenessRule') && !policy.ruleDetails.latenessRule" @click="addBlock('latenessRule')">+ 지각/조퇴</el-button>
-        <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('goOutRule') && !policy.ruleDetails.goOutRule" @click="addBlock('goOutRule')">+ 외출</el-button>
+        <!-- <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('goOutRule') && !policy.ruleDetails.goOutRule" @click="addBlock('goOutRule')">+ 외출</el-button> -->
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('leaveRule') && !policy.ruleDetails.leaveRule" @click="addBlock('leaveRule')">+ 휴가</el-button>
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('tripRule') && !policy.ruleDetails.tripRule" @click="addBlock('tripRule')">+ 출장</el-button>
-        <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('expenseRule') && !policy.ruleDetails.expenseRule" @click="addBlock('expenseRule')">+ 경비</el-button>
         <el-button v-if="POLICY_RULE_MAPPING[policy.typeCode]?.includes('overtimeRule') && !policy.ruleDetails.overtimeRule" @click="addBlock('overtimeRule')">+ 연장 근무</el-button>
       </div>
 
@@ -87,18 +86,18 @@
       </div>
       <div v-if="policy.ruleDetails.authRule" class="rule-block-container">
         <div class="block-header">
-          <h4>인증 규칙<el-tag v-if="isMandatory('authRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
+          <h4>근무지 규칙<el-tag v-if="isMandatory('authRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
           <el-button v-if="!isMandatory('authRule')" type="danger" @click="removeBlock('authRule')" text circle><el-icon><CloseBold /></el-icon></el-button>
         </div>
         <AuthRuleBlock v-model="policy.ruleDetails.authRule" />
       </div>
-      <div v-if="policy.ruleDetails.goOutRule" class="rule-block-container">
+      <!-- <div v-if="policy.ruleDetails.goOutRule" class="rule-block-container">
         <div class="block-header">
           <h4>외출 규칙<el-tag v-if="isMandatory('goOutRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
           <el-button v-if="!isMandatory('goOutRule')" type="danger" @click="removeBlock('goOutRule')" text circle><el-icon><CloseBold /></el-icon></el-button>
         </div>
         <GoOutRuleBlock v-model="policy.ruleDetails.goOutRule" />
-      </div>
+      </div> -->
       <div v-if="policy.ruleDetails.leaveRule" class="rule-block-container">
         <div class="block-header">
           <h4>휴가 규칙<el-tag v-if="isMandatory('leaveRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
@@ -119,13 +118,6 @@
           <el-button v-if="!isMandatory('breakRule')" type="danger" @click="removeBlock('breakRule')" text circle><el-icon><CloseBold /></el-icon></el-button>
         </div>
         <BreakRuleBlock v-model="policy.ruleDetails.breakRule" :work-time-rule="policy.ruleDetails.workTimeRule" />
-      </div>
-      <div v-if="policy.ruleDetails.expenseRule" class="rule-block-container">
-        <div class="block-header">
-          <h4>경비 규칙<el-tag v-if="isMandatory('expenseRule')" type="danger" size="small" style="margin-left: 8px;">필수</el-tag></h4>
-          <el-button v-if="!isMandatory('expenseRule')" type="danger" @click="removeBlock('expenseRule')" text circle><el-icon><CloseBold /></el-icon></el-button>
-        </div>
-        <ExpenseRuleBlock v-model="policy.ruleDetails.expenseRule" />
       </div>
       <div v-if="policy.ruleDetails.latenessRule" class="rule-block-container">
         <div class="block-header">
@@ -158,11 +150,10 @@ import { getPolicyTypes, getPolicyById, createPolicy, updatePolicy } from '@/api
 import { useSnackbar } from '@/composables/useSnackbar';
 import WorkTimeRuleBlock from './components/WorkTimeRuleBlock.vue';
 import AuthRuleBlock from './components/AuthRuleBlock.vue';
-import GoOutRuleBlock from './components/GoOutRuleBlock.vue';
+// import GoOutRuleBlock from './components/GoOutRuleBlock.vue';
 import LeaveRuleBlock from './components/LeaveRuleBlock.vue';
 import TripRuleBlock from './components/TripRuleBlock.vue';
 import BreakRuleBlock from './components/BreakRuleBlock.vue';
-import ExpenseRuleBlock from './components/ExpenseRuleBlock.vue';
 import LatenessRuleBlock from './components/LatenessRuleBlock.vue';
 import OvertimeRuleBlock from './components/OvertimeRuleBlock.vue';
 import { CloseBold } from '@element-plus/icons-vue';
@@ -172,11 +163,10 @@ export default {
   components: {
     WorkTimeRuleBlock,
     AuthRuleBlock,
-    GoOutRuleBlock,
+    // GoOutRuleBlock,
     LeaveRuleBlock,
     TripRuleBlock,
     BreakRuleBlock,
-    ExpenseRuleBlock,
     LatenessRuleBlock,
     OvertimeRuleBlock,
     CloseBold
@@ -199,7 +189,7 @@ export default {
       'PTC004': ['leaveRule'],
       'PTC005': ['leaveRule'],
       'PTC006': ['leaveRule'],
-      'PTC101': ['workTimeRule', 'authRule', 'breakRule', 'latenessRule', 'goOutRule', 'expenseRule'],  // 기본근무: 다양한 규칙 조합 가능
+      'PTC101': ['workTimeRule', 'authRule', 'breakRule', 'latenessRule'],  // 기본근무 (authRule 복구, goOutRule 제거)
       'PTC102': ['tripRule'],
       'PTC103': ['overtimeRule'],
       'PTC104': ['overtimeRule'],
@@ -214,7 +204,7 @@ export default {
       'PTC004': ['leaveRule'],     // 육아휴직 - 휴가 규칙 필수
       'PTC005': ['leaveRule'],     // 가족돌봄휴가 - 휴가 규칙 필수
       'PTC006': ['leaveRule'],     // 생리휴가 - 휴가 규칙 필수
-      'PTC101': ['workTimeRule', 'authRule'],  // 기본근무 - 근무시간 + 인증 필수
+      'PTC101': ['workTimeRule'],  // 기본근무 - 근무시간 필수 (authRule 제거)
       'PTC102': ['tripRule'],      // 출장 - 출장 규칙 필수
       'PTC103': ['overtimeRule'],  // 연장근무 - 연장근무 규칙 필수
       'PTC104': ['overtimeRule'],  // 야간근무 - 연장근무 규칙 필수
@@ -232,7 +222,7 @@ export default {
       isPaid: false,
       ruleDetails: {
         workTimeRule: null, authRule: null, goOutRule: null, leaveRule: null,
-        tripRule: null, breakRule: null, expenseRule: null, latenessRule: null, overtimeRule: null,
+        tripRule: null, breakRule: null, latenessRule: null, overtimeRule: null,
       }
     });
 
@@ -241,7 +231,33 @@ export default {
 
     const addBlock = (blockName) => {
         if (blockName === 'leaveRule' && !policy.value.ruleDetails.leaveRule) {
-            policy.value.ruleDetails.leaveRule = { defaultDays: 0 };
+            // PTC001 (연차유급휴가)의 경우 더 상세한 초기값 설정
+            if (policy.value.typeCode === 'PTC001') {
+                policy.value.ruleDetails.leaveRule = {
+                    defaultDays: 15,
+                    accrualType: 'ACCRUAL',
+                    standardType: 'FISCAL_YEAR',
+                    baseAnnualLeaveForOverOneYear: 15,
+                    additionalAnnualLeaveRules: [],
+                    maximumAnnualLeaveLimit: 25,
+                    firstYearRule: {
+                        monthlyAccrualEnabled: true,
+                        monthlyAccrualDays: 1.0,
+                        maxAccrualFirstYear: 11
+                    },
+                    overOneYearRule: {
+                        carryOverEnabled: false,
+                        carryOverLimitDays: 0,
+                        carryOverExpirationMonths: 3
+                    },
+                    minimumRequestUnit: 'DAY',
+                    requestDeadlineDays: 1,
+                    allowRetrospectiveRequest: false
+                };
+            } else {
+                // 다른 휴가 유형은 기본 초기값
+                policy.value.ruleDetails.leaveRule = { defaultDays: 0 };
+            }
         } else if (blockName === 'workTimeRule' && !policy.value.ruleDetails.workTimeRule) {
             policy.value.ruleDetails.workTimeRule = {
                 type: 'FIXED',
@@ -254,13 +270,17 @@ export default {
         } else if (blockName === 'breakRule' && !policy.value.ruleDetails.breakRule) {
             policy.value.ruleDetails.breakRule = { mandatoryBreakMinutes: 0 };
         } else if (blockName === 'overtimeRule' && !policy.value.ruleDetails.overtimeRule) {
-            policy.value.ruleDetails.overtimeRule = { allowOvertime: false, overtimeRate: 1.5 };
+            policy.value.ruleDetails.overtimeRule = {
+                maxWeeklyOvertimeMinutes: 720,
+                overtimeRate: 1.5,
+                nightWorkRate: 1.5,
+                holidayWorkRate: 1.5,
+                holidayOvertimeRate: 2.0
+            };
         } else if (blockName === 'latenessRule' && !policy.value.ruleDetails.latenessRule) {
             policy.value.ruleDetails.latenessRule = { allowLateness: false };
         } else if (blockName === 'goOutRule' && !policy.value.ruleDetails.goOutRule) {
             policy.value.ruleDetails.goOutRule = { allowGoOut: false };
-        } else if (blockName === 'expenseRule' && !policy.value.ruleDetails.expenseRule) {
-            policy.value.ruleDetails.expenseRule = { allowExpense: false };
         } else if (blockName === 'tripRule' && !policy.value.ruleDetails.tripRule) {
             policy.value.ruleDetails.tripRule = {
                 type: '',
@@ -306,7 +326,7 @@ export default {
         const fetchedPolicy = await getPolicyById(policyId.value);
         const defaultRuleDetails = {
           workTimeRule: null, authRule: null, goOutRule: null, leaveRule: null,
-          tripRule: null, breakRule: null, expenseRule: null, latenessRule: null, overtimeRule: null,
+          tripRule: null, breakRule: null, latenessRule: null, overtimeRule: null,
         };
 
         policy.value.name = fetchedPolicy.name;
@@ -370,7 +390,6 @@ export default {
         goOutRule: '외출 규칙',
         leaveRule: '휴가 규칙',
         tripRule: '출장 규칙',
-        expenseRule: '경비 규칙',
         overtimeRule: '연장 근무 규칙'
       };
       return names[ruleName] || ruleName;

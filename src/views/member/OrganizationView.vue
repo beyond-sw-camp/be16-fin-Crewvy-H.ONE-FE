@@ -396,9 +396,11 @@ onUnmounted(() => {
   align-items: flex-start;
   margin-bottom: 24px;
 }
-
+.employee-list-card {
+  border-radius: 8px;
+}
 .org-tree-card {
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   background: white;
   padding: 20px 24px;
