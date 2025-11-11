@@ -373,7 +373,7 @@ import {
   deleteVideoConference,
   joinVideoConferenceWithPassword
 } from '@/api/videoConference'
-import employeeService from '@/api/employeeService'
+import searchService from '@/api/searchService'
 
 export default {
   name: 'MeetingPage',
@@ -665,8 +665,8 @@ export default {
         const scheduledStartTime = this.scheduleForm.dateTime.replace(' ', 'T')
         if (this.isEditingSchedule && this.editTargetId) {
           const updateBody = {}
-          if (this.scheduleForm.title) updateBody.name = this.scheduleForm.title
-          if (this.scheduleForm.description) updateBody.description = this.scheduleForm.description
+          updateBody.name = this.scheduleForm.title
+          updateBody.description = this.scheduleForm.description
           if (this.scheduleForm.dateTime) updateBody.scheduledStartTime = scheduledStartTime
           if (typeof this.scheduleForm.recording === 'boolean') updateBody.isRecording = this.scheduleForm.recording
           if (Array.isArray(this.scheduleForm.participants) && this.scheduleForm.participants.length > 0) {
@@ -787,8 +787,9 @@ export default {
       if (query) {
         this.employeeSearchLoading = true;
         try {
-          const response = await employeeService.searchEmployees(query);
-          this.searchedEmployees = response.data.data.filter(emp => emp.memberId !== this.memberId);
+          const response = await searchService.searchEmployees(query, { page: 0, size: 100 });
+          const pageData = response.data.data;
+          this.searchedEmployees = (pageData.content || []).filter(emp => emp.memberId !== this.memberId);
         } catch (e) {
           this.error('직원 검색에 실패했습니다.');
           this.searchedEmployees = [];
