@@ -665,8 +665,8 @@ export default {
         const scheduledStartTime = this.scheduleForm.dateTime.replace(' ', 'T')
         if (this.isEditingSchedule && this.editTargetId) {
           const updateBody = {}
-          if (this.scheduleForm.title) updateBody.name = this.scheduleForm.title
-          if (this.scheduleForm.description) updateBody.description = this.scheduleForm.description
+          updateBody.name = this.scheduleForm.title
+          updateBody.description = this.scheduleForm.description
           if (this.scheduleForm.dateTime) updateBody.scheduledStartTime = scheduledStartTime
           if (typeof this.scheduleForm.recording === 'boolean') updateBody.isRecording = this.scheduleForm.recording
           if (Array.isArray(this.scheduleForm.participants) && this.scheduleForm.participants.length > 0) {
