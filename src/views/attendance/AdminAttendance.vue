@@ -175,21 +175,21 @@
             </div>
 
             <div class="balance-table">
-              <el-table :data="balanceData" v-loading="balanceLoading" style="width: 100%">
-                <el-table-column prop="memberName" label="이름" width="120" />
-                <el-table-column prop="organizationName" label="부서" width="150" />
-                <el-table-column prop="titleName" label="직책" width="120" />
-                <el-table-column label="입사일" width="120">
+              <el-table :data="balanceData" v-loading="balanceLoading" style="width: 100%" default-sort="{prop: 'memberName', order: 'ascending'}">
+                <el-table-column prop="memberName" label="이름" width="120" sortable />
+                <el-table-column prop="organizationName" label="부서" width="150" sortable />
+                <el-table-column prop="titleName" label="직책" width="120" sortable />
+                <el-table-column prop="joinDate" label="입사일" width="120" sortable>
                   <template #default="scope">
                     {{ scope.row.joinDate || '-' }}
                   </template>
                 </el-table-column>
-                <el-table-column label="근속년수" width="100">
+                <el-table-column prop="joinDate" label="근속년수" width="100" sortable>
                   <template #default="scope">
                     {{ calculateYearsOfService(scope.row.joinDate) }}년
                   </template>
                 </el-table-column>
-                <el-table-column label="전월 근속률" width="120" align="center">
+                <el-table-column prop="previousMonthAttendanceRate" label="전월 근속률" width="120" align="center" sortable>
                   <template #default="scope">
                     <span :class="{ 'low-attendance': scope.row.previousMonthAttendanceRate < 80 }">
                       {{ scope.row.previousMonthAttendanceRate ? scope.row.previousMonthAttendanceRate.toFixed(1) : '0.0' }}%
@@ -197,23 +197,23 @@
                     <el-tag v-if="scope.row.previousMonthAttendanceRate < 80" type="danger" size="small" style="margin-left: 4px;">미달</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="policyTypeName" label="유형" width="140" />
-                <el-table-column label="부여" width="80" align="right">
+                <el-table-column prop="policyTypeName" label="유형" width="140" sortable />
+                <el-table-column prop="totalGranted" label="부여" width="80" align="right" sortable>
                   <template #default="scope">
                     {{ (scope.row.totalGranted || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
-                <el-table-column label="사용" width="80" align="right">
+                <el-table-column prop="totalUsed" label="사용" width="80" align="right" sortable>
                   <template #default="scope">
                     {{ (scope.row.totalUsed || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
-                <el-table-column label="잔여" width="80" align="right">
+                <el-table-column prop="remainingBalance" label="잔여" width="80" align="right" sortable>
                   <template #default="scope">
                     {{ (scope.row.remainingBalance || 0).toFixed(1) }}일
                   </template>
                 </el-table-column>
-                <el-table-column label="상태" width="100">
+                <el-table-column prop="isUsable" label="상태" width="100" sortable>
                   <template #default="scope">
                     <el-tag v-if="scope.row.isUsable === false" type="danger" size="small">사용불가</el-tag>
                     <el-tag v-else type="success" size="small">정상</el-tag>

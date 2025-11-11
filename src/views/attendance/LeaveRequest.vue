@@ -76,8 +76,29 @@
               </el-select>
             </el-form-item>
 
-            <!-- 추가근무: 기간 + 1일 시간 입력 방식 -->
-            <el-form-item v-if="requestType === 'extraWork'" label="신청 기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
+            <!-- 야간근무: 시간대 입력 -->
+            <el-form-item v-if="requestType === 'extraWork' && selectedPolicy && selectedPolicy.typeCode === 'PTC104'" label="야간근무 시간대" prop="dateTimeRange" :rules="{ required: true, message: '야간근무 시간대를 선택하세요', trigger: 'change' }">
+              <el-date-picker
+                v-model="form.dateTimeRange"
+                type="datetimerange"
+                range-separator="~"
+                start-placeholder="시작 시간"
+                end-placeholder="종료 시간"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                :disabled-date="getDisabledDate"
+                :cell-class-name="getCellClassName"
+              />
+              <span class="form-description">
+                * 야간근무는 22:00~06:00 시간대에만 신청 가능합니다.
+              </span>
+              <span v-if="deadlineHelpText" class="form-description">
+                {{ deadlineHelpText }}
+              </span>
+            </el-form-item>
+
+            <!-- 연장/휴일근무: 기간 + 1일 시간 입력 방식 -->
+            <el-form-item v-if="requestType === 'extraWork' && selectedPolicy && ['PTC103', 'PTC105'].includes(selectedPolicy.typeCode)" label="신청 기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
               <el-popover
                 placement="bottom-start"
                 :width="350"
@@ -137,7 +158,7 @@
               </span>
             </el-form-item>
 
-            <el-form-item v-if="requestType === 'extraWork'" label="1일 시간" prop="dailyOvertimeHours" :rules="{ required: true, message: '1일 시간을 입력하세요', trigger: 'change' }">
+            <el-form-item v-if="requestType === 'extraWork' && selectedPolicy && ['PTC103', 'PTC105'].includes(selectedPolicy.typeCode)" label="1일 시간" prop="dailyOvertimeHours" :rules="{ required: true, message: '1일 시간을 입력하세요', trigger: 'change' }">
               <el-time-picker
                 v-model="form.dailyOvertimeHours"
                 format="HH:mm"
@@ -297,17 +318,29 @@
             </div>
           </template>
           <el-table :data="myRequests" v-loading="tableLoading" stripe height="600">
-            <el-table-column prop="policyName" label="신청 종류" />
-            <el-table-column label="신청 기간" width="220">
+            <el-table-column prop="policyName" label="신청 종류" width="130" />
+            <el-table-column label="신청 기간" width="180">
               <template #default="{ row }">
                 {{ formatPeriod(row) }}
               </template>
             </el-table-column>
-            <el-table-column prop="deductionDays" label="차감일수" width="90" />
-            <el-table-column prop="reason" label="사유" show-overflow-tooltip />
-            <el-table-column label="상태" width="90">
+            <el-table-column prop="deductionDays" label="차감일수" width="70" align="center" />
+            <el-table-column prop="reason" label="사유" min-width="120" show-overflow-tooltip />
+            <el-table-column label="상태" width="70" align="center">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.status)">{{ formatStatus(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="작업" width="90" align="center">
+              <template #default="{ row }">
+                <el-button
+                  v-if="row.status === 'PENDING' || row.status?.codeValue === 'RS001'"
+                  type="danger"
+                  size="small"
+                  @click="handleCancelRequest(row)"
+                >
+                  취소
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -330,8 +363,9 @@
 <script>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { ElMessageBox } from 'element-plus';
 import { useSnackbar } from '@/composables/useSnackbar';
-import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances, getHolidays } from '@/api/attendance';
+import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances, getHolidays, cancelRequest } from '@/api/attendance';
 import { Refresh, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
 
 export default {
@@ -652,9 +686,7 @@ export default {
 
       // 0. 연장근무/휴일근무/야간근무가 아닌 경우: 주말/공휴일 선택 불가
       const isExtraWorkPolicy = requestType.value === 'extraWork' ||
-                                selectedPolicy.value.typeCode === 'PTC103' ||  // 연장근무
-                                selectedPolicy.value.typeCode === 'PTC104' ||  // 야간근무
-                                selectedPolicy.value.typeCode === 'PTC105';    // 휴일근무
+                                (selectedPolicy.value && ['PTC103', 'PTC104', 'PTC105'].includes(selectedPolicy.value.typeCode));
 
       if (!isExtraWorkPolicy) {
         // 반차/시차: 해당 날짜가 주말/공휴일이면 선택 불가
@@ -946,8 +978,26 @@ export default {
       }
     });
 
-    // 정책 선택 시 신청 단위 자동 조정
-    watch(() => form.value.policyId, (newPolicyId) => {
+    // 정책 선택 시 폼 상태 초기화 및 신청 단위 자동 조정
+    watch(() => form.value.policyId, (newPolicyId, oldPolicyId) => {
+      // 정책이 실제로 변경된 경우에만 초기화 (초기 로드는 제외)
+      if (oldPolicyId !== undefined && newPolicyId !== oldPolicyId) {
+        // 추가근무 관련 필드 초기화
+        if (requestType.value === 'extraWork') {
+          form.value.dateRange = [];
+          form.value.dateTimeRange = [];
+          form.value.dailyOvertimeHours = null;
+          dateRangePopoverVisible.value = false;
+          tempDateRange.value = [];
+        }
+        // 일반 휴가/출장 관련 필드도 초기화
+        else {
+          form.value.dateRange = [];
+          form.value.dateTimeRange = [];
+          form.value.workLocation = null;
+        }
+      }
+
       if (newPolicyId && selectedPolicy.value) {
         // 연차가 아닌 경우 무조건 종일(DAY)로 설정
         if (selectedPolicy.value.typeCode !== 'PTC001') {
@@ -1149,15 +1199,27 @@ export default {
               };
               response = await createTripRequest(tripPayload);
             }
-            // 추가근무 신청 (방식 A: 기간 + 1일 연장시간)
+            // 추가근무 신청
             else if (requestType.value === 'extraWork') {
               const payload = {
-                startAt: form.value.dateRange[0],
-                endAt: form.value.dateRange[1],
-                dailyOvertimeHours: form.value.dailyOvertimeHours, // "HH:mm" 형식
+                policyId: form.value.policyId,
+                requestUnit: selectedPolicy.value.typeCode === 'PTC104' ? 'TIME_OFF' : 'DAY',
                 reason: form.value.reason,
                 requesterComment: form.value.requesterComment || null,
               };
+
+              // 야간근무: 시간대 입력
+              if (selectedPolicy.value.typeCode === 'PTC104') {
+                payload.startDateTime = form.value.dateTimeRange[0];
+                payload.endDateTime = form.value.dateTimeRange[1];
+              }
+              // 연장/휴일근무: 기간 + 1일 시간
+              else {
+                payload.startAt = form.value.dateRange[0];
+                payload.endAt = form.value.dateRange[1];
+                payload.dailyOvertimeHours = form.value.dailyOvertimeHours;
+              }
+
               response = await createLeaveRequest(payload);
             }
             // 휴가/휴직/연장근무 신청
@@ -1243,6 +1305,28 @@ export default {
       fetchMyRequests();
     };
 
+    const handleCancelRequest = async (row) => {
+      try {
+        await ElMessageBox.confirm(
+          `${row.policyName} 신청을 취소하시겠습니까?`,
+          '신청 취소',
+          {
+            confirmButtonText: '확인',
+            cancelButtonText: '취소',
+            type: 'warning',
+          }
+        );
+
+        await cancelRequest(row.requestId);
+        success('신청이 취소되었습니다.');
+        fetchMyRequests();
+      } catch (err) {
+        if (err !== 'cancel') {
+          error(err.message || '신청 취소에 실패했습니다.');
+        }
+      }
+    };
+
     const formatRequestUnit = (unit) => ({ 'DAY': '종일', 'HALF_DAY_AM': '오전 반차', 'HALF_DAY_PM': '오후 반차', 'TIME_OFF': '시간 단위' }[unit] || unit);
     const formatStatus = (status) => ({ 'PENDING': '대기중', 'APPROVED': '승인', 'REJECTED': '반려', 'CANCELED': '취소' }[status] || status);
     const getStatusType = (status) => ({ 'PENDING': 'info', 'APPROVED': 'success', 'REJECTED': 'danger', 'CANCELED': 'warning' }[status] || 'info');
@@ -1283,6 +1367,7 @@ export default {
       fetchMyRequests,
       handleSizeChange,
       handlePageChange,
+      handleCancelRequest,
       formatRequestUnit,
       formatStatus,
       getStatusType,

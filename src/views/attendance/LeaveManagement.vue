@@ -49,26 +49,26 @@
         </el-button>
       </div>
       <div class="leave-table">
-        <el-table :data="processedLeaveData" v-loading="isLoading" style="width: 100%">
-          <el-table-column prop="employeeName" label="이름" width="150" />
-          <el-table-column prop="department" label="부서" width="180" />
-          <el-table-column prop="policyTypeName" label="유형" width="150" />
-          <el-table-column label="총 부여" width="120" align="right">
+        <el-table :data="processedLeaveData" v-loading="isLoading" style="width: 100%" default-sort="{prop: 'employeeName', order: 'ascending'}">
+          <el-table-column prop="employeeName" label="이름" width="150" sortable />
+          <el-table-column prop="department" label="부서" width="180" sortable />
+          <el-table-column prop="policyTypeName" label="유형" width="150" sortable />
+          <el-table-column prop="totalLeave" label="총 부여" width="120" align="right" sortable>
             <template #default="scope">
               {{ (scope.row.totalLeave || 0).toFixed(1) }}일
             </template>
           </el-table-column>
-          <el-table-column label="사용" width="120" align="right">
+          <el-table-column prop="usedLeave" label="사용" width="120" align="right" sortable>
             <template #default="scope">
               {{ (scope.row.usedLeave || 0).toFixed(1) }}일
             </template>
           </el-table-column>
-          <el-table-column label="잔여" width="120" align="right">
+          <el-table-column prop="remainingLeave" label="잔여" width="120" align="right" sortable>
             <template #default="scope">
               <span style="font-weight: bold; color: #4f46e5;">{{ (scope.row.remainingLeave || 0).toFixed(1) }}일</span>
             </template>
           </el-table-column>
-          <el-table-column label="사용률" min-width="200">
+          <el-table-column prop="usageRate" label="사용률" min-width="200" sortable>
             <template #default="scope">
               <el-progress :percentage="scope.row.usageRate" :color="getUsageRateColor(scope.row.usageRate)" />
             </template>
