@@ -286,26 +286,6 @@ export default {
   border-top: 1px solid #e4e7ed;
 }
 
-.save-button {
-  padding: 12px 32px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  transition: all 0.3s ease;
-}
-
-.save-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-}
-
-.save-button:active {
-  transform: translateY(0);
-}
-
 .save-button :deep(.el-icon) {
   margin-right: 8px;
   font-size: 18px;

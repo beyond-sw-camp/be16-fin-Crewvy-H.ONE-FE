@@ -208,7 +208,7 @@ const formatDate = (dateString) => {
 /* Dropdown Link (Bell Icon) */
 .el-dropdown-link {
   cursor: pointer;
-  color: #303133;
+  color: #606266;
   display: flex;
   align-items: center;
   transition: color 0.3s ease;
