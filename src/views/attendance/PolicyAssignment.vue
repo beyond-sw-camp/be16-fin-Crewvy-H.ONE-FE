@@ -99,27 +99,27 @@
                             <h3>할당된 정책 목록</h3>
                             <div>
                               <el-button 
-                                type="success"
+                                type="primary"
                                 @click="handleBulkReactivate"
                                 :disabled="selectedAssignments.length === 0"
                               >
                                 선택 항목 재활성
                               </el-button>
                               <el-button 
-                                type="warning"
+                                type="primary"
                                 @click="handleBulkRevoke"
                                 :disabled="selectedAssignments.length === 0"
                               >
                                 선택 항목 해지
                               </el-button>
                               <el-button 
-                                type="danger" 
+                                type="primary" 
                                 @click="handleBulkDelete" 
                                 :disabled="selectedAssignments.length === 0"
                               >
                                 선택 항목 삭제
                               </el-button>
-                              <el-button type="primary" @click="fetchAllAssignments" :loading="isLoading">
+                              <el-button @click="fetchAllAssignments" :loading="isLoading">
                                 <el-icon><Refresh /></el-icon>
                                 <span style="margin-left: 8px;">새로고침</span>
                               </el-button>
