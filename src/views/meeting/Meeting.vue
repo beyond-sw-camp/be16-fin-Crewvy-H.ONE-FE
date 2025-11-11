@@ -373,7 +373,7 @@ import {
   deleteVideoConference,
   joinVideoConferenceWithPassword
 } from '@/api/videoConference'
-import employeeService from '@/api/employeeService'
+import searchService from '@/api/searchService'
 
 export default {
   name: 'MeetingPage',
@@ -787,8 +787,9 @@ export default {
       if (query) {
         this.employeeSearchLoading = true;
         try {
-          const response = await employeeService.searchEmployees(query);
-          this.searchedEmployees = response.data.data.filter(emp => emp.memberId !== this.memberId);
+          const response = await searchService.searchEmployees(query, { page: 0, size: 100 });
+          const pageData = response.data.data;
+          this.searchedEmployees = (pageData.content || []).filter(emp => emp.memberId !== this.memberId);
         } catch (e) {
           this.error('직원 검색에 실패했습니다.');
           this.searchedEmployees = [];
