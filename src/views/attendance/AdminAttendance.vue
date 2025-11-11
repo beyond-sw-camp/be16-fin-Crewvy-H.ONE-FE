@@ -593,7 +593,9 @@
           endDate: endDate.toISOString().split('T')[0]
         };
 
-        holidays.value = await getHolidays(params);
+        const response = await getHolidays(params);
+        holidays.value = response || [];
+        console.log('공휴일 데이터 로드 완료:', holidays.value.length, '개');
       } catch (err) {
         console.error('공휴일 조회 실패:', err);
         // 공휴일 조회 실패해도 계속 진행
@@ -1032,14 +1034,31 @@
   color: #f56c6c;
 }
 
-/* 캘린더 주말 스타일 (숫자만 빨간색) */
-:deep(.weekend-cell) {
-  color: #f56c6c;
+/* Element Plus DatePicker 주말 스타일 */
+:deep(.el-date-table td.weekend) {
+  color: #f56c6c !important;
 }
 
-/* 캘린더 공휴일 스타일 (선택 시 파란색 원 → 빨간색 원) */
+:deep(.el-date-table td.weekend .el-date-table-cell__text) {
+  color: #f56c6c !important;
+}
+
+/* 캘린더 주말 스타일 (숫자만 빨간색) */
+:deep(.weekend-cell) {
+  color: #f56c6c !important;
+}
+
+:deep(.weekend-cell .el-date-table-cell__text) {
+  color: #f56c6c !important;
+}
+
+/* 캘린더 공휴일 스타일 */
 :deep(.holiday-cell) {
-  color: #f56c6c;
+  color: #f56c6c !important;
+}
+
+:deep(.holiday-cell .el-date-table-cell__text) {
+  color: #f56c6c !important;
 }
 
 :deep(.holiday-cell.in-range),

@@ -66,17 +66,57 @@
 
             <!-- 추가근무: 기간 + 1일 연장시간 입력 방식 -->
             <el-form-item v-if="requestType === 'extraWork'" label="신청 기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
-              <el-date-picker
-                v-model="form.dateRange"
-                type="daterange"
-                range-separator="-"
-                start-placeholder="시작일"
-                end-placeholder="종료일"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                :disabled-date="getDisabledDate"
-                :cell-class-name="getCellClassName"
-              />
+              <el-popover
+                placement="bottom-start"
+                :width="350"
+                trigger="click"
+                v-model:visible="dateRangePopoverVisible"
+              >
+                <template #reference>
+                  <el-input
+                    :model-value="formatDateRange(form.dateRange)"
+                    placeholder="기간을 선택하세요"
+                    readonly
+                    style="cursor: pointer; width: 100%;"
+                  >
+                    <template #suffix>
+                      <el-icon><Calendar /></el-icon>
+                    </template>
+                  </el-input>
+                </template>
+                <div class="date-range-calendar-popup">
+                  <div class="calendar-header">
+                    <el-button size="small" @click="previousMonth" :icon="ArrowLeft" circle />
+                    <span class="current-month">{{ formatCalendarMonth(calendarDate) }}</span>
+                    <el-button size="small" @click="nextMonth" :icon="ArrowRight" circle />
+                  </div>
+                  <el-calendar v-model="calendarDate" style="width: 100%;">
+                    <template #date-cell="{ data }">
+                      <div
+                        :class="[
+                          'calendar-day-cell',
+                          getCalendarCellClass(data),
+                          isDateInRange(data.day) ? 'in-range' : '',
+                          isRangeStart(data.day) ? 'range-start' : '',
+                          isRangeEnd(data.day) ? 'range-end' : '',
+                          isDateDisabled(data.day) ? 'disabled' : ''
+                        ]"
+                        @click="handleDateClick(data.day)"
+                      >
+                        {{ data.day.split('-').slice(2).join('-') }}
+                      </div>
+                    </template>
+                  </el-calendar>
+                  <div class="calendar-legend">
+                    <span class="legend-item"><span class="legend-dot weekend"></span>주말</span>
+                    <span class="legend-item"><span class="legend-dot holiday"></span>공휴일</span>
+                  </div>
+                  <div class="calendar-actions">
+                    <el-button size="small" @click="clearDateRange">초기화</el-button>
+                    <el-button size="small" type="primary" @click="confirmDateRange">확인</el-button>
+                  </div>
+                </div>
+              </el-popover>
               <span class="form-description">
                 * 선택한 기간의 각 날짜마다 1일 연장시간이 적용됩니다.
               </span>
@@ -133,17 +173,57 @@
             </el-form-item>
 
             <el-form-item v-if="form.requestUnit !== 'TIME_OFF' && requestType !== 'extraWork'" label="기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
-              <el-date-picker
-                v-model="form.dateRange"
-                type="daterange"
-                range-separator="-"
-                start-placeholder="시작일"
-                end-placeholder="종료일"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                :disabled-date="getDisabledDate"
-                :cell-class-name="getCellClassName"
-              />
+              <el-popover
+                placement="bottom-start"
+                :width="350"
+                trigger="click"
+                v-model:visible="dateRangePopoverVisible"
+              >
+                <template #reference>
+                  <el-input
+                    :model-value="formatDateRange(form.dateRange)"
+                    placeholder="기간을 선택하세요"
+                    readonly
+                    style="cursor: pointer; width: 100%;"
+                  >
+                    <template #suffix>
+                      <el-icon><Calendar /></el-icon>
+                    </template>
+                  </el-input>
+                </template>
+                <div class="date-range-calendar-popup">
+                  <div class="calendar-header">
+                    <el-button size="small" @click="previousMonth" :icon="ArrowLeft" circle />
+                    <span class="current-month">{{ formatCalendarMonth(calendarDate) }}</span>
+                    <el-button size="small" @click="nextMonth" :icon="ArrowRight" circle />
+                  </div>
+                  <el-calendar v-model="calendarDate" style="width: 100%;">
+                    <template #date-cell="{ data }">
+                      <div
+                        :class="[
+                          'calendar-day-cell',
+                          getCalendarCellClass(data),
+                          isDateInRange(data.day) ? 'in-range' : '',
+                          isRangeStart(data.day) ? 'range-start' : '',
+                          isRangeEnd(data.day) ? 'range-end' : '',
+                          isDateDisabled(data.day) ? 'disabled' : ''
+                        ]"
+                        @click="handleDateClick(data.day)"
+                      >
+                        {{ data.day.split('-').slice(2).join('-') }}
+                      </div>
+                    </template>
+                  </el-calendar>
+                  <div class="calendar-legend">
+                    <span class="legend-item"><span class="legend-dot weekend"></span>주말</span>
+                    <span class="legend-item"><span class="legend-dot holiday"></span>공휴일</span>
+                  </div>
+                  <div class="calendar-actions">
+                    <el-button size="small" @click="clearDateRange">초기화</el-button>
+                    <el-button size="small" type="primary" @click="confirmDateRange">확인</el-button>
+                  </div>
+                </div>
+              </el-popover>
               <span v-if="deadlineHelpText" class="form-description">
                 {{ deadlineHelpText }}
               </span>
@@ -241,7 +321,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useSnackbar } from '@/composables/useSnackbar';
 import { createLeaveRequest, createTripRequest, getMyAssignedPolicies, getActiveWorkLocations, getMyLeaveRequests, getMyAllBalances, getHolidays } from '@/api/attendance';
-import { Refresh } from '@element-plus/icons-vue';
+import { Refresh, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
 
 export default {
   name: 'LeaveRequest',
@@ -276,6 +356,9 @@ export default {
 
     // --- 공휴일 데이터 ---
     const holidays = ref([]);
+    const calendarDate = ref(new Date());
+    const dateRangePopoverVisible = ref(false);
+    const tempDateRange = ref([]);
 
     const leavePolicies = computed(() =>
       allPolicies.value.filter(p =>
@@ -387,8 +470,20 @@ export default {
 
     // 공휴일 체크 함수
     const isHoliday = (date) => {
-      const dateStr = date.toISOString().split('T')[0];
-      return holidays.value.some(h => h.date === dateStr);
+      // toISOString() 대신 로컬 날짜를 YYYY-MM-DD 형식으로 변환
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      // holidays.value의 date 필드와 비교
+      return holidays.value.some(h => {
+        // h.date가 문자열이거나 배열 형태일 수 있으므로 안전하게 비교
+        const holidayDate = Array.isArray(h.date)
+          ? `${h.date[0]}-${String(h.date[1]).padStart(2, '0')}-${String(h.date[2]).padStart(2, '0')}`
+          : h.date;
+        return holidayDate === dateStr;
+      });
     };
 
     // 캘린더 셀 클래스 설정 (주말: 빨간 숫자, 공휴일: 빨간 원)
@@ -402,6 +497,130 @@ export default {
       }
       return '';
     };
+
+    // el-calendar용 셀 클래스 설정
+    const getCalendarCellClass = (data) => {
+      // data.day format: 'YYYY-MM-DD'
+      const targetDate = new Date(data.day);
+
+      if (isHoliday(targetDate)) {
+        return 'holiday'; // 공휴일
+      }
+      if (isWeekend(targetDate)) {
+        return 'weekend'; // 주말
+      }
+      return '';
+    };
+
+    // 날짜 범위 포맷팅 (input 표시용)
+    const formatDateRange = (range) => {
+      if (!range || range.length !== 2) return '';
+      return `${range[0]} ~ ${range[1]}`;
+    };
+
+    // 캘린더 월 표시 포맷
+    const formatCalendarMonth = (date) => {
+      const d = new Date(date);
+      return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+    };
+
+    // 이전 월로 이동
+    const previousMonth = () => {
+      const d = new Date(calendarDate.value);
+      d.setMonth(d.getMonth() - 1);
+      calendarDate.value = d;
+    };
+
+    // 다음 월로 이동
+    const nextMonth = () => {
+      const d = new Date(calendarDate.value);
+      d.setMonth(d.getMonth() + 1);
+      calendarDate.value = d;
+    };
+
+    // 날짜가 범위 내에 있는지 확인
+    const isDateInRange = (dateStr) => {
+      if (!tempDateRange.value || tempDateRange.value.length !== 2) return false;
+      const date = new Date(dateStr);
+      const start = new Date(tempDateRange.value[0]);
+      const end = new Date(tempDateRange.value[1]);
+      return date >= start && date <= end;
+    };
+
+    // 시작일인지 확인
+    const isRangeStart = (dateStr) => {
+      return tempDateRange.value && tempDateRange.value[0] === dateStr;
+    };
+
+    // 종료일인지 확인
+    const isRangeEnd = (dateStr) => {
+      return tempDateRange.value && tempDateRange.value[1] === dateStr;
+    };
+
+    // 날짜가 비활성화되었는지 확인
+    const isDateDisabled = (dateStr) => {
+      const targetDate = new Date(dateStr);
+      return getDisabledDate(targetDate);
+    };
+
+    // 날짜 클릭 처리 (범위 선택)
+    const handleDateClick = (dateStr) => {
+      // getDisabledDate 체크 - 선택 불가능한 날짜면 무시
+      const targetDate = new Date(dateStr);
+      if (getDisabledDate(targetDate)) {
+        return;
+      }
+
+      if (!tempDateRange.value || tempDateRange.value.length === 0) {
+        // 첫 번째 클릭: 시작일 설정
+        tempDateRange.value = [dateStr];
+      } else if (tempDateRange.value.length === 1) {
+        // 두 번째 클릭: 종료일 설정
+        const startDate = new Date(tempDateRange.value[0]);
+        const endDate = new Date(dateStr);
+
+        if (endDate < startDate) {
+          // 종료일이 시작일보다 이전이면 시작일로 재설정
+          tempDateRange.value = [dateStr];
+        } else {
+          // 정상 범위 설정
+          tempDateRange.value = [tempDateRange.value[0], dateStr];
+        }
+      } else {
+        // 세 번째 클릭: 범위 초기화하고 새로 시작
+        tempDateRange.value = [dateStr];
+      }
+    };
+
+    // 날짜 범위 초기화
+    const clearDateRange = () => {
+      tempDateRange.value = [];
+      form.value.dateRange = [];
+      dateRangePopoverVisible.value = false;
+    };
+
+    // 날짜 범위 확인 (form에 반영)
+    const confirmDateRange = () => {
+      if (tempDateRange.value && tempDateRange.value.length === 2) {
+        form.value.dateRange = [...tempDateRange.value];
+      }
+      dateRangePopoverVisible.value = false;
+    };
+
+    // 팝오버가 열릴 때 tempDateRange 초기화
+    watch(dateRangePopoverVisible, (visible) => {
+      if (visible) {
+        // 팝오버가 열릴 때 현재 선택된 날짜로 초기화
+        if (form.value.dateRange && form.value.dateRange.length === 2) {
+          tempDateRange.value = [...form.value.dateRange];
+          // 선택된 날짜의 월로 캘린더 이동
+          calendarDate.value = new Date(form.value.dateRange[0]);
+        } else {
+          tempDateRange.value = [];
+          calendarDate.value = new Date();
+        }
+      }
+    });
 
     // 날짜 선택 제한 함수 (requestDeadlineDays 및 사후 신청 규칙 적용 + 공휴일/주말 제한)
     const getDisabledDate = (date) => {
@@ -786,24 +1005,68 @@ export default {
       }
     };
 
-    // 공휴일 조회 (1년치)
-    const fetchHolidays = async () => {
+    // 공휴일 조회 (특정 년도)
+    const fetchHolidays = async (year) => {
       try {
-        const today = new Date();
-        const startDate = new Date(today.getFullYear(), 0, 1); // 올해 1월 1일
-        const endDate = new Date(today.getFullYear(), 11, 31); // 올해 12월 31일
+        const targetYear = year || new Date().getFullYear();
+        const startDate = new Date(targetYear, 0, 1); // 해당 년도 1월 1일
+        const endDate = new Date(targetYear, 11, 31); // 해당 년도 12월 31일
 
         const params = {
           startDate: startDate.toISOString().split('T')[0],
           endDate: endDate.toISOString().split('T')[0]
         };
 
-        holidays.value = await getHolidays(params);
+        const response = await getHolidays(params);
+
+        // 기존 공휴일 데이터와 병합 (중복 제거)
+        const newHolidays = response || [];
+        const existingDates = new Set(holidays.value.map(h => {
+          if (Array.isArray(h.date)) {
+            return `${h.date[0]}-${String(h.date[1]).padStart(2, '0')}-${String(h.date[2]).padStart(2, '0')}`;
+          }
+          return h.date;
+        }));
+
+        newHolidays.forEach(holiday => {
+          let dateStr;
+          if (Array.isArray(holiday.date)) {
+            dateStr = `${holiday.date[0]}-${String(holiday.date[1]).padStart(2, '0')}-${String(holiday.date[2]).padStart(2, '0')}`;
+          } else {
+            dateStr = holiday.date;
+          }
+
+          if (!existingDates.has(dateStr)) {
+            holidays.value.push(holiday);
+          }
+        });
+
+        console.log(`${targetYear}년 공휴일 데이터 로드 완료:`, newHolidays.length, '개');
       } catch (err) {
         console.error('공휴일 조회 실패:', err);
         // 공휴일 조회 실패해도 계속 진행
       }
     };
+
+    // calendarDate의 년도가 바뀌면 해당 년도 공휴일 로드
+    watch(calendarDate, (newDate, oldDate) => {
+      const newYear = newDate.getFullYear();
+      const oldYear = oldDate ? oldDate.getFullYear() : null;
+
+      if (newYear !== oldYear) {
+        // 해당 년도 공휴일이 아직 로드되지 않았으면 로드
+        const hasYearData = holidays.value.some(h => {
+          if (Array.isArray(h.date)) {
+            return h.date[0] === newYear;
+          }
+          return h.date && h.date.startsWith(String(newYear));
+        });
+
+        if (!hasYearData) {
+          fetchHolidays(newYear);
+        }
+      }
+    });
 
     onMounted(() => {
       fetchInitialData();
@@ -1016,7 +1279,25 @@ export default {
       childcarePolicies,
       getDisabledDate,
       getCellClassName,
+      getCalendarCellClass,
+      calendarDate,
+      dateRangePopoverVisible,
+      tempDateRange,
+      formatDateRange,
+      formatCalendarMonth,
+      previousMonth,
+      nextMonth,
+      isDateInRange,
+      isRangeStart,
+      isRangeEnd,
+      isDateDisabled,
+      handleDateClick,
+      clearDateRange,
+      confirmDateRange,
       deadlineHelpText,
+      Calendar,
+      ArrowLeft,
+      ArrowRight,
     };
   },
 };
@@ -1072,14 +1353,31 @@ export default {
   font-style: italic;
 }
 
-/* 캘린더 주말 스타일 (숫자만 빨간색) */
-:deep(.weekend-cell) {
-  color: #f56c6c;
+/* Element Plus DatePicker 주말 스타일 */
+:deep(.el-date-table td.weekend) {
+  color: #f56c6c !important;
 }
 
-/* 캘린더 공휴일 스타일 (선택 시 파란색 원 → 빨간색 원) */
+:deep(.el-date-table td.weekend .el-date-table-cell__text) {
+  color: #f56c6c !important;
+}
+
+/* 캘린더 주말 스타일 (숫자만 빨간색) */
+:deep(.weekend-cell) {
+  color: #f56c6c !important;
+}
+
+:deep(.weekend-cell .el-date-table-cell__text) {
+  color: #f56c6c !important;
+}
+
+/* 캘린더 공휴일 스타일 */
 :deep(.holiday-cell) {
-  color: #f56c6c;
+  color: #f56c6c !important;
+}
+
+:deep(.holiday-cell .el-date-table-cell__text) {
+  color: #f56c6c !important;
 }
 
 :deep(.holiday-cell.in-range),
@@ -1087,5 +1385,143 @@ export default {
 :deep(.holiday-cell.end-date) {
   background-color: #f56c6c !important;
   color: #fff !important;
+}
+
+/* 날짜 범위 캘린더 팝업 */
+.date-range-calendar-popup {
+  padding: 8px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.current-month {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+:deep(.el-calendar__body) {
+  padding: 0;
+}
+
+:deep(.el-calendar-table) {
+  table-layout: fixed;
+}
+
+:deep(.el-calendar-table thead th) {
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+:deep(.el-calendar-table .el-calendar-day) {
+  height: 32px;
+  padding: 0;
+}
+
+:deep(.el-calendar__header) {
+  display: none;
+}
+
+/* 캘린더 셀 스타일 */
+.calendar-day-cell {
+  padding: 4px;
+  text-align: center;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-day-cell:hover {
+  background-color: #f5f7fa;
+}
+
+.calendar-day-cell.weekend {
+  color: #f56c6c;
+}
+
+.calendar-day-cell.holiday {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+/* 비활성화된 날짜 */
+.calendar-day-cell.disabled {
+  color: #c0c4cc !important;
+  background-color: #f5f7fa !important;
+  cursor: not-allowed !important;
+  text-decoration: line-through;
+}
+
+.calendar-day-cell.disabled:hover {
+  background-color: #f5f7fa !important;
+}
+
+/* 선택된 범위 스타일 */
+.calendar-day-cell.in-range {
+  background-color: #ecf5ff !important;
+  color: #409eff !important;
+}
+
+.calendar-day-cell.range-start,
+.calendar-day-cell.range-end {
+  background-color: #409eff !important;
+  color: white !important;
+  font-weight: bold;
+}
+
+/* 캘린더 범례 */
+.calendar-legend {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e4e7ed;
+  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.weekend {
+  background-color: transparent;
+  border: 2px solid #f56c6c;
+}
+
+.legend-dot.holiday {
+  background-color: #f56c6c;
+}
+
+/* 캘린더 액션 버튼 */
+.calendar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e4e7ed;
 }
 </style>

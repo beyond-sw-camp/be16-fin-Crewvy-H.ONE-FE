@@ -706,6 +706,8 @@
   padding: 10px;
   max-height: 400px;
   overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 .custom-tree-node {
   display: flex;
