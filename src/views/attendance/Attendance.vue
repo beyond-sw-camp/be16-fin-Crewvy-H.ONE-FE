@@ -594,7 +594,7 @@ export default {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   margin-bottom: 24px;
 }
 
@@ -661,7 +661,7 @@ export default {
   justify-content: center;
   font-size: 20px;
   color: white;
-  background: #409EFF;
+  background: #4f46e5;
 }
 
 .card-content {
@@ -752,7 +752,7 @@ export default {
 .time-value {
   font-size: 28px;
   font-weight: 600;
-  color: #409EFF;
+  color: #4f46e5;
 }
 
 /* 휴가 관리 탭 스타일 */

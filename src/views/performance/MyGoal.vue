@@ -675,26 +675,8 @@
   font-size: 56px;
   padding: 16px;
   border-radius: 12px;
-}
-
-.stat-icon.requested {
-  color: #e6a23c;
-  background: rgba(230, 162, 60, 0.1);
-}
-
-.stat-icon.approved {
-  color: #67c23a;
-  background: rgba(103, 194, 58, 0.1);
-}
-
-.stat-icon.rejected {
-  color: #f56c6c;
-  background: rgba(245, 108, 108, 0.1);
-}
-
-.stat-icon.evaluation {
-  color: #409eff;
-  background: rgba(64, 158, 255, 0.1);
+  color: white;
+  background: #4f46e5;
 }
 
 .stat-info {
@@ -703,7 +685,7 @@
 
 .stat-value {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 600;
   color: #303133;
   line-height: 1;
   margin-bottom: 4px;

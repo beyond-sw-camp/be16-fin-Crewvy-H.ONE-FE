@@ -10,8 +10,8 @@
     </div>
 
     <el-row :gutter="24" class="layout-row">
-      <el-col :lg="8" :md="24">
-        <el-card class="org-tree-card">
+      <el-col :lg="8" :md="24" class="org-tree-col">
+        <el-card class="org-tree-card" ref="orgTreeCardRef">
           <template #header>
             <div class="card-header">
               <span>조직도</span>
@@ -95,15 +95,22 @@ import { MoreFilled } from '@element-plus/icons-vue';
 
 const tableHeight = ref('400px'); // Default height
 const employeeCardRef = ref(null);
+const orgTreeCardRef = ref(null); // Add ref for org tree card
 
 const updateTableHeight = async () => {
   await nextTick(); // Wait for DOM to be updated
-  if (employeeCardRef.value) {
-    const cardElement = employeeCardRef.value.$el;
-    const headerElement = cardElement.querySelector('.el-card__header');
+  if (employeeCardRef.value && orgTreeCardRef.value) {
+    const employeeCardElement = employeeCardRef.value.$el;
+    const orgTreeCardElement = orgTreeCardRef.value.$el;
+
+    // Set both cards to the same height
+    const employeeCardHeight = employeeCardElement.clientHeight;
+    orgTreeCardElement.style.height = `${employeeCardHeight}px`;
+
+    const headerElement = employeeCardElement.querySelector('.el-card__header');
     const headerHeight = headerElement ? headerElement.offsetHeight : 0;
     const cardPadding = 40; // el-card__body has 20px padding top/bottom
-    const calculatedHeight = cardElement.clientHeight - headerHeight - cardPadding;
+    const calculatedHeight = employeeCardHeight - headerHeight - cardPadding;
     tableHeight.value = calculatedHeight > 0 ? `${calculatedHeight}px` : '400px';
   }
 };
@@ -125,7 +132,7 @@ const filteredEmployees = computed(() => {
   if (!selectedOrganization.value) {
     return employees.value;
   }
-  return employees.value.filter(emp => emp.organizationName === selectedOrganization.value.name);
+  return employees.value.filter(emp => emp.organizationId === selectedOrganization.value.id);
 });
 
 const filterNode = (value, data) => {
@@ -404,7 +411,18 @@ onUnmounted(() => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   background: white;
   padding: 20px 24px;
-  /* 내부 패딩 추가 */
+  overflow-y: auto; /* Add scroll for overflow */
+}
+
+.org-tree-card .el-card__body {
+  height: 100%; /* Ensure body takes full height for scrolling */
+  display: flex;
+  flex-direction: column;
+}
+
+.org-tree-card .el-tree {
+  flex-grow: 1; /* Allow tree to grow and take available space */
+  overflow-y: auto; /* Add scroll to the tree itself if needed */
 }
 
 .card-header {
