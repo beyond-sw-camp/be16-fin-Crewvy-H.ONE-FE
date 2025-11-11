@@ -884,16 +884,36 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
         this.sidebarCollapsed = !this.sidebarCollapsed
       },
       getPageTitle() {
+        const nameTitles = {
+          EmployeeDetailView: '직원 상세 정보',
+          EmployeeEdit: '직원 정보 수정',
+          AddEmployee: '직원 추가',
+          AddOrganization: '조직 추가',
+          TitleManagement: '직책 관리',
+          GradeManagement: '직급 관리',
+          RoleList: '역할 목록',
+          CreateRole: '역할 생성',
+          RoleEdit: '역할 수정',
+          MyInfo: '내 정보',
+          MyInfoEdit: '내 정보 수정',
+          NotificationSettings: '알림 설정'
+        }
+
+        if (this.$route.name && nameTitles[this.$route.name]) {
+          return nameTitles[this.$route.name]
+        }
+
+        if (this.$route.path.startsWith('/employee/detail/')) {
+          return '직원 상세 정보'
+        }
+
         const titles = {
           '/': '대시보드',
           '/search': '통합 검색',
           '/organization': '조직 관리',
           '/employee': '직원 관리',
-          '/employee/add': '직원 추가',
           '/employee/title': '직책 관리',
           '/employee/grade': '직급 관리',
-          '/employee/role': '역할 목록',
-          '/employee/role/create': '역할 생성',
           '/attendance': '내 근태 현황',
           '/leave-request': '휴가/출장 신청',
           '/shared-calendar': '공유 캘린더',
@@ -928,6 +948,7 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
           '/admin/policy-assignment' : '정책 할당',
           '/admin/work-location-management' : '근무지 관리',
           '/schedule' : '일정',
+          
         }
         return titles[this.$route.path] || 'H.ONE'
       },
@@ -1866,9 +1887,24 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
 
 /* 캘린더 모달 스타일 */
 .calendar-btn {
-  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #606266;
-  margin-right: 8px;
+  border-radius: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.calendar-btn .el-icon {
+  font-size: 24px;
+}
+
+.calendar-btn:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
 }
 
 .calendar-modal {
