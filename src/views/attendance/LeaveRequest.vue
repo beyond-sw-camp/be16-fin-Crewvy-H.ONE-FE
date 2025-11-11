@@ -905,26 +905,26 @@ export default {
               response = await createLeaveRequest(payload);
             }
 
-            // 성공 메시지
-            if (response.autoApproved && response.status === 'APPROVED') {
-              success('자동승인처리되었습니다.');
-            } else {
-              success('신청이 성공적으로 제출되었습니다.');
-            }
-
             fetchMyRequests();
 
-            // 백엔드에서 자동 매핑한 documentId가 있으면 결재 양식 화면으로 이동
-            if (response.documentId) {
-              router.push({
-                path: `/approval/form/${response.documentId}`,
-                query: {
-                  requestId: response.requestId
-                }
-              });
+            // 자동 승인 여부 확인 (status가 APPROVED면 자동 승인)
+            const isAutoApproved = response.status === 'APPROVED';
+
+            if (isAutoApproved) {
+              // 자동 승인: 완료 메시지만 표시하고 결재 화면으로 이동하지 않음
+              success('신청이 자동 승인되었습니다. 근태 현황에 즉시 반영됩니다.');
             } else {
-              // 자동 승인되었으면 바로 근태 관리 화면으로
-              router.push({ name: 'AttendanceManagement' });
+              // 수동 승인: 결재 화면으로 이동
+              success('신청이 성공적으로 제출되었습니다.');
+
+              if (response.documentId) {
+                router.push({
+                  path: `/approval/form/${response.documentId}`,
+                  query: {
+                    requestId: response.requestId
+                  }
+                });
+              }
             }
           } catch (err) {
             error(err.message || '신청 제출에 실패했습니다.');

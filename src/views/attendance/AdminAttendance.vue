@@ -82,7 +82,7 @@
               </el-button>
             </div>
             <div class="attendance-table">
-              <el-table :data="attendanceData" v-loading="isLoading" style="width: 100%">
+              <el-table :data="filteredAttendanceData" v-loading="isLoading" style="width: 100%">
                 <el-table-column prop="employeeName" label="이름" width="120" />
                 <el-table-column prop="department" label="부서" width="150" />
                 <el-table-column prop="date" label="날짜" width="150" />
@@ -93,9 +93,11 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="clockIn" label="출근 시간" width="150" />
-                <el-table-column prop="clockOut" label="퇴근 시간" width="150" />
-                <el-table-column prop="workHours" label="근무 시간" />
+                <el-table-column prop="clockIn" label="출근 시간" width="120" />
+                <el-table-column prop="clockOut" label="퇴근 시간" width="120" />
+                <el-table-column prop="workHours" label="기본 근무" width="120" />
+                <el-table-column prop="extraWorkHours" label="추가 근무" width="120" />
+                <el-table-column prop="totalWorkHours" label="총 근무" width="120" />
                 <el-table-column label="작업" width="120">
                   <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">수정</el-button>
@@ -106,7 +108,7 @@
                 <el-pagination
                   background
                   layout="prev, pager, next"
-                  :total="attendanceTotalElements"
+                  :total="filteredAttendanceData.length"
                   :page-size="attendancePageSize"
                   v-model:current-page="attendanceCurrentPage"
                   @current-change="handleAttendancePageChange"
@@ -635,6 +637,8 @@
             clockIn: item.clockInTime || '-',
             clockOut: item.clockOutTime || '-',
             workHours: item.workHours || '-',
+            extraWorkHours: item.extraWorkHours || '-',  // 추가 근무
+            totalWorkHours: item.totalWorkHours || '-',  // 총 근무
             requestType: item.requestType,  // 휴가/출장 유형
             requestReason: item.requestReason,  // 신청 사유
           };
@@ -660,7 +664,9 @@
         상태: item.status,
         출근시간: item.clockIn,
         퇴근시간: item.clockOut,
-        근무시간: item.workHours,
+        기본근무시간: item.workHours,
+        추가근무시간: item.extraWorkHours,
+        총근무시간: item.totalWorkHours,
         요청유형: item.requestType || '-',
         신청사유: item.requestReason || '-'
       }));
