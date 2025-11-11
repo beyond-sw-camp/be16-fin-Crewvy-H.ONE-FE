@@ -64,7 +64,19 @@
               </span>
             </el-form-item>
 
-            <!-- 추가근무: 기간 + 1일 연장시간 입력 방식 -->
+            <!-- 추가근무: 정책 선택 -->
+            <el-form-item v-if="requestType === 'extraWork'" label="추가근무 정책" prop="policyId" :rules="{ required: true, message: '추가근무 정책을 선택하세요', trigger: 'change' }">
+              <el-select v-model="form.policyId" placeholder="추가근무 정책을 선택하세요">
+                <el-option
+                  v-for="policy in extraWorkPolicies"
+                  :key="policy.policyId"
+                  :label="`[${getExtraWorkTypeName(policy.typeCode)}] ${policy.name}`"
+                  :value="policy.policyId"
+                />
+              </el-select>
+            </el-form-item>
+
+            <!-- 추가근무: 기간 + 1일 시간 입력 방식 -->
             <el-form-item v-if="requestType === 'extraWork'" label="신청 기간" prop="dateRange" :rules="{ required: true, message: '기간을 선택하세요', trigger: 'change' }">
               <el-popover
                 placement="bottom-start"
@@ -125,17 +137,16 @@
               </span>
             </el-form-item>
 
-            <el-form-item v-if="requestType === 'extraWork'" label="1일 연장시간" prop="dailyOvertimeHours" :rules="{ required: true, message: '1일 연장시간을 입력하세요', trigger: 'change' }">
+            <el-form-item v-if="requestType === 'extraWork'" label="1일 시간" prop="dailyOvertimeHours" :rules="{ required: true, message: '1일 시간을 입력하세요', trigger: 'change' }">
               <el-time-picker
                 v-model="form.dailyOvertimeHours"
                 format="HH:mm"
                 value-format="HH:mm"
-                placeholder="예: 02:00"
-                :disabled-hours="() => Array.from({ length: 24 }, (_, i) => i).filter(h => h > 12)"
+                placeholder="예: 03:00"
                 style="width: 200px;"
               />
               <span class="form-description">
-                * 퇴근 시간 이후 매일 연장할 시간을 선택하세요. (최대 12시간)
+                * 선택한 기간의 각 날짜마다 적용할 시간을 입력하세요.
               </span>
               <el-alert
                 v-if="extraWorkWarning"
@@ -386,6 +397,13 @@ export default {
     );
     const holidayWorkPolicies = computed(() =>
       allPolicies.value.filter(p => p && p.typeCode && p.isActive && p.typeCode === 'PTC105')
+    );
+    // 추가근무 정책 (연장/야간/휴일 모두 포함)
+    const extraWorkPolicies = computed(() =>
+      allPolicies.value.filter(p =>
+        p && p.typeCode && p.isActive &&
+        (p.typeCode === 'PTC103' || p.typeCode === 'PTC104' || p.typeCode === 'PTC105')
+      )
     );
 
     // 선택된 정책 정보
@@ -1228,6 +1246,7 @@ export default {
     const formatRequestUnit = (unit) => ({ 'DAY': '종일', 'HALF_DAY_AM': '오전 반차', 'HALF_DAY_PM': '오후 반차', 'TIME_OFF': '시간 단위' }[unit] || unit);
     const formatStatus = (status) => ({ 'PENDING': '대기중', 'APPROVED': '승인', 'REJECTED': '반려', 'CANCELED': '취소' }[status] || status);
     const getStatusType = (status) => ({ 'PENDING': 'info', 'APPROVED': 'success', 'REJECTED': 'danger', 'CANCELED': 'warning' }[status] || 'info');
+    const getExtraWorkTypeName = (typeCode) => ({ 'PTC103': '연장근무', 'PTC104': '야간근무', 'PTC105': '휴일근무' }[typeCode] || '추가근무');
     const formatDate = (dateTimeStr) => dateTimeStr ? dateTimeStr.split('T')[0] : '';
     const formatPeriod = (row) => {
       if (!row) return '';
@@ -1251,10 +1270,12 @@ export default {
       overtimePolicies,
       nightWorkPolicies,
       holidayWorkPolicies,
+      extraWorkPolicies,
       workLocations,
       allowedWorkLocations,
       submitForm,
       resetForm,
+      getExtraWorkTypeName,
       handleRequestTypeChange,
       myRequests,
       pagination,
