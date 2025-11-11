@@ -322,7 +322,7 @@ export default {
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
   margin-bottom: 24px;
-  max-width: 800px;
+  width: 100%;
 }
 
 .stat-card {
@@ -347,17 +347,9 @@ export default {
   font-size: 56px;
   padding: 16px;
   border-radius: 12px;
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.stat-icon.active {
-  color: #e6a23c;
-  background: rgba(230, 162, 60, 0.1);
-}
-
-.stat-icon.completed {
-  color: #67c23a;
-  background: rgba(103, 194, 58, 0.1);
+  flex-shrink: 0;
+  color: white;
+  background: #4f46e5;
 }
 
 .stat-info {
@@ -366,7 +358,7 @@ export default {
 
 .stat-value {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 600;
   color: #303133;
   line-height: 1;
   margin-bottom: 4px;

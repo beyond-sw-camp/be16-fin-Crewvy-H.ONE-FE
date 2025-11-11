@@ -1,27 +1,201 @@
 <template>
-  <div class="dashboard">
-    <!-- 환영 메시지 -->
-    <div v-if="user" class="welcome-section">
-      <div class="welcome-content">
-        <h2>안녕하세요, {{ userName }}님!</h2>
-        <p>오늘도 좋은 하루 되세요. H.ONE에서 효율적인 업무를 시작해보세요.</p>
-      </div>
-      <div class="welcome-actions">
-        <el-button type="primary" @click="$router.push('/attendance')">
-          <el-icon><Clock /></el-icon>
-          <span style="margin-left: 8px;">출근 체크</span>
-        </el-button>
-        <el-button @click="$router.push('/chat')">
-          <el-icon><ChatDotRound /></el-icon>
-          <span style="margin-left: 8px;">채팅 시작</span>
-        </el-button>
-      </div>
-    </div>
-
+  <div class="dashboard"> 
     <!-- 메인 컨텐츠 그리드 -->
     <div class="content-grid">
+      <!-- 일정 -->
+      <div class="content-card schedule-card">
+        <div class="card-header schedule-header">
+          <h3>일정</h3>
+          <div class="schedule-controls">
+            <el-radio-group v-model="scheduleView" size="small" class="schedule-view-toggle">
+              <el-radio-button label="daily">일일</el-radio-button>
+              <el-radio-button label="weekly">주간</el-radio-button>
+              <el-radio-button label="monthly">월간</el-radio-button>
+            </el-radio-group>
+            <el-button type="text" @click="$router.push('/schedule')">전체보기</el-button>
+          </div>
+        </div>
+        <div class="schedule-content">
+          <template v-if="scheduleView === 'daily'">
+              <div class="schedule-list">
+                <div v-if="todaySchedule.length === 0" class="calendar-empty">
+                  <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+                  <p class="calendar-empty-title">오늘 예정된 일정이 없습니다.</p>
+                </div>
+                <div 
+                v-else
+                v-for="schedule in todaySchedule.slice(0, 4)" 
+                :key="schedule.id" 
+                class="schedule-item"
+                :class="schedule.type"
+                @click="viewEvent(schedule)"
+                style="cursor: pointer;"
+              >
+                <div class="schedule-time">{{ schedule.time }}</div>
+                <div class="schedule-content-body">
+                  <div class="schedule-title-wrapper">
+                    <span class="schedule-title">{{ schedule.title }}</span>
+                    <el-tag 
+                      v-if="schedule.typeName" 
+                      :type="getTagType(schedule.typeName)"
+                      size="small"
+                      class="schedule-type-tag"
+                    >
+                      {{ schedule.typeName }}
+                    </el-tag>
+                  </div>
+                  <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
+                </div>
+              </div>
+            </div>
+            <div 
+              class="schedule-footer" 
+              v-if="todaySchedule.length > 4"
+            >
+              <el-button 
+                type="text" 
+                @click="showTodayScheduleModal = true"
+              >
+                전체보기 ({{ todaySchedule.length }}개)
+              </el-button>
+            </div>
+          </template>
+          <template v-else-if="scheduleView === 'weekly'">
+            <div 
+              v-if="weeklySchedule.length === 0 || weeklySchedule.every(day => day.events.length === 0)"
+              class="calendar-empty calendar-empty-weekly"
+            >
+              <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+              <p class="calendar-empty-title">이번 주 예정된 일정이 없습니다.</p>
+            </div>
+            <div 
+              v-else 
+              class="weekly-schedule-list"
+            >
+              <div class="schedule-day" v-for="day in weeklySchedule" :key="day.date">
+                <div class="day-header">
+                  <span class="day-name">{{ day.dayName }}</span>
+                  <span class="day-date">{{ day.date }}</span>
+                </div>
+                <div class="day-events">
+                  <div v-if="day.events.length === 0" class="no-events">일정 없음</div>
+                  <template v-else>
+                    <div 
+                      class="event-item" 
+                      v-for="event in day.events.slice(0, 4)" 
+                      :key="event.id"
+                      @click="viewEvent(event)"
+                      style="cursor: pointer;"
+                    >
+                      <div class="event-time">{{ event.time }}</div>
+                      <div class="event-title">{{ event.title }}</div>
+                    </div>
+                    <div v-if="day.events.length > 4" class="more-events-indicator">
+                      +{{ day.events.length - 4 }}개 더
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="calendar-view">
+              <template v-if="hasMonthlyEvents">
+                <div class="calendar-header">
+                  <div class="calendar-title">
+                    <span class="calendar-month">{{ currentMonthLabel }}</span>
+                    <span class="calendar-summary">총 {{ monthlyEventsCount }}개 일정</span>
+                  </div>
+                  <div class="calendar-nav">
+                    <el-button circle size="small" @click="goToPrevMonth">
+                      <el-icon><ArrowLeft /></el-icon>
+                    </el-button>
+                    <el-button circle size="small" @click="goToNextMonth">
+                      <el-icon><ArrowRight /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+
+                <div class="calendar-grid">
+                  <div class="calendar-weekdays">
+                    <div 
+                      v-for="weekday in calendarWeekdays" 
+                      :key="weekday" 
+                      class="calendar-weekday"
+                    >
+                      {{ weekday }}
+                    </div>
+                  </div>
+                  <div class="calendar-days">
+                    <div
+                      v-for="day in monthlyCalendarDays"
+                      :key="day.date"
+                      class="calendar-day"
+                      :class="{
+                        'other-month': !day.currentMonth,
+                        today: day.isToday,
+                        'has-events': day.events.length > 0
+                      }"
+                    >
+                      <div class="calendar-day-header">
+                        <span class="day-number">{{ day.day }}</span>
+                        <span v-if="day.events.length" class="day-count">{{ day.events.length }}</span>
+                      </div>
+                      <div class="calendar-day-events">
+                        <div
+                          v-for="event in day.events.slice(0, 2)"
+                          :key="event.id"
+                          class="calendar-event"
+                          :class="event.type"
+                          @click="viewEvent(event)"
+                          style="cursor: pointer;"
+                        >
+                          <span class="event-title">{{ event.title }}</span>
+                        </div>
+                        <div
+                          v-if="day.events.length > 2"
+                          class="calendar-more"
+                        >
+                          +{{ day.events.length - 2 }}개 더
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div v-else class="calendar-empty">
+                <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+                <p class="calendar-empty-title">이번 달 예정된 일정이 없습니다.</p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 대기 중인 결재 -->
+      <div class="content-card approval-card">
+        <div class="card-header">
+          <h3>대기 중인 결재</h3>
+          <el-button type="text" @click="$router.push('/approval')">전체보기</el-button>
+        </div>
+        <div class="approval-list">
+          <div v-if="pendingApprovals.length === 0" class="no-approval">
+            대기 중인 결재가 없습니다.
+          </div>
+          <div v-else class="approval-item" v-for="approval in pendingApprovals" :key="approval.id" @click="viewApprovalDetail(approval)" style="cursor: pointer;">
+            <div class="approval-content">
+              <div class="approval-title">{{ approval.title }}</div>
+              <div class="approval-requester">{{ approval.requester }} • {{ approval.time }}</div>
+            </div>
+            <el-tag :type="approval.priority === 'high' ? 'danger' : 'warning'">
+              {{ approval.priority === 'high' ? '긴급' : '일반' }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+
       <!-- 근태 현황 -->
-      <div class="content-card">
+      <div class="content-card attendance-card">
         <div class="card-header">
           <h3>근태 현황</h3>
           <el-button type="text" @click="$router.push('/attendance')">전체보기</el-button>
@@ -43,99 +217,6 @@
           </div>
           <div class="attendance-chart">
             <AttendanceChart />
-          </div>
-        </div>
-      </div>
-
-      <!-- 이번 주 일정 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>이번 주 일정</h3>
-          <el-button type="text" @click="$router.push('/schedule')">전체보기</el-button>
-        </div>
-        <div class="weekly-schedule-list">
-          <div class="schedule-day" v-for="day in weeklySchedule" :key="day.date">
-            <div class="day-header">
-              <span class="day-name">{{ day.dayName }}</span>
-              <span class="day-date">{{ day.date }}</span>
-            </div>
-            <div class="day-events">
-              <div v-if="day.events.length === 0" class="no-events">일정 없음</div>
-              <template v-else>
-                <div class="event-item" v-for="event in day.events.slice(0, 4)" :key="event.id">
-                  <div class="event-time">{{ event.time }}</div>
-                  <div class="event-title">{{ event.title }}</div>
-                </div>
-                <div v-if="day.events.length > 4" class="more-events-indicator">
-                  +{{ day.events.length - 4 }}개 더
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 대기 중인 결재 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>대기 중인 결재</h3>
-          <el-button type="text" @click="$router.push('/approval')">전체보기</el-button>
-        </div>
-        <div class="approval-list">
-          <div v-if="pendingApprovals.length === 0" class="no-approval">
-            대기 중인 결재가 없습니다.
-          </div>
-          <div v-else class="approval-item" v-for="approval in pendingApprovals" :key="approval.id" @click="viewApprovalDetail(approval)" style="cursor: pointer;">
-            <div class="approval-content">
-              <div class="approval-title">{{ approval.title }}</div>
-              <div class="approval-requester">{{ approval.requester }} • {{ approval.time }}</div>
-            </div>
-            <el-tag :type="approval.priority === 'high' ? 'danger' : 'warning'">
-              {{ approval.priority === 'high' ? '긴급' : '일반' }}
-            </el-tag>
-          </div>
-        </div>
-      </div>
-
-      <!-- 오늘의 일정 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>오늘의 일정</h3>
-          <el-button 
-            type="text" 
-            @click="showTodayScheduleModal = true"
-            v-if="todaySchedule.length > 0"
-          >
-            전체보기 ({{ todaySchedule.length }}개)
-          </el-button>
-        </div>
-        <div class="schedule-list">
-          <div v-if="todaySchedule.length === 0" class="no-schedule">
-            오늘 예정된 일정이 없습니다.
-          </div>
-        <div 
-          v-for="schedule in todaySchedule.slice(0, 4)" 
-          :key="schedule.id" 
-          class="schedule-item"
-          :class="schedule.type"
-          @click="viewEvent(schedule)"
-          style="cursor: pointer;"
-        >
-            <div class="schedule-time">{{ schedule.time }}</div>
-            <div class="schedule-content">
-              <div class="schedule-title-wrapper">
-                <span class="schedule-title">{{ schedule.title }}</span>
-                <el-tag 
-                  v-if="schedule.typeName" 
-                  :type="getTagType(schedule.typeName)"
-                  size="small"
-                  class="schedule-type-tag"
-                >
-                  {{ schedule.typeName }}
-                </el-tag>
-              </div>
-              <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
-            </div>
           </div>
         </div>
       </div>
@@ -312,43 +393,6 @@
         </div>
       </template>
     </el-dialog>
-
-      <!-- 팀 현황 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>팀 현황</h3>
-          <el-button type="text" @click="$router.push('/organization')">전체보기</el-button>
-        </div>
-        <div class="team-stats">
-          <div class="team-item" v-for="team in teamStats" :key="team.name">
-            <div class="team-name">{{ team.name }}</div>
-            <div class="team-members">{{ team.members }}명</div>
-            <div class="team-attendance">
-              <span class="attendance-rate">{{ team.attendanceRate }}%</span>
-              <span class="attendance-label">출근률</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 빠른 액션 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>빠른 액션</h3>
-        </div>
-        <div class="quick-actions">
-          <el-button 
-            v-for="action in quickActions" 
-            :key="action.name"
-            :type="action.type"
-            @click="handleQuickAction(action.route)"
-            class="action-button"
-          >
-            <el-icon><component :is="action.icon" /></el-icon>
-            {{ action.name }}
-          </el-button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -357,7 +401,7 @@
 import { mapState, mapGetters } from 'vuex'
 import AttendanceChart from '@/components/AttendanceChart.vue'
 import apiClient from '@/api/http'
-import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck } from '@element-plus/icons-vue'
+import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck, ArrowLeft, ArrowRight, Calendar } from '@element-plus/icons-vue'
 
 export default {
   name: 'DashboardPage',
@@ -369,13 +413,20 @@ export default {
     Clock,
     Delete,
     Edit,
-    CircleCheck
+    CircleCheck,
+    Calendar,
+    ArrowLeft,
+    ArrowRight
   },
   data() {
     return {
       weeklySchedule: [],
+      monthlySchedule: [],
+      currentMonthlyDate: new Date(),
+      calendarWeekdays: ['일', '월', '화', '수', '목', '금', '토'],
       pendingApprovals: [],
       todaySchedule: [],
+      scheduleView: 'daily',
       showTodayScheduleModal: false,
       showEventDetailDialog: false,
       selectedEvent: {},
@@ -405,12 +456,68 @@ export default {
   computed: {
     ...mapState(['user']),
     ...mapGetters(['userName']),
+    currentMonthLabel() {
+      return this.currentMonthlyDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long'
+      })
+    },
+    monthlyEventsCount() {
+      return this.monthlySchedule.reduce((sum, day) => {
+        return sum + (Array.isArray(day.events) ? day.events.length : 0)
+      }, 0)
+    },
+    hasMonthlyEvents() {
+      return this.monthlyEventsCount > 0
+    },
+    monthlyScheduleMap() {
+      return this.monthlySchedule.reduce((map, day) => {
+        map[day.date] = Array.isArray(day.events) ? day.events : []
+        return map
+      }, {})
+    },
+    monthlyCalendarDays() {
+      const year = this.currentMonthlyDate.getFullYear()
+      const month = this.currentMonthlyDate.getMonth()
+
+      const firstDay = new Date(year, month, 1)
+      const startDate = new Date(firstDay)
+      startDate.setDate(startDate.getDate() - startDate.getDay())
+
+      const days = []
+      const today = new Date()
+
+      for (let i = 0; i < 42; i++) {
+        const date = new Date(startDate)
+        date.setDate(startDate.getDate() + i)
+
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        const events = this.monthlyScheduleMap[dateKey] || []
+
+        days.push({
+          date: dateKey,
+          day: date.getDate(),
+          currentMonth: date.getMonth() === month,
+          isToday: date.toDateString() === today.toDateString(),
+          events
+        })
+      }
+
+      return days
+    },
     eventDetailTitle() {
       return this.isEditingEvent ? '일정 수정' : '일정 상세';
     },
     canEditEvent() {
       // 개인일정만 수정/삭제 가능
       return this.selectedEvent.typeName === '개인일정' || this.selectedEvent.type === 'personal';
+    }
+  },
+  watch: {
+    scheduleView(newValue) {
+      if (newValue === 'monthly') {
+        this.fetchMonthlySchedule()
+      }
     }
   },
   methods: {
@@ -439,20 +546,6 @@ export default {
           }
         }
         
-        // typeName을 타입으로 매핑하는 함수 (캘린더와 동일)
-        const mapTypeNameToCalendarType = (typeName) => {
-          const typeMapping = {
-            '화상회의': 'meeting',
-            '회의': 'meeting',
-            '예약': 'reservation',
-            '휴가': 'vacation',
-            '출장': 'businessTrip',
-            '개인일정': 'personal',
-            '개인': 'personal'
-          };
-          return typeMapping[typeName] || 'personal';
-        };
-        
         this.todaySchedule = scheduleData.map((item, index) => {
           // LocalDateTime 파싱
           const startDateTime = item.startDate ? new Date(item.startDate) : null
@@ -463,7 +556,7 @@ export default {
           const timeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
           
           // typeName 매핑
-          const calendarType = mapTypeNameToCalendarType(item.typeName)
+          const calendarType = this.mapTypeNameToCalendarType(item.typeName)
           
           return {
             id: item.scheduleId || index,
@@ -702,6 +795,126 @@ export default {
         }
       }
     },
+    async fetchMonthlySchedule() {
+      try {
+        const targetDate = this.currentMonthlyDate
+          ? new Date(this.currentMonthlyDate)
+          : new Date()
+
+        const response = await apiClient.get('/workspace-service/calendar/find-my-schedule', {
+          params: {
+            searchType: 'Month',
+            year: targetDate.getFullYear(),
+            month: targetDate.getMonth() + 1
+          }
+        })
+        
+        let scheduleData = []
+        
+        if (response.data) {
+          if (response.data.data && Array.isArray(response.data.data)) {
+            scheduleData = response.data.data
+          } else if (Array.isArray(response.data)) {
+            scheduleData = response.data
+          }
+        }
+        
+        const dayMap = new Map()
+        
+        scheduleData.forEach((item, index) => {
+          if (!item.startDate || !item.endDate) return
+          
+          const startDateTime = new Date(item.startDate)
+          const endDateTime = new Date(item.endDate)
+          
+          const startDateKey = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`
+          const currentDate = new Date(startDateTime)
+          currentDate.setHours(0, 0, 0, 0)
+          const endDate = new Date(endDateTime)
+          endDate.setHours(0, 0, 0, 0)
+          
+          while (currentDate <= endDate) {
+            const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+            
+            if (!dayMap.has(dateKey)) {
+              dayMap.set(dateKey, [])
+            }
+            
+            const isStartDate = dateKey === startDateKey
+            const timeStr = isStartDate
+              ? `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
+              : '00:00'
+            
+            dayMap.get(dateKey).push({
+              id: `${item.scheduleId || index}-${dateKey}`,
+              scheduleId: item.scheduleId,
+              time: timeStr,
+              title: item.title || '제목 없음',
+              typeName: item.typeName || '',
+              type: this.mapTypeNameToCalendarType(item.typeName),
+              contents: item.contents || '',
+              startDate: item.startDate,
+              endDate: item.endDate
+            })
+            
+            currentDate.setDate(currentDate.getDate() + 1)
+          }
+        })
+        
+        const sortedDays = Array.from(dayMap.entries())
+          .filter(([, events]) => events.length > 0)
+          .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+          .map(([dateKey, events]) => {
+            const dateObj = new Date(dateKey)
+            const displayDate = `${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`
+            const sortedEvents = events.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+            
+            return {
+              date: dateKey,
+              displayDate,
+              dayName: this.getKoreanDayName(dateObj.getDay()),
+              events: sortedEvents
+            }
+          })
+        
+        this.monthlySchedule = sortedDays
+      } catch (error) {
+        console.error('이번 달 일정 조회 실패:', error)
+        this.monthlySchedule = []
+      }
+    },
+    goToPrevMonth() {
+      this.currentMonthlyDate = new Date(
+        this.currentMonthlyDate.getFullYear(),
+        this.currentMonthlyDate.getMonth() - 1,
+        1
+      )
+      this.fetchMonthlySchedule()
+    },
+    goToNextMonth() {
+      this.currentMonthlyDate = new Date(
+        this.currentMonthlyDate.getFullYear(),
+        this.currentMonthlyDate.getMonth() + 1,
+        1
+      )
+      this.fetchMonthlySchedule()
+    },
+    mapTypeNameToCalendarType(typeName) {
+      const typeMapping = {
+        '화상회의': 'meeting',
+        '회의': 'meeting',
+        '예약': 'reservation',
+        '휴가': 'vacation',
+        '출장': 'businessTrip',
+        '개인일정': 'personal',
+        '개인': 'personal'
+      }
+      return typeMapping[typeName] || 'personal'
+    },
+    getKoreanDayName(dayIndex) {
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+      return dayNames[dayIndex] || ''
+    },
     getEventTypeName(typeName) {
       return typeName || '일정'
     },
@@ -828,6 +1041,7 @@ export default {
   mounted() {
     this.fetchTodaySchedule()
     this.fetchWeeklySchedule()
+    this.fetchMonthlySchedule()
     this.fetchPendingApprovals()
   }
 }
@@ -837,6 +1051,10 @@ export default {
 .dashboard {
   max-width: 1200px;
   margin: 0 auto;
+  min-height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .welcome-section {
@@ -880,8 +1098,315 @@ export default {
 
 .content-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: 2fr 1.2fr;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "schedule approval"
+    "schedule attendance";
   gap: 20px;
+}
+
+.schedule-card {
+  grid-area: schedule;
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-card {
+  grid-area: approval;
+}
+
+.attendance-card {
+  grid-area: attendance;
+}
+
+.schedule-header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.schedule-controls .el-button {
+  padding: 0;
+}
+
+.schedule-card .schedule-content {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.schedule-card .schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.schedule-content-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.calendar-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-month {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.calendar-summary {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.calendar-nav .el-button {
+  border-color: #e2e8f0;
+  color: #4b5563;
+}
+
+.calendar-nav .el-button:hover {
+  border-color: #c7d2fe;
+  color: #6366f1;
+  background: #eef2ff;
+}
+
+.calendar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  background: #f9fafb;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-day {
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  padding: 10px 10px 12px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+}
+
+.calendar-day:nth-child(7n + 1) {
+  border-left: 1px solid #e2e8f0;
+}
+
+.calendar-day:nth-child(-n + 7) {
+  border-top: 1px solid #e2e8f0;
+}
+
+.calendar-weekdays .calendar-weekday {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 0;
+}
+
+.calendar-weekdays .calendar-weekday:first-child {
+  border-left: 1px solid #e2e8f0;
+}
+
+.calendar-weekdays .calendar-weekday:last-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.calendar-day.today {
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+}
+
+.calendar-day.other-month {
+  background: #f9fafb;
+  color: #a1a1aa;
+}
+
+.calendar-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.day-count {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #312e81;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.calendar-event:hover {
+  background: #e0e7ff;
+}
+
+.calendar-event.meeting {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.calendar-event.reservation {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.calendar-event.vacation {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.calendar-event.businessTrip {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.calendar-event.personal {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.calendar-event .event-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-more {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 500;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.calendar-empty {
+  padding: 24px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.calendar-empty-icon {
+  font-size: 32px;
+  color: #6366f1;
+}
+
+.calendar-empty-title {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.calendar-empty-weekly {
+  min-height: 200px;
+  justify-content: center;
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "schedule"
+      "approval"
+      "attendance";
+  }
+
+  .schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .schedule-controls {
+    justify-content: flex-start;
+  }
 }
 
 .content-card {
@@ -945,7 +1470,7 @@ export default {
   padding: 16px;
 }
 
-.chat-list, .approval-list, .schedule-list {
+.chat-list, .approval-list {
   padding: 16px 24px;
 }
 
@@ -1028,6 +1553,10 @@ export default {
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.schedule-item {
+  align-items: flex-start;
 }
 
 .approval-item:hover {
