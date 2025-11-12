@@ -256,10 +256,12 @@ export default {
           clockInTime.value = todayStatus.firstClockIn ? new Date(todayStatus.firstClockIn).toLocaleTimeString('ko-KR') : null;
           clockOutTime.value = todayStatus.lastClockOut ? new Date(todayStatus.lastClockOut).toLocaleTimeString('ko-KR') : null;
 
-          if(todayStatus.workedMinutes) {
+          if(todayStatus.workedMinutes != null) {
             const hours = Math.floor(todayStatus.workedMinutes / 60);
             const minutes = todayStatus.workedMinutes % 60;
             totalWorkTime.value = `${String(hours).padStart(2, '0')}시간 ${String(minutes).padStart(2, '0')}분`;
+          } else {
+            totalWorkTime.value = '00시간 00분';
           }
 
           // 마지막 이벤트를 기준으로 현재 상태를 명확하게 결정

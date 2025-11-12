@@ -201,22 +201,78 @@
           <el-button type="text" @click="$router.push('/attendance')">전체보기</el-button>
         </div>
         <div class="attendance-content">
-          <div class="attendance-summary">
-            <div class="summary-item">
-              <span class="label">출근 시간</span>
-              <span class="value">09:15</span>
+          <!-- 3단 요약 -->
+          <div class="attendance-summary-grid">
+            <div class="summary-section">
+              <div class="section-title">오늘</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">출근</span>
+                  <span class="stat-value" :class="{ 'late': clockInStatus === '지각' }">
+                    {{ clockInTime }}
+                    <el-tag v-if="clockInStatus" :type="clockInStatus === '정상' ? 'success' : 'danger'" size="small">
+                      {{ clockInStatus }}
+                    </el-tag>
+                  </span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">근무</span>
+                  <span class="stat-value">{{ workedTime }}</span>
+                </div>
+              </div>
             </div>
-            <div class="summary-item">
-              <span class="label">퇴근 예정</span>
-              <span class="value">18:15</span>
+
+            <div class="summary-section">
+              <div class="section-title">이번 주</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">출근율</span>
+                  <span class="stat-value">{{ weeklyAttendanceRate }}%</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">지각</span>
+                  <span class="stat-value">{{ weeklyLateCount }}회</span>
+                </div>
+              </div>
             </div>
-            <div class="summary-item">
-              <span class="label">근무 시간</span>
-              <span class="value">8시간 30분</span>
+
+            <div class="summary-section">
+              <div class="section-title">이번 달</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">근무시간</span>
+                  <span class="stat-value">{{ monthlyWorkHours }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">잔여연차</span>
+                  <span class="stat-value highlight">{{ remainingLeave }}일</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="attendance-chart">
-            <AttendanceChart />
+
+          <!-- 이번 주 출근 현황 -->
+          <div class="weekly-status">
+            <div class="weekly-title">이번 주 출근 현황</div>
+            <div class="weekly-days">
+              <div
+                v-for="day in weeklyAttendance"
+                :key="day.attendanceDate"
+                class="day-item"
+                :class="{
+                  'present': day.status !== 'ABSENT' && !day.isLate,
+                  'late': day.isLate,
+                  'absent': day.status === 'ABSENT'
+                }"
+              >
+                <div class="day-label">{{ getDayLabel(day.attendanceDate) }}</div>
+                <div class="day-status">
+                  <span v-if="day.status !== 'ABSENT' && !day.isLate">✓</span>
+                  <span v-else-if="day.isLate">△</span>
+                  <span v-else>✗</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -399,14 +455,13 @@
 
 <script>
 import { mapState, mapGetters } from 'vuex'
-import AttendanceChart from '@/components/AttendanceChart.vue'
 import apiClient from '@/api/http'
 import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck, ArrowLeft, ArrowRight, Calendar } from '@element-plus/icons-vue'
+import { getMyTodayAttendance, getMyMonthlyAttendance, getMyAllBalances } from '@/api/attendance'
 
 export default {
   name: 'DashboardPage',
   components: {
-    AttendanceChart,
     Notebook,
     Document,
     Tickets,
@@ -440,6 +495,11 @@ export default {
         endDate: '',
         endTime: ''
       },
+      // 근태 데이터
+      todayAttendance: null,
+      weeklyAttendance: [],
+      monthlyTotalMinutes: 0,
+      remainingLeave: 0,
       teamStats: [
         { name: '개발팀', members: 12, attendanceRate: 95 },
         { name: '디자인팀', members: 8, attendanceRate: 88 },
@@ -511,6 +571,33 @@ export default {
     canEditEvent() {
       // 개인일정만 수정/삭제 가능
       return this.selectedEvent.typeName === '개인일정' || this.selectedEvent.type === 'personal';
+    },
+    // 근태 관련 computed
+    clockInTime() {
+      if (!this.todayAttendance || !this.todayAttendance.firstClockIn) return '--:--';
+      return this.todayAttendance.firstClockIn.substring(11, 16);
+    },
+    clockInStatus() {
+      if (!this.todayAttendance) return '';
+      return this.todayAttendance.isLate ? '지각' : '정상';
+    },
+    workedTime() {
+      if (!this.todayAttendance || !this.todayAttendance.workedMinutes) return '0시간 0분';
+      const hours = Math.floor(this.todayAttendance.workedMinutes / 60);
+      const minutes = this.todayAttendance.workedMinutes % 60;
+      return `${hours}시간 ${minutes}분`;
+    },
+    weeklyAttendanceRate() {
+      if (this.weeklyAttendance.length === 0) return 0;
+      const workDays = this.weeklyAttendance.filter(day => day.status !== 'ABSENT').length;
+      return Math.round((workDays / this.weeklyAttendance.length) * 100);
+    },
+    weeklyLateCount() {
+      return this.weeklyAttendance.filter(day => day.isLate).length;
+    },
+    monthlyWorkHours() {
+      const hours = Math.floor(this.monthlyTotalMinutes / 60);
+      return `${hours}시간`;
     }
   },
   watch: {
@@ -1036,6 +1123,60 @@ export default {
         '개인일정': ''
       };
       return tagTypes[typeName] || '';
+    },
+    // 근태 데이터 가져오기
+    async fetchAttendanceData() {
+      try {
+        // 오늘 출근 정보
+        const todayData = await getMyTodayAttendance();
+        this.todayAttendance = todayData;
+
+        // 월별 근태 정보 (이번 주 + 이번 달)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+
+        const monthlyData = await getMyMonthlyAttendance({ year, month });
+
+        // 이번 주 데이터 필터링 (월~금)
+        const startOfWeek = this.getStartOfWeek(now);
+        const endOfWeek = this.getEndOfWeek(now);
+
+        this.weeklyAttendance = monthlyData.filter(day => {
+          const date = new Date(day.attendanceDate);
+          return date >= startOfWeek && date <= endOfWeek;
+        });
+
+        // 이번 달 총 근무시간
+        this.monthlyTotalMinutes = monthlyData.reduce((sum, day) => {
+          return sum + (day.workedMinutes || 0);
+        }, 0);
+
+        // 잔여 연차
+        const balances = await getMyAllBalances();
+        const annualLeave = balances.find(b => b.balanceTypeCode?.codeValue === 'PTC001');
+        this.remainingLeave = annualLeave ? annualLeave.remaining : 0;
+
+      } catch (error) {
+        console.error('근태 데이터 조회 실패:', error);
+      }
+    },
+    getStartOfWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 월요일로 조정
+      return new Date(d.setDate(diff));
+    },
+    getEndOfWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() + (day === 0 ? 0 : 5 - day + 1); // 금요일로 조정
+      return new Date(d.setDate(diff));
+    },
+    getDayLabel(dateString) {
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const date = new Date(dateString);
+      return days[date.getDay()];
     }
   },
   mounted() {
@@ -1043,6 +1184,7 @@ export default {
     this.fetchWeeklySchedule()
     this.fetchMonthlySchedule()
     this.fetchPendingApprovals()
+    this.fetchAttendanceData()
   }
 }
 </script>
@@ -1435,39 +1577,123 @@ export default {
   padding: 20px 24px;
 }
 
-.attendance-summary {
+.attendance-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
-.summary-item {
-  text-align: center;
-  padding: 16px;
+.summary-section {
   background: #f8f9fa;
   border-radius: 8px;
+  padding: 16px;
 }
 
-.summary-item .label {
-  display: block;
-  font-size: 12px;
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.stat-label {
+  font-size: 13px;
   color: #606266;
-  margin-bottom: 4px;
 }
 
-.summary-item .value {
-  display: block;
-  font-size: 16px;
+.stat-value {
+  font-size: 15px;
   font-weight: 600;
   color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.attendance-chart {
-  height: 200px;
-  background: white;
-  border-radius: 8px;
-  padding: 16px;
+.stat-value.late {
+  color: #f56c6c;
+}
+
+.stat-value.highlight {
+  color: #4f46e5;
+}
+
+.weekly-status {
+  border-top: 1px solid #e4e7ed;
+  padding-top: 20px;
+}
+
+.weekly-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.weekly-days {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.day-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  min-width: 50px;
+}
+
+.day-item.present {
+  background: #e8f5e9;
+}
+
+.day-item.late {
+  background: #fff3e0;
+}
+
+.day-item.absent {
+  background: #ffebee;
+}
+
+.day-label {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.day-status {
+  font-size: 18px;
+}
+
+.day-item.present .day-status {
+  color: #67c23a;
+}
+
+.day-item.late .day-status {
+  color: #e6a23c;
+}
+
+.day-item.absent .day-status {
+  color: #f56c6c;
 }
 
 .chat-list, .approval-list {
