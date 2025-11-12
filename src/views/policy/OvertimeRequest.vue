@@ -33,6 +33,22 @@
               <el-input v-model="form.title" placeholder="제목을 입력하세요" />
             </el-form-item>
 
+            <el-form-item label="추가근무 정책" required>
+              <el-select v-model="form.policyId" placeholder="추가근무 정책을 선택하세요" style="width: 100%;" :loading="policiesLoading">
+                <el-option
+                  v-for="policy in extraWorkPolicies"
+                  :key="policy.id"
+                  :label="`${policy.name} (${getPolicyTypeLabel(policy.policyTypeCode)})`"
+                  :value="policy.id"
+                >
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>{{ policy.name }}</span>
+                    <span style="color: var(--el-text-color-secondary); font-size: 12px;">{{ getPolicyTypeLabel(policy.policyTypeCode) }}</span>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
+
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="총 연장근무 시간">
@@ -164,23 +180,60 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { Plus, Delete, UploadFilled, Edit } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import ApprovalLineEditorModal from '@/components/approval/ApprovalLineEditorModal.vue';
+import { getApplicablePolicies } from '@/api/attendance';
 
 const route = useRoute();
 
 const form = ref({
   requestDate: new Date().toISOString().slice(0, 10),
-  title: ''
-  ,
+  title: '',
+  policyId: null,
   rows: [
     { workDate: new Date().toISOString().slice(0, 10), startTime: '18:00', endTime: '20:00', task: '', isNightWeekend: false },
   ],
 });
 
+// 추가근무 정책 목록 (PTC103, PTC104, PTC105만 필터링)
+const extraWorkPolicies = ref([]);
+const policiesLoading = ref(false);
+
+// 정책 타입 코드 -> 라벨 변환
+const getPolicyTypeLabel = (code) => {
+  const labels = {
+    'PTC103': '연장근무',
+    'PTC104': '야간근무',
+    'PTC105': '휴일근무',
+  };
+  return labels[code] || code;
+};
+
+// 추가근무 정책 목록 조회
+const fetchExtraWorkPolicies = async () => {
+  policiesLoading.value = true;
+  try {
+    const allPolicies = await getApplicablePolicies();
+    // PTC103 (연장근무), PTC104 (야간근무), PTC105 (휴일근무)만 필터링
+    extraWorkPolicies.value = allPolicies.filter(policy =>
+      ['PTC103', 'PTC104', 'PTC105'].includes(policy.policyTypeCode)
+    );
+
+    if (extraWorkPolicies.value.length === 0) {
+      ElMessage.warning('할당된 추가근무 정책이 없습니다.');
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '정책 목록을 불러오는 데 실패했습니다.');
+  } finally {
+    policiesLoading.value = false;
+  }
+};
+
 onMounted(() => {
   if (route.query.reason) {
     form.value.title = route.query.reason;
   }
+  fetchExtraWorkPolicies();
 });
 
 const showApprovalLineModal = ref(false);
