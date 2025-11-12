@@ -12,7 +12,14 @@
       </div>
       <div class="policy-layout" v-loading="isLoading">
         <div class="policy-list-panel">
-          <el-menu :default-active="selectedPolicyId" class="policy-menu" @select="handlePolicySelect">
+          <el-menu
+            :default-active="selectedPolicyId"
+            :default-openeds="openedMenus"
+            class="policy-menu"
+            @select="handlePolicySelect"
+            @open="handleMenuOpen"
+            @close="handleMenuClose"
+          >
             <el-sub-menu v-for="(group, type) in groupedPolicies" :key="type" :index="type">
               <template #title>
                 <span>{{ policyTypeNames[type] }}</span>
@@ -80,11 +87,57 @@ export default {
     const isLoading = ref(false);
     const selectedPolicyId = ref(null);
 
+    // localStorage에서 초기값 즉시 로드
+    const getInitialOpenedMenus = () => {
+      try {
+        const saved = localStorage.getItem('policyManagement_openedMenus');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log('저장된 메뉴 상태 로드:', parsed);
+          return parsed;
+        }
+      } catch (e) {
+        console.error('메뉴 상태 로드 실패:', e);
+      }
+      return [];
+    };
+
+    const openedMenus = ref(getInitialOpenedMenus());
+
     const policyTypeNames = {
       leave: '휴가 정책',
       work: '근무 정책',
       trip: '출장 정책',
       overtime: '연장/야간/휴일 근무',
+    };
+
+    // localStorage에 열린 메뉴 상태 저장
+    const saveOpenedMenus = () => {
+      try {
+        console.log('메뉴 상태 저장:', openedMenus.value);
+        localStorage.setItem('policyManagement_openedMenus', JSON.stringify(openedMenus.value));
+      } catch (e) {
+        console.error('메뉴 상태 저장 실패:', e);
+      }
+    };
+
+    // 메뉴 열림 처리
+    const handleMenuOpen = (index) => {
+      console.log('메뉴 열림:', index);
+      if (!openedMenus.value.includes(index)) {
+        openedMenus.value.push(index);
+        saveOpenedMenus();
+      }
+    };
+
+    // 메뉴 닫힘 처리
+    const handleMenuClose = (index) => {
+      console.log('메뉴 닫힘:', index);
+      const idx = openedMenus.value.indexOf(index);
+      if (idx > -1) {
+        openedMenus.value.splice(idx, 1);
+        saveOpenedMenus();
+      }
     };
 
     const groupedPolicies = computed(() => {
@@ -129,7 +182,10 @@ export default {
       }
     };
 
-    onMounted(fetchPolicies);
+    onMounted(() => {
+      console.log('컴포넌트 마운트, 현재 openedMenus:', openedMenus.value);
+      fetchPolicies();
+    });
 
     const handlePolicySelect = (index) => {
       selectedPolicyId.value = index;
@@ -191,7 +247,10 @@ export default {
       policyTypeNames,
       selectedPolicyId,
       selectedPolicy,
+      openedMenus,
       handlePolicySelect,
+      handleMenuOpen,
+      handleMenuClose,
       goToCreatePage,
       goToAssignPage,
       editPolicy,

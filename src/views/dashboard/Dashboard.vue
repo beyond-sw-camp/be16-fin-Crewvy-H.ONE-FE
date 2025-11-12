@@ -1,82 +1,179 @@
 <template>
-  <div class="dashboard">
-    <!-- 환영 메시지 -->
-    <div v-if="user" class="welcome-section">
-      <div class="welcome-content">
-        <h2>안녕하세요, {{ userName }}님!</h2>
-        <p>오늘도 좋은 하루 되세요. H.ONE에서 효율적인 업무를 시작해보세요.</p>
-      </div>
-      <div class="welcome-actions">
-        <el-button type="primary" @click="$router.push('/attendance')">
-          <el-icon><Clock /></el-icon>
-          <span style="margin-left: 8px;">출근 체크</span>
-        </el-button>
-        <el-button @click="$router.push('/chat')">
-          <el-icon><ChatDotRound /></el-icon>
-          <span style="margin-left: 8px;">채팅 시작</span>
-        </el-button>
-      </div>
-    </div>
-
+  <div class="dashboard"> 
     <!-- 메인 컨텐츠 그리드 -->
     <div class="content-grid">
-      <!-- 근태 현황 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>근태 현황</h3>
-          <el-button type="text" @click="$router.push('/attendance')">전체보기</el-button>
-        </div>
-        <div class="attendance-content">
-          <div class="attendance-summary">
-            <div class="summary-item">
-              <span class="label">출근 시간</span>
-              <span class="value">09:15</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">퇴근 예정</span>
-              <span class="value">18:15</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">근무 시간</span>
-              <span class="value">8시간 30분</span>
-            </div>
-          </div>
-          <div class="attendance-chart">
-            <AttendanceChart />
+      <!-- 일정 -->
+      <div class="content-card schedule-card">
+        <div class="card-header schedule-header">
+          <h3>일정</h3>
+          <div class="schedule-controls">
+            <el-radio-group v-model="scheduleView" size="small" class="schedule-view-toggle">
+              <el-radio-button label="daily">일일</el-radio-button>
+              <el-radio-button label="weekly">주간</el-radio-button>
+              <el-radio-button label="monthly">월간</el-radio-button>
+            </el-radio-group>
+            <el-button type="text" @click="$router.push('/schedule')">전체보기</el-button>
           </div>
         </div>
-      </div>
-
-      <!-- 이번 주 일정 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>이번 주 일정</h3>
-          <el-button type="text" @click="$router.push('/schedule')">전체보기</el-button>
-        </div>
-        <div class="weekly-schedule-list">
-          <div class="schedule-day" v-for="day in weeklySchedule" :key="day.date">
-            <div class="day-header">
-              <span class="day-name">{{ day.dayName }}</span>
-              <span class="day-date">{{ day.date }}</span>
-            </div>
-            <div class="day-events">
-              <div v-if="day.events.length === 0" class="no-events">일정 없음</div>
-              <template v-else>
-                <div class="event-item" v-for="event in day.events.slice(0, 4)" :key="event.id">
-                  <div class="event-time">{{ event.time }}</div>
-                  <div class="event-title">{{ event.title }}</div>
+        <div class="schedule-content">
+          <template v-if="scheduleView === 'daily'">
+              <div class="schedule-list">
+                <div v-if="todaySchedule.length === 0" class="calendar-empty">
+                  <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+                  <p class="calendar-empty-title">오늘 예정된 일정이 없습니다.</p>
                 </div>
-                <div v-if="day.events.length > 4" class="more-events-indicator">
-                  +{{ day.events.length - 4 }}개 더
+                <div 
+                v-else
+                v-for="schedule in todaySchedule.slice(0, 4)" 
+                :key="schedule.id" 
+                class="schedule-item"
+                :class="schedule.type"
+                @click="viewEvent(schedule)"
+                style="cursor: pointer;"
+              >
+                <div class="schedule-time">{{ schedule.time }}</div>
+                <div class="schedule-content-body">
+                  <div class="schedule-title-wrapper">
+                    <span class="schedule-title">{{ schedule.title }}</span>
+                    <el-tag 
+                      v-if="schedule.typeName" 
+                      :type="getTagType(schedule.typeName)"
+                      size="small"
+                      class="schedule-type-tag"
+                    >
+                      {{ schedule.typeName }}
+                    </el-tag>
+                  </div>
+                  <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
+                </div>
+              </div>
+            </div>
+            <div 
+              class="schedule-footer" 
+              v-if="todaySchedule.length > 4"
+            >
+              <el-button 
+                type="text" 
+                @click="showTodayScheduleModal = true"
+              >
+                전체보기 ({{ todaySchedule.length }}개)
+              </el-button>
+            </div>
+          </template>
+          <template v-else-if="scheduleView === 'weekly'">
+            <div 
+              v-if="weeklySchedule.length === 0 || weeklySchedule.every(day => day.events.length === 0)"
+              class="calendar-empty calendar-empty-weekly"
+            >
+              <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+              <p class="calendar-empty-title">이번 주 예정된 일정이 없습니다.</p>
+            </div>
+            <div 
+              v-else 
+              class="weekly-schedule-list"
+            >
+              <div class="schedule-day" v-for="day in weeklySchedule" :key="day.date">
+                <div class="day-header">
+                  <span class="day-name">{{ day.dayName }}</span>
+                  <span class="day-date">{{ day.date }}</span>
+                </div>
+                <div class="day-events">
+                  <div v-if="day.events.length === 0" class="no-events">일정 없음</div>
+                  <template v-else>
+                    <div 
+                      class="event-item" 
+                      v-for="event in day.events.slice(0, 4)" 
+                      :key="event.id"
+                      @click="viewEvent(event)"
+                      style="cursor: pointer;"
+                    >
+                      <div class="event-time">{{ event.time }}</div>
+                      <div class="event-title">{{ event.title }}</div>
+                    </div>
+                    <div v-if="day.events.length > 4" class="more-events-indicator">
+                      +{{ day.events.length - 4 }}개 더
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="calendar-view">
+              <template v-if="hasMonthlyEvents">
+                <div class="calendar-header">
+                  <div class="calendar-title">
+                    <span class="calendar-month">{{ currentMonthLabel }}</span>
+                    <span class="calendar-summary">총 {{ monthlyEventsCount }}개 일정</span>
+                  </div>
+                  <div class="calendar-nav">
+                    <el-button circle size="small" @click="goToPrevMonth">
+                      <el-icon><ArrowLeft /></el-icon>
+                    </el-button>
+                    <el-button circle size="small" @click="goToNextMonth">
+                      <el-icon><ArrowRight /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+
+                <div class="calendar-grid">
+                  <div class="calendar-weekdays">
+                    <div 
+                      v-for="weekday in calendarWeekdays" 
+                      :key="weekday" 
+                      class="calendar-weekday"
+                    >
+                      {{ weekday }}
+                    </div>
+                  </div>
+                  <div class="calendar-days">
+                    <div
+                      v-for="day in monthlyCalendarDays"
+                      :key="day.date"
+                      class="calendar-day"
+                      :class="{
+                        'other-month': !day.currentMonth,
+                        today: day.isToday,
+                        'has-events': day.events.length > 0
+                      }"
+                    >
+                      <div class="calendar-day-header">
+                        <span class="day-number">{{ day.day }}</span>
+                        <span v-if="day.events.length" class="day-count">{{ day.events.length }}</span>
+                      </div>
+                      <div class="calendar-day-events">
+                        <div
+                          v-for="event in day.events.slice(0, 2)"
+                          :key="event.id"
+                          class="calendar-event"
+                          :class="event.type"
+                          @click="viewEvent(event)"
+                          style="cursor: pointer;"
+                        >
+                          <span class="event-title">{{ event.title }}</span>
+                        </div>
+                        <div
+                          v-if="day.events.length > 2"
+                          class="calendar-more"
+                        >
+                          +{{ day.events.length - 2 }}개 더
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </template>
+              <div v-else class="calendar-empty">
+                <el-icon class="calendar-empty-icon"><Calendar /></el-icon>
+                <p class="calendar-empty-title">이번 달 예정된 일정이 없습니다.</p>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
 
       <!-- 대기 중인 결재 -->
-      <div class="content-card">
+      <div class="content-card approval-card">
         <div class="card-header">
           <h3>대기 중인 결재</h3>
           <el-button type="text" @click="$router.push('/approval')">전체보기</el-button>
@@ -97,44 +194,84 @@
         </div>
       </div>
 
-      <!-- 오늘의 일정 -->
-      <div class="content-card">
+      <!-- 근태 현황 -->
+      <div class="content-card attendance-card">
         <div class="card-header">
-          <h3>오늘의 일정</h3>
-          <el-button 
-            type="text" 
-            @click="showTodayScheduleModal = true"
-            v-if="todaySchedule.length > 0"
-          >
-            전체보기 ({{ todaySchedule.length }}개)
-          </el-button>
+          <h3>근태 현황</h3>
+          <el-button type="text" @click="$router.push('/attendance')">전체보기</el-button>
         </div>
-        <div class="schedule-list">
-          <div v-if="todaySchedule.length === 0" class="no-schedule">
-            오늘 예정된 일정이 없습니다.
-          </div>
-        <div 
-          v-for="schedule in todaySchedule.slice(0, 4)" 
-          :key="schedule.id" 
-          class="schedule-item"
-          :class="schedule.type"
-          @click="viewEvent(schedule)"
-          style="cursor: pointer;"
-        >
-            <div class="schedule-time">{{ schedule.time }}</div>
-            <div class="schedule-content">
-              <div class="schedule-title-wrapper">
-                <span class="schedule-title">{{ schedule.title }}</span>
-                <el-tag 
-                  v-if="schedule.typeName" 
-                  :type="getTagType(schedule.typeName)"
-                  size="small"
-                  class="schedule-type-tag"
-                >
-                  {{ schedule.typeName }}
-                </el-tag>
+        <div class="attendance-content">
+          <!-- 3단 요약 -->
+          <div class="attendance-summary-grid">
+            <div class="summary-section">
+              <div class="section-title">오늘</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">출근</span>
+                  <span class="stat-value" :class="{ 'late': clockInStatus === '지각' }">
+                    {{ clockInTime }}
+                    <el-tag v-if="clockInStatus" :type="clockInStatus === '정상' ? 'success' : 'danger'" size="small">
+                      {{ clockInStatus }}
+                    </el-tag>
+                  </span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">근무</span>
+                  <span class="stat-value">{{ workedTime }}</span>
+                </div>
               </div>
-              <div v-if="schedule.contents" class="schedule-contents">{{ schedule.contents }}</div>
+            </div>
+
+            <div class="summary-section">
+              <div class="section-title">이번 주</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">출근율</span>
+                  <span class="stat-value">{{ weeklyAttendanceRate }}%</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">지각</span>
+                  <span class="stat-value">{{ weeklyLateCount }}회</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="summary-section">
+              <div class="section-title">이번 달</div>
+              <div class="section-content">
+                <div class="stat-row">
+                  <span class="stat-label">근무시간</span>
+                  <span class="stat-value">{{ monthlyWorkHours }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">잔여연차</span>
+                  <span class="stat-value highlight">{{ remainingLeave }}일</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 이번 주 출근 현황 -->
+          <div class="weekly-status">
+            <div class="weekly-title">이번 주 출근 현황</div>
+            <div class="weekly-days">
+              <div
+                v-for="day in weeklyAttendance"
+                :key="day.attendanceDate"
+                class="day-item"
+                :class="{
+                  'present': day.status !== 'ABSENT' && !day.isLate,
+                  'late': day.isLate,
+                  'absent': day.status === 'ABSENT'
+                }"
+              >
+                <div class="day-label">{{ getDayLabel(day.attendanceDate) }}</div>
+                <div class="day-status">
+                  <span v-if="day.status !== 'ABSENT' && !day.isLate">✓</span>
+                  <span v-else-if="day.isLate">△</span>
+                  <span v-else>✗</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -312,70 +449,39 @@
         </div>
       </template>
     </el-dialog>
-
-      <!-- 팀 현황 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>팀 현황</h3>
-          <el-button type="text" @click="$router.push('/organization')">전체보기</el-button>
-        </div>
-        <div class="team-stats">
-          <div class="team-item" v-for="team in teamStats" :key="team.name">
-            <div class="team-name">{{ team.name }}</div>
-            <div class="team-members">{{ team.members }}명</div>
-            <div class="team-attendance">
-              <span class="attendance-rate">{{ team.attendanceRate }}%</span>
-              <span class="attendance-label">출근률</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 빠른 액션 -->
-      <div class="content-card">
-        <div class="card-header">
-          <h3>빠른 액션</h3>
-        </div>
-        <div class="quick-actions">
-          <el-button 
-            v-for="action in quickActions" 
-            :key="action.name"
-            :type="action.type"
-            @click="handleQuickAction(action.route)"
-            class="action-button"
-          >
-            <el-icon><component :is="action.icon" /></el-icon>
-            {{ action.name }}
-          </el-button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
 import { mapState, mapGetters } from 'vuex'
-import AttendanceChart from '@/components/AttendanceChart.vue'
 import apiClient from '@/api/http'
-import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck } from '@element-plus/icons-vue'
+import { Notebook, Document, Tickets, Clock, Delete, Edit, CircleCheck, ArrowLeft, ArrowRight, Calendar } from '@element-plus/icons-vue'
+import { getMyTodayAttendance, getMyMonthlyAttendance, getMyAllBalances } from '@/api/attendance'
 
 export default {
   name: 'DashboardPage',
   components: {
-    AttendanceChart,
     Notebook,
     Document,
     Tickets,
     Clock,
     Delete,
     Edit,
-    CircleCheck
+    CircleCheck,
+    Calendar,
+    ArrowLeft,
+    ArrowRight
   },
   data() {
     return {
       weeklySchedule: [],
+      monthlySchedule: [],
+      currentMonthlyDate: new Date(),
+      calendarWeekdays: ['일', '월', '화', '수', '목', '금', '토'],
       pendingApprovals: [],
       todaySchedule: [],
+      scheduleView: 'daily',
       showTodayScheduleModal: false,
       showEventDetailDialog: false,
       selectedEvent: {},
@@ -389,6 +495,11 @@ export default {
         endDate: '',
         endTime: ''
       },
+      // 근태 데이터
+      todayAttendance: null,
+      weeklyAttendance: [],
+      monthlyTotalMinutes: 0,
+      remainingLeave: 0,
       teamStats: [
         { name: '개발팀', members: 12, attendanceRate: 95 },
         { name: '디자인팀', members: 8, attendanceRate: 88 },
@@ -405,12 +516,95 @@ export default {
   computed: {
     ...mapState(['user']),
     ...mapGetters(['userName']),
+    currentMonthLabel() {
+      return this.currentMonthlyDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long'
+      })
+    },
+    monthlyEventsCount() {
+      return this.monthlySchedule.reduce((sum, day) => {
+        return sum + (Array.isArray(day.events) ? day.events.length : 0)
+      }, 0)
+    },
+    hasMonthlyEvents() {
+      return this.monthlyEventsCount > 0
+    },
+    monthlyScheduleMap() {
+      return this.monthlySchedule.reduce((map, day) => {
+        map[day.date] = Array.isArray(day.events) ? day.events : []
+        return map
+      }, {})
+    },
+    monthlyCalendarDays() {
+      const year = this.currentMonthlyDate.getFullYear()
+      const month = this.currentMonthlyDate.getMonth()
+
+      const firstDay = new Date(year, month, 1)
+      const startDate = new Date(firstDay)
+      startDate.setDate(startDate.getDate() - startDate.getDay())
+
+      const days = []
+      const today = new Date()
+
+      for (let i = 0; i < 42; i++) {
+        const date = new Date(startDate)
+        date.setDate(startDate.getDate() + i)
+
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        const events = this.monthlyScheduleMap[dateKey] || []
+
+        days.push({
+          date: dateKey,
+          day: date.getDate(),
+          currentMonth: date.getMonth() === month,
+          isToday: date.toDateString() === today.toDateString(),
+          events
+        })
+      }
+
+      return days
+    },
     eventDetailTitle() {
       return this.isEditingEvent ? '일정 수정' : '일정 상세';
     },
     canEditEvent() {
       // 개인일정만 수정/삭제 가능
       return this.selectedEvent.typeName === '개인일정' || this.selectedEvent.type === 'personal';
+    },
+    // 근태 관련 computed
+    clockInTime() {
+      if (!this.todayAttendance || !this.todayAttendance.firstClockIn) return '--:--';
+      return this.todayAttendance.firstClockIn.substring(11, 16);
+    },
+    clockInStatus() {
+      if (!this.todayAttendance) return '';
+      return this.todayAttendance.isLate ? '지각' : '정상';
+    },
+    workedTime() {
+      if (!this.todayAttendance || !this.todayAttendance.workedMinutes) return '0시간 0분';
+      const hours = Math.floor(this.todayAttendance.workedMinutes / 60);
+      const minutes = this.todayAttendance.workedMinutes % 60;
+      return `${hours}시간 ${minutes}분`;
+    },
+    weeklyAttendanceRate() {
+      if (this.weeklyAttendance.length === 0) return 0;
+      const workDays = this.weeklyAttendance.filter(day => day.status !== 'ABSENT').length;
+      return Math.round((workDays / this.weeklyAttendance.length) * 100);
+    },
+    weeklyLateCount() {
+      return this.weeklyAttendance.filter(day => day.isLate).length;
+    },
+    monthlyWorkHours() {
+      const hours = Math.floor(this.monthlyTotalMinutes / 60);
+      return `${hours}시간`;
+    }
+  },
+  watch: {
+    scheduleView(newValue) {
+      if (newValue === 'monthly') {
+        this.fetchMonthlySchedule()
+      }
     }
   },
   methods: {
@@ -439,20 +633,6 @@ export default {
           }
         }
         
-        // typeName을 타입으로 매핑하는 함수 (캘린더와 동일)
-        const mapTypeNameToCalendarType = (typeName) => {
-          const typeMapping = {
-            '화상회의': 'meeting',
-            '회의': 'meeting',
-            '예약': 'reservation',
-            '휴가': 'vacation',
-            '출장': 'businessTrip',
-            '개인일정': 'personal',
-            '개인': 'personal'
-          };
-          return typeMapping[typeName] || 'personal';
-        };
-        
         this.todaySchedule = scheduleData.map((item, index) => {
           // LocalDateTime 파싱
           const startDateTime = item.startDate ? new Date(item.startDate) : null
@@ -463,7 +643,7 @@ export default {
           const timeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
           
           // typeName 매핑
-          const calendarType = mapTypeNameToCalendarType(item.typeName)
+          const calendarType = this.mapTypeNameToCalendarType(item.typeName)
           
           return {
             id: item.scheduleId || index,
@@ -702,6 +882,126 @@ export default {
         }
       }
     },
+    async fetchMonthlySchedule() {
+      try {
+        const targetDate = this.currentMonthlyDate
+          ? new Date(this.currentMonthlyDate)
+          : new Date()
+
+        const response = await apiClient.get('/workspace-service/calendar/find-my-schedule', {
+          params: {
+            searchType: 'Month',
+            year: targetDate.getFullYear(),
+            month: targetDate.getMonth() + 1
+          }
+        })
+        
+        let scheduleData = []
+        
+        if (response.data) {
+          if (response.data.data && Array.isArray(response.data.data)) {
+            scheduleData = response.data.data
+          } else if (Array.isArray(response.data)) {
+            scheduleData = response.data
+          }
+        }
+        
+        const dayMap = new Map()
+        
+        scheduleData.forEach((item, index) => {
+          if (!item.startDate || !item.endDate) return
+          
+          const startDateTime = new Date(item.startDate)
+          const endDateTime = new Date(item.endDate)
+          
+          const startDateKey = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`
+          const currentDate = new Date(startDateTime)
+          currentDate.setHours(0, 0, 0, 0)
+          const endDate = new Date(endDateTime)
+          endDate.setHours(0, 0, 0, 0)
+          
+          while (currentDate <= endDate) {
+            const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
+            
+            if (!dayMap.has(dateKey)) {
+              dayMap.set(dateKey, [])
+            }
+            
+            const isStartDate = dateKey === startDateKey
+            const timeStr = isStartDate
+              ? `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`
+              : '00:00'
+            
+            dayMap.get(dateKey).push({
+              id: `${item.scheduleId || index}-${dateKey}`,
+              scheduleId: item.scheduleId,
+              time: timeStr,
+              title: item.title || '제목 없음',
+              typeName: item.typeName || '',
+              type: this.mapTypeNameToCalendarType(item.typeName),
+              contents: item.contents || '',
+              startDate: item.startDate,
+              endDate: item.endDate
+            })
+            
+            currentDate.setDate(currentDate.getDate() + 1)
+          }
+        })
+        
+        const sortedDays = Array.from(dayMap.entries())
+          .filter(([, events]) => events.length > 0)
+          .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+          .map(([dateKey, events]) => {
+            const dateObj = new Date(dateKey)
+            const displayDate = `${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`
+            const sortedEvents = events.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+            
+            return {
+              date: dateKey,
+              displayDate,
+              dayName: this.getKoreanDayName(dateObj.getDay()),
+              events: sortedEvents
+            }
+          })
+        
+        this.monthlySchedule = sortedDays
+      } catch (error) {
+        console.error('이번 달 일정 조회 실패:', error)
+        this.monthlySchedule = []
+      }
+    },
+    goToPrevMonth() {
+      this.currentMonthlyDate = new Date(
+        this.currentMonthlyDate.getFullYear(),
+        this.currentMonthlyDate.getMonth() - 1,
+        1
+      )
+      this.fetchMonthlySchedule()
+    },
+    goToNextMonth() {
+      this.currentMonthlyDate = new Date(
+        this.currentMonthlyDate.getFullYear(),
+        this.currentMonthlyDate.getMonth() + 1,
+        1
+      )
+      this.fetchMonthlySchedule()
+    },
+    mapTypeNameToCalendarType(typeName) {
+      const typeMapping = {
+        '화상회의': 'meeting',
+        '회의': 'meeting',
+        '예약': 'reservation',
+        '휴가': 'vacation',
+        '출장': 'businessTrip',
+        '개인일정': 'personal',
+        '개인': 'personal'
+      }
+      return typeMapping[typeName] || 'personal'
+    },
+    getKoreanDayName(dayIndex) {
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+      return dayNames[dayIndex] || ''
+    },
     getEventTypeName(typeName) {
       return typeName || '일정'
     },
@@ -823,12 +1123,68 @@ export default {
         '개인일정': ''
       };
       return tagTypes[typeName] || '';
+    },
+    // 근태 데이터 가져오기
+    async fetchAttendanceData() {
+      try {
+        // 오늘 출근 정보
+        const todayData = await getMyTodayAttendance();
+        this.todayAttendance = todayData;
+
+        // 월별 근태 정보 (이번 주 + 이번 달)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+
+        const monthlyData = await getMyMonthlyAttendance({ year, month });
+
+        // 이번 주 데이터 필터링 (월~금)
+        const startOfWeek = this.getStartOfWeek(now);
+        const endOfWeek = this.getEndOfWeek(now);
+
+        this.weeklyAttendance = monthlyData.filter(day => {
+          const date = new Date(day.attendanceDate);
+          return date >= startOfWeek && date <= endOfWeek;
+        });
+
+        // 이번 달 총 근무시간
+        this.monthlyTotalMinutes = monthlyData.reduce((sum, day) => {
+          return sum + (day.workedMinutes || 0);
+        }, 0);
+
+        // 잔여 연차
+        const balances = await getMyAllBalances();
+        const annualLeave = balances.find(b => b.balanceTypeCode?.codeValue === 'PTC001');
+        this.remainingLeave = annualLeave ? annualLeave.remaining : 0;
+
+      } catch (error) {
+        console.error('근태 데이터 조회 실패:', error);
+      }
+    },
+    getStartOfWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 월요일로 조정
+      return new Date(d.setDate(diff));
+    },
+    getEndOfWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() + (day === 0 ? 0 : 5 - day + 1); // 금요일로 조정
+      return new Date(d.setDate(diff));
+    },
+    getDayLabel(dateString) {
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const date = new Date(dateString);
+      return days[date.getDay()];
     }
   },
   mounted() {
     this.fetchTodaySchedule()
     this.fetchWeeklySchedule()
+    this.fetchMonthlySchedule()
     this.fetchPendingApprovals()
+    this.fetchAttendanceData()
   }
 }
 </script>
@@ -837,6 +1193,10 @@ export default {
 .dashboard {
   max-width: 1200px;
   margin: 0 auto;
+  min-height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .welcome-section {
@@ -880,8 +1240,315 @@ export default {
 
 .content-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: 2fr 1.2fr;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "schedule approval"
+    "schedule attendance";
   gap: 20px;
+}
+
+.schedule-card {
+  grid-area: schedule;
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-card {
+  grid-area: approval;
+}
+
+.attendance-card {
+  grid-area: attendance;
+}
+
+.schedule-header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.schedule-controls .el-button {
+  padding: 0;
+}
+
+.schedule-card .schedule-content {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.schedule-card .schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.schedule-content-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.calendar-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-month {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.calendar-summary {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.calendar-nav .el-button {
+  border-color: #e2e8f0;
+  color: #4b5563;
+}
+
+.calendar-nav .el-button:hover {
+  border-color: #c7d2fe;
+  color: #6366f1;
+  background: #eef2ff;
+}
+
+.calendar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  background: #f9fafb;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-day {
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  padding: 10px 10px 12px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+}
+
+.calendar-day:nth-child(7n + 1) {
+  border-left: 1px solid #e2e8f0;
+}
+
+.calendar-day:nth-child(-n + 7) {
+  border-top: 1px solid #e2e8f0;
+}
+
+.calendar-weekdays .calendar-weekday {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 0;
+}
+
+.calendar-weekdays .calendar-weekday:first-child {
+  border-left: 1px solid #e2e8f0;
+}
+
+.calendar-weekdays .calendar-weekday:last-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.calendar-day.today {
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+}
+
+.calendar-day.other-month {
+  background: #f9fafb;
+  color: #a1a1aa;
+}
+
+.calendar-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.day-count {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #312e81;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.calendar-event:hover {
+  background: #e0e7ff;
+}
+
+.calendar-event.meeting {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.calendar-event.reservation {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.calendar-event.vacation {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.calendar-event.businessTrip {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.calendar-event.personal {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.calendar-event .event-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-more {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 500;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.calendar-empty {
+  padding: 24px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.calendar-empty-icon {
+  font-size: 32px;
+  color: #6366f1;
+}
+
+.calendar-empty-title {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.calendar-empty-weekly {
+  min-height: 200px;
+  justify-content: center;
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "schedule"
+      "approval"
+      "attendance";
+  }
+
+  .schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .schedule-controls {
+    justify-content: flex-start;
+  }
 }
 
 .content-card {
@@ -910,42 +1577,126 @@ export default {
   padding: 20px 24px;
 }
 
-.attendance-summary {
+.attendance-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
-.summary-item {
-  text-align: center;
-  padding: 16px;
+.summary-section {
   background: #f8f9fa;
   border-radius: 8px;
-}
-
-.summary-item .label {
-  display: block;
-  font-size: 12px;
-  color: #606266;
-  margin-bottom: 4px;
-}
-
-.summary-item .value {
-  display: block;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.attendance-chart {
-  height: 200px;
-  background: white;
-  border-radius: 8px;
   padding: 16px;
 }
 
-.chat-list, .approval-list, .schedule-list {
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-value.late {
+  color: #f56c6c;
+}
+
+.stat-value.highlight {
+  color: #4f46e5;
+}
+
+.weekly-status {
+  border-top: 1px solid #e4e7ed;
+  padding-top: 20px;
+}
+
+.weekly-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.weekly-days {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.day-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  min-width: 50px;
+}
+
+.day-item.present {
+  background: #e8f5e9;
+}
+
+.day-item.late {
+  background: #fff3e0;
+}
+
+.day-item.absent {
+  background: #ffebee;
+}
+
+.day-label {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.day-status {
+  font-size: 18px;
+}
+
+.day-item.present .day-status {
+  color: #67c23a;
+}
+
+.day-item.late .day-status {
+  color: #e6a23c;
+}
+
+.day-item.absent .day-status {
+  color: #f56c6c;
+}
+
+.chat-list, .approval-list {
   padding: 16px 24px;
 }
 
@@ -1028,6 +1779,10 @@ export default {
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.schedule-item {
+  align-items: flex-start;
 }
 
 .approval-item:hover {

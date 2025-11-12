@@ -445,26 +445,8 @@ export default {
   padding: 16px;
   border-radius: 12px;
   flex-shrink: 0;
-}
-
-.stat-icon.my-goal {
-  color: #409eff;
-  background: rgba(64, 158, 255, 0.1);
-}
-
-.stat-icon.team-goal {
-  color: #e6a23c;
-  background: rgba(230, 162, 60, 0.1);
-}
-
-.stat-icon.completed-my {
-  color: #67c23a;
-  background: rgba(103, 194, 58, 0.1);
-}
-
-.stat-icon.completed-team {
-  color: #909399;
-  background: rgba(144, 147, 153, 0.1);
+  color: white;
+  background: #4f46e5;
 }
 
 .stat-info {
@@ -473,7 +455,7 @@ export default {
 
 .stat-value {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 600;
   color: #303133;
   margin-bottom: 4px;
   line-height: 1;

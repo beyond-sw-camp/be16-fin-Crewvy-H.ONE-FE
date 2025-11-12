@@ -181,7 +181,7 @@
                 </div>
                 <div class="vacation-status">
                   <el-tag :type="getVacationStatusType(leave.status)" size="small">
-                    {{ leave.status }}
+                    {{ formatStatus(leave.status) }}
                   </el-tag>
                 </div>
               </div>
@@ -256,10 +256,12 @@ export default {
           clockInTime.value = todayStatus.firstClockIn ? new Date(todayStatus.firstClockIn).toLocaleTimeString('ko-KR') : null;
           clockOutTime.value = todayStatus.lastClockOut ? new Date(todayStatus.lastClockOut).toLocaleTimeString('ko-KR') : null;
 
-          if(todayStatus.workedMinutes) {
+          if(todayStatus.workedMinutes != null) {
             const hours = Math.floor(todayStatus.workedMinutes / 60);
             const minutes = todayStatus.workedMinutes % 60;
             totalWorkTime.value = `${String(hours).padStart(2, '0')}시간 ${String(minutes).padStart(2, '0')}분`;
+          } else {
+            totalWorkTime.value = '00시간 00분';
           }
 
           // 마지막 이벤트를 기준으로 현재 상태를 명확하게 결정
@@ -546,9 +548,20 @@ export default {
       const statusMap = {
         'PENDING': 'warning',
         'APPROVED': 'success',
-        'REJECTED': 'danger'
+        'REJECTED': 'danger',
+        'CANCELED': 'warning'
       };
       return statusMap[status] || 'info';
+    };
+
+    const formatStatus = (status) => {
+      const statusMap = {
+        'PENDING': '대기중',
+        'APPROVED': '승인',
+        'REJECTED': '반려',
+        'CANCELED': '취소'
+      };
+      return statusMap[status] || status;
     };
 
     const getProgressColor = (balance) => {
@@ -565,7 +578,7 @@ export default {
       leaveRequests, leavePagination, handleLeavePageChange, goToLeaveRequest, goToLeaveRequestWithPolicy,
       Clock, Calendar, Sunny, TrendCharts, VideoPlay, VideoPause, Plus, CoffeeCup, Check,
       balanceInfo,
-      formatDate, getVacationStatusType, allBalances, usableBalances, getProgressColor,
+      formatDate, getVacationStatusType, formatStatus, allBalances, usableBalances, getProgressColor,
       isBreakManualMode, effectivePolicy,
       monthlyWorkDays, totalMonthlyWorkHours
     };
@@ -583,7 +596,7 @@ export default {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   margin-bottom: 24px;
 }
 
@@ -650,7 +663,7 @@ export default {
   justify-content: center;
   font-size: 20px;
   color: white;
-  background: #409EFF;
+  background: #4f46e5;
 }
 
 .card-content {
@@ -741,12 +754,20 @@ export default {
 .time-value {
   font-size: 28px;
   font-weight: 600;
-  color: #409EFF;
+  color: #4f46e5;
 }
 
 /* 휴가 관리 탭 스타일 */
 .section-header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-header .el-button {
+  flex-shrink: 0;
 }
 
 .section-header h3 {

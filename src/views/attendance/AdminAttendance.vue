@@ -1,242 +1,259 @@
 <template>
   <div class="admin-attendance">
+    <div class="header-content">
+      <h1>근태 현황</h1>
+      <p>직원들의 근태 현황을 확인하세요.</p>
+    </div>
     <!-- 대시보드 통계 -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-label">총원</div>
-          <div class="stat-number">{{ summaryStats.total }}</div>
+          <el-icon class="stat-icon total"><UserFilled /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ summaryStats.total }}</div>
+            <div class="stat-label">총원</div>
+          </div>
         </div>
       </div>
-      <div class="stat-card success">
+      <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-label">정상 출근</div>
-          <div class="stat-number">{{ summaryStats.onTime }}</div>
+          <el-icon class="stat-icon success"><CircleCheck /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ summaryStats.onTime }}</div>
+            <div class="stat-label">정상 출근</div>
+          </div>
         </div>
       </div>
-      <div class="stat-card warning">
+      <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-label">지각</div>
-          <div class="stat-number">{{ summaryStats.late }}</div>
+          <el-icon class="stat-icon warning"><Timer /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ summaryStats.late }}</div>
+            <div class="stat-label">지각</div>
+          </div>
         </div>
       </div>
-      <div class="stat-card info">
+      <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-label">휴가</div>
-          <div class="stat-number">{{ summaryStats.leave }}</div>
+          <el-icon class="stat-icon info"><Calendar /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ summaryStats.leave }}</div>
+            <div class="stat-label">휴가</div>
+          </div>
         </div>
       </div>
     </div>
 
-    <el-tabs v-model="activeTab" class="content-card">
-      <el-tab-pane label="근태 현황" name="status">
-        <div v-if="activeTab === 'status'">
-          <!-- 일일 근태 차트 -->
-          <div class="chart-card">
-            <div class="card-header">
-              <h3>일일 근태 요약</h3>
-            </div>
-            <div class="chart-container" v-if="activeTab === 'status'">
-              <Bar ref="barChart" :key="chartKey" :data="chartData" :options="chartOptions" />
-            </div>
-          </div>
-
-          <!-- 근태 현황 목록 -->
-          <div class="table-card">
-            <div class="card-header">
-              <h3>근태 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
-              <div style="display: flex; gap: 12px;">
-                <el-button type="warning" @click="runAttendanceCorrection" :loading="correctionLoading">
-                  <el-icon><Tools /></el-icon>
-                  <span style="margin-left: 8px;">근태 보정 배치 실행</span>
-                </el-button>
-                <el-button type="primary" @click="exportToExcel">
-                  <el-icon><Download /></el-icon>
-                  <span style="margin-left: 8px;">엑셀로 내보내기</span>
-                </el-button>
+    <div class="tabs-card">
+      <el-tabs v-model="activeTab" class="status-tabs">
+        <el-tab-pane label="근태 현황" name="status">
+          <div v-if="activeTab === 'status'" class="tab-content">
+            <div class="chart-section">
+              <div class="chart-section-header">
+                <h3>일일 근태 요약</h3>
+              </div>
+              <div class="chart-container">
+                <Bar ref="barChart" :key="chartKey" :data="chartData" :options="chartOptions" />
               </div>
             </div>
-            <div class="filter-section">
-              <el-date-picker
-                v-model="selectedDate"
-                type="date"
-                placeholder="날짜 선택"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                @change="fetchAttendanceData"
-              />
-              <el-input
-                v-model="searchQuery"
-                placeholder="이름 또는 부서로 검색"
-                clearable
-                style="width: 240px;"
-              >
-                <template #prepend>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-              <el-button @click="fetchAttendanceData" :loading="isLoading">
-                <el-icon><Refresh /></el-icon>
-                <span style="margin-left: 8px;">새로고침</span>
-              </el-button>
-            </div>
-            <div class="attendance-table">
-              <el-table :data="attendanceData" v-loading="isLoading" style="width: 100%">
-                <el-table-column prop="employeeName" label="이름" width="120" />
-                <el-table-column prop="department" label="부서" width="150" />
-                <el-table-column prop="date" label="날짜" width="150" />
-                <el-table-column prop="status" label="상태" width="100">
-                  <template #default="scope">
-                    <el-tag :type="getStatusTagType(scope.row.status)">
-                      {{ scope.row.status }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="clockIn" label="출근 시간" width="150" />
-                <el-table-column prop="clockOut" label="퇴근 시간" width="150" />
-                <el-table-column prop="workHours" label="근무 시간" />
-                <el-table-column label="작업" width="120">
-                  <template #default="scope">
-                    <el-button size="small" @click="handleEdit(scope.row)">수정</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <div v-if="attendanceTotalPages > 1" class="pagination-container">
-                <el-pagination
-                  background
-                  layout="prev, pager, next"
-                  :total="attendanceTotalElements"
-                  :page-size="attendancePageSize"
-                  v-model:current-page="attendanceCurrentPage"
-                  @current-change="handleAttendancePageChange"
+
+            <div class="table-card">
+              <div class="card-header">
+                <h3>근태 현황 (권한에 따라 조회 범위가 결정됩니다)</h3>
+                <div style="display: flex; gap: 12px;">
+                  <el-button class="action-button" @click="runAttendanceCorrection" :loading="correctionLoading">
+                    <el-icon><Tools /></el-icon>
+                    <span style="margin-left: 8px;">근태 보정 배치 실행</span>
+                  </el-button>
+                  <el-button type="primary" @click="exportToExcel">
+                    <el-icon><Download /></el-icon>
+                    <span style="margin-left: 8px;">엑셀로 내보내기</span>
+                  </el-button>
+                </div>
+              </div>
+              <div class="filter-section">
+                <el-date-picker
+                  v-model="selectedDate"
+                  type="date"
+                  placeholder="날짜 선택"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  @change="fetchAttendanceData"
+                  :cell-class-name="getCellClassName"
                 />
+                <el-input
+                  v-model="searchQuery"
+                  placeholder="이름 또는 부서로 검색"
+                  clearable
+                  style="width: 240px;"
+                >
+                  <template #prepend>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
+                <el-button @click="fetchAttendanceData" :loading="isLoading">
+                  <el-icon><Refresh /></el-icon>
+                  <span style="margin-left: 8px;">새로고침</span>
+                </el-button>
+              </div>
+              <div class="attendance-table">
+                <el-table :data="attendanceData" v-loading="isLoading" style="width: 100%">
+                  <el-table-column prop="employeeName" label="이름" width="120" />
+                  <el-table-column prop="department" label="부서" width="150" />
+                  <el-table-column prop="date" label="날짜" width="150" />
+                  <el-table-column prop="status" label="상태" width="100">
+                    <template #default="scope">
+                      <el-tag :type="getStatusTagType(scope.row.status)">
+                        {{ scope.row.status }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="clockIn" label="출근 시간" width="150" />
+                  <el-table-column prop="clockOut" label="퇴근 시간" width="150" />
+                  <el-table-column prop="workHours" label="근무 시간" />
+                  <el-table-column label="작업" width="120">
+                    <template #default="scope">
+                      <el-button size="small" @click="handleEdit(scope.row)">수정</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="attendanceTotalPages > 1" class="pagination-container">
+                  <el-pagination
+                    background
+                    layout="prev, pager, next"
+                    :total="attendanceTotalElements"
+                    :page-size="attendancePageSize"
+                    v-model:current-page="attendanceCurrentPage"
+                    @current-change="handleAttendancePageChange"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </el-tab-pane>
+        </el-tab-pane>
 
-      <el-tab-pane label="휴가 현황" name="balance">
-        <div v-if="activeTab === 'balance'">
-          <div class="table-card">
-            <div class="card-header">
-              <h3>휴가 현황 관리</h3>
-              <div style="display: flex; gap: 12px;">
-                <el-button type="info" @click="goToLeaveDetail">
-                  <el-icon><View /></el-icon>
-                  <span style="margin-left: 8px;">휴가현황 상세보기</span>
-                </el-button>
-                <el-button type="success" @click="runMonthlyAccrualBatch" :loading="monthlyBatchLoading" :disabled="!isMonthlyBatchEnabled">
-                  <el-icon><Calendar /></el-icon>
-                  <span style="margin-left: 8px;">월별 연차 배치 실행</span>
-                </el-button>
-                <el-button type="primary" @click="exportBalanceToExcel">
-                  <el-icon><Download /></el-icon>
-                  <span style="margin-left: 8px;">엑셀로 내보내기</span>
+        <el-tab-pane label="휴가 현황" name="balance">
+          <div v-if="activeTab === 'balance'" class="tab-content">
+            <div class="table-card">
+              <div class="card-header">
+                <h3>휴가 현황 관리</h3>
+                <div style="display: flex; gap: 12px;">
+                  <el-button type="info" @click="goToLeaveDetail">
+                    <el-icon><View /></el-icon>
+                    <span style="margin-left: 8px;">휴가현황 상세보기</span>
+                  </el-button>
+                  <el-button type="success" @click="runMonthlyAccrualBatch" :loading="monthlyBatchLoading" :disabled="!isMonthlyBatchEnabled">
+                    <el-icon><Calendar /></el-icon>
+                    <span style="margin-left: 8px;">월별 연차 배치 실행</span>
+                  </el-button>
+                  <el-button type="primary" @click="exportBalanceToExcel">
+                    <el-icon><Download /></el-icon>
+                    <span style="margin-left: 8px;">엑셀로 내보내기</span>
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="filter-section">
+                <el-select v-model="policyTypeFilter" placeholder="유형 선택" clearable style="width: 180px;">
+                  <el-option label="전체" value="" />
+                  <el-option label="연차유급휴가" value="PTC001" />
+                  <el-option label="출산전후휴가" value="PTC002" />
+                  <el-option label="배우자 출산휴가" value="PTC003" />
+                  <el-option label="육아휴직" value="PTC004" />
+                  <el-option label="가족돌봄휴가" value="PTC005" />
+                  <el-option label="생리휴가" value="PTC006" />
+                </el-select>
+                <el-select v-model="yearsOfServiceFilter" placeholder="근속년수" clearable style="width: 150px;">
+                  <el-option label="전체" value="" />
+                  <el-option label="1년 미만" value="<1" />
+                  <el-option label="1년 이상" value=">=1" />
+                  <el-option label="3년 이상" value=">=3" />
+                  <el-option label="5년 이상" value=">=5" />
+                  <el-option label="10년 이상" value=">=10" />
+                </el-select>
+                <el-input
+                  v-model="balanceSearchQuery"
+                  placeholder="이름 또는 부서로 검색"
+                  clearable
+                  style="width: 240px;"
+                >
+                  <template #prepend>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
+                <el-button @click="fetchBalanceData" :loading="balanceLoading">
+                  <el-icon><Refresh /></el-icon>
+                  <span style="margin-left: 8px;">새로고침</span>
                 </el-button>
               </div>
-            </div>
 
-            <div class="filter-section">
-              <el-select v-model="policyTypeFilter" placeholder="유형 선택" clearable style="width: 180px;">
-                <el-option label="전체" value="" />
-                <el-option label="연차유급휴가" value="PTC001" />
-                <el-option label="출산전후휴가" value="PTC002" />
-                <el-option label="배우자 출산휴가" value="PTC003" />
-                <el-option label="육아휴직" value="PTC004" />
-                <el-option label="가족돌봄휴가" value="PTC005" />
-                <el-option label="생리휴가" value="PTC006" />
-              </el-select>
-              <el-select v-model="yearsOfServiceFilter" placeholder="근속년수" clearable style="width: 150px;">
-                <el-option label="전체" value="" />
-                <el-option label="1년 미만" value="<1" />
-                <el-option label="1년 이상" value=">=1" />
-                <el-option label="3년 이상" value=">=3" />
-                <el-option label="5년 이상" value=">=5" />
-                <el-option label="10년 이상" value=">=10" />
-              </el-select>
-              <el-input
-                v-model="balanceSearchQuery"
-                placeholder="이름 또는 부서로 검색"
-                clearable
-                style="width: 240px;"
-              >
-                <template #prepend>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-              <el-button @click="fetchBalanceData" :loading="balanceLoading">
-                <el-icon><Refresh /></el-icon>
-                <span style="margin-left: 8px;">새로고침</span>
-              </el-button>
-            </div>
-
-            <div class="balance-table">
-              <el-table :data="balanceData" v-loading="balanceLoading" style="width: 100%">
-                <el-table-column prop="memberName" label="이름" width="120" />
-                <el-table-column prop="organizationName" label="부서" width="150" />
-                <el-table-column prop="titleName" label="직책" width="120" />
-                <el-table-column label="입사일" width="120">
-                  <template #default="scope">
-                    {{ scope.row.joinDate || '-' }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="근속년수" width="100">
-                  <template #default="scope">
-                    {{ calculateYearsOfService(scope.row.joinDate) }}년
-                  </template>
-                </el-table-column>
-                <el-table-column label="전월 근속률" width="120" align="center">
-                  <template #default="scope">
-                    <span :class="{ 'low-attendance': scope.row.previousMonthAttendanceRate < 80 }">
-                      {{ scope.row.previousMonthAttendanceRate ? scope.row.previousMonthAttendanceRate.toFixed(1) : '0.0' }}%
-                    </span>
-                    <el-tag v-if="scope.row.previousMonthAttendanceRate < 80" type="danger" size="small" style="margin-left: 4px;">미달</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="policyTypeName" label="유형" width="140" />
-                <el-table-column label="부여" width="80" align="right">
-                  <template #default="scope">
-                    {{ (scope.row.totalGranted || 0).toFixed(1) }}일
-                  </template>
-                </el-table-column>
-                <el-table-column label="사용" width="80" align="right">
-                  <template #default="scope">
-                    {{ (scope.row.totalUsed || 0).toFixed(1) }}일
-                  </template>
-                </el-table-column>
-                <el-table-column label="잔여" width="80" align="right">
-                  <template #default="scope">
-                    {{ (scope.row.remainingBalance || 0).toFixed(1) }}일
-                  </template>
-                </el-table-column>
-                <el-table-column label="상태" width="100">
-                  <template #default="scope">
-                    <el-tag v-if="scope.row.isUsable === false" type="danger" size="small">사용불가</el-tag>
-                    <el-tag v-else type="success" size="small">정상</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="작업" width="120" fixed="right">
-                  <template #default="scope">
-                    <el-button size="small" @click="handleBalanceEdit(scope.row)">수정</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <div v-if="balanceTotalPages > 1" class="pagination-container">
-                <el-pagination
-                  background
-                  layout="prev, pager, next"
-                  :total="balanceTotalElements"
-                  :page-size="balancePageSize"
-                  v-model:current-page="balanceCurrentPage"
-                  @current-change="handleBalancePageChange"
-                />
+              <div class="balance-table">
+                <el-table :data="balanceData" v-loading="balanceLoading" style="width: 100%" default-sort="{prop: 'memberName', order: 'ascending'}">
+                  <el-table-column prop="memberName" label="이름" width="120" sortable />
+                  <el-table-column prop="organizationName" label="부서" width="150" sortable />
+                  <el-table-column prop="titleName" label="직책" width="120" sortable />
+                  <el-table-column prop="joinDate" label="입사일" width="120" sortable>
+                    <template #default="scope">
+                      {{ scope.row.joinDate || '-' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="joinDate" label="근속년수" width="100" sortable>
+                    <template #default="scope">
+                      {{ calculateYearsOfService(scope.row.joinDate) }}년
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="previousMonthAttendanceRate" label="전월 근속률" width="120" align="center" sortable>
+                    <template #default="scope">
+                      <span :class="{ 'low-attendance': scope.row.previousMonthAttendanceRate < 80 }">
+                        {{ scope.row.previousMonthAttendanceRate ? scope.row.previousMonthAttendanceRate.toFixed(1) : '0.0' }}%
+                      </span>
+                      <el-tag v-if="scope.row.previousMonthAttendanceRate < 80" type="danger" size="small" style="margin-left: 4px;">미달</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="policyTypeName" label="유형" width="140" sortable />
+                  <el-table-column prop="totalGranted" label="부여" width="80" align="right" sortable>
+                    <template #default="scope">
+                      {{ (scope.row.totalGranted || 0).toFixed(1) }}일
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="totalUsed" label="사용" width="80" align="right" sortable>
+                    <template #default="scope">
+                      {{ (scope.row.totalUsed || 0).toFixed(1) }}일
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="remainingBalance" label="잔여" width="80" align="right" sortable>
+                    <template #default="scope">
+                      {{ (scope.row.remainingBalance || 0).toFixed(1) }}일
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="isUsable" label="상태" width="100" sortable>
+                    <template #default="scope">
+                      <el-tag v-if="scope.row.isUsable === false" type="danger" size="small">사용불가</el-tag>
+                      <el-tag v-else type="success" size="small">정상</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="작업" width="120" fixed="right">
+                    <template #default="scope">
+                      <el-button size="small" @click="handleBalanceEdit(scope.row)">수정</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="balanceTotalPages > 1" class="pagination-container">
+                  <el-pagination
+                    background
+                    layout="prev, pager, next"
+                    :total="balanceTotalElements"
+                    :page-size="balancePageSize"
+                    v-model:current-page="balanceCurrentPage"
+                    @current-change="handleBalancePageChange"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </el-tab-pane>
-                </el-tabs>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
             
                 <!-- 연차 수정 다이얼로그 -->
                 <el-dialog v-model="balanceEditDialogVisible" title="연차 수정" width="500px">
@@ -336,14 +353,14 @@
             import { Bar } from 'vue-chartjs';
             import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
             import { useSnackbar } from '@/composables/useSnackbar';
-            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch, updateMemberBalance } from '@/api/attendance';
-            import { Download, Search, Refresh, Tools, Calendar, View } from '@element-plus/icons-vue';
+            import { getTeamAttendanceStatus, runAnnualLeaveAccrualBatch as runBatchAPI, getLeaveBalanceStatus, updateDailyAttendance, runAttendanceCorrectionBatch, updateMemberBalance, getHolidays } from '@/api/attendance';
+import { Download, Search, Refresh, Tools, Calendar, View, UserFilled, CircleCheck, Timer } from '@element-plus/icons-vue';
 
             ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
             export default {
               name: 'AdminAttendance',
-              components: { Bar, Download, Search, Refresh, Tools, Calendar, View },
+              components: { Bar, Download, Search, Refresh, Tools, Calendar, View, UserFilled, CircleCheck, Timer },
               setup() {
                 const router = useRouter();
                 const { success, info, error } = useSnackbar();
@@ -376,6 +393,9 @@
     const attendanceCurrentPage = ref(1);
     const attendancePageSize = ref(20);
     const attendanceTotalElements = ref(0);
+
+    // 공휴일 데이터
+    const holidays = ref([]);
 
     const filteredAttendanceData = computed(() => {
       return attendanceData.value.filter(item => {
@@ -548,6 +568,49 @@
 
       } catch (err) {
         error(err.message || '근태 기록 수정에 실패했습니다.');
+      }
+    };
+
+    // 주말 체크 함수
+    const isWeekend = (date) => {
+      const day = date.getDay();
+      return day === 0 || day === 6; // 일요일(0) 또는 토요일(6)
+    };
+
+    // 공휴일 체크 함수
+    const isHoliday = (date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      return holidays.value.some(h => h.date === dateStr);
+    };
+
+    // 캘린더 셀 클래스 설정 (주말: 빨간 숫자, 공휴일: 빨간 원)
+    const getCellClassName = (date) => {
+      const targetDate = new Date(date);
+      if (isWeekend(targetDate)) {
+        return 'weekend-cell'; // 주말 (숫자만 빨간색)
+      }
+      if (isHoliday(targetDate)) {
+        return 'holiday-cell'; // 공휴일 (선택 시 빨간 원)
+      }
+      return '';
+    };
+
+    // 공휴일 조회 (1년치)
+    const fetchHolidays = async () => {
+      try {
+        const today = new Date();
+        const startDate = new Date(today.getFullYear(), 0, 1); // 올해 1월 1일
+        const endDate = new Date(today.getFullYear(), 11, 31); // 올해 12월 31일
+
+        const params = {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        };
+
+        holidays.value = await getHolidays(params);
+      } catch (err) {
+        console.error('공휴일 조회 실패:', err);
+        // 공휴일 조회 실패해도 계속 진행
       }
     };
 
@@ -802,6 +865,7 @@
     // 컴포넌트 마운트 시 데이터 조회
     onMounted(() => {
       fetchAttendanceData();
+      fetchHolidays();
     });
 
     // 탭 변경 시 데이터 조회
@@ -839,6 +903,7 @@
       handleSave,
       exportToExcel,
       fetchAttendanceData,
+      getCellClassName,
       runAnnualLeaveAccrualBatch,
       getNextBatchDate,
       viewBatchHistory,
@@ -879,6 +944,19 @@
 </script>
 
 <style scoped>
+.header-content h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.header-content p {
+  font-size: 16px;
+  color: #606266;
+  margin-bottom: 24px;
+}
+
 .admin-attendance {
   max-width: 1600px;
   margin: 0 auto;
@@ -886,33 +964,57 @@
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
   margin-bottom: 24px;
 }
 
 .stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  border-left: 5px solid #dcdfe6;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.stat-card.success { border-left-color: #67c23a; }
-.stat-card.warning { border-left-color: #e6a23c; }
-.stat-card.info { border-left-color: #409eff; }
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.15);
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: white;
+  background: #4f46e5;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
 
 .stat-label {
   font-size: 14px;
-  color: #606266;
-  margin-bottom: 8px;
-}
-
-.stat-number {
-  font-size: 28px;
-  font-weight: 600;
-  color: #303133;
+  color: #909399;
+  font-weight: 500;
 }
 
 .table-card {
@@ -923,12 +1025,58 @@
   margin-top: 24px;
 }
 
-.chart-card {
-  background: white;
-  padding: 24px;
+.tabs-card {
+  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  width: 100%;
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.tabs-card :deep(.el-tabs__header) {
+  margin-top: 10px;
+  padding: 0 24px;
+  background: #ffffff;
+}
+
+.tabs-card :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background-color: #e4e7ed;
+}
+
+.tabs-card :deep(.el-tabs__item) {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 16px;
+}
+
+.tab-content {
+  padding: 24px;
+  background: #ffffff;
+}
+
+.chart-section {
+  margin-bottom: 24px;
+}
+
+.chart-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chart-section-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.action-button {
+  color: #303133;
+  background-color: #fff;
+
 }
 
 .chart-container {
@@ -975,5 +1123,23 @@
 
 .warning-text {
   color: #f56c6c;
+}
+
+/* 캘린더 주말 스타일 (숫자만 빨간색) */
+:deep(.weekend-cell) {
+  color: #f56c6c;
+}
+
+/* 캘린더 공휴일 스타일 (선택 시 파란색 원 → 빨간색 원) */
+:deep(.holiday-cell) {
+  color: #f56c6c;
+}
+
+:deep(.holiday-cell.in-range),
+:deep(.holiday-cell.start-date),
+:deep(.holiday-cell.end-date),
+:deep(.holiday-cell.selected) {
+  background-color: #f56c6c !important;
+  color: #fff !important;
 }
 </style>

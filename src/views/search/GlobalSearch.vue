@@ -8,7 +8,7 @@
     </div>
 
     <div class="search-section">
-      <el-input v-model="searchQuery" placeholder="직원, 부서, 결재 문서, 회의록 등 무엇이든 검색해보세요." prefix-icon="Search" clearable
+      <el-input v-model="searchQuery" placeholder="직원, 부서, 결재 문서 등 무엇이든 검색해보세요." prefix-icon="Search" clearable
         @keyup.enter="performSearch">
       </el-input>
       <el-button @click="performSearch">검색</el-button>
@@ -249,7 +249,6 @@ export default {
       categories: [
         { name: 'employee', label: '직원' },
         { name: 'approval', label: '결재문서' },
-        { name: 'meeting', label: '회의록' },
       ],
       results: [], // For global search results
       approvalResults: [], // For paginated approval results
@@ -404,15 +403,15 @@ export default {
 }
 
 .header-content h1 {
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 600;
-  color: #303133;
-  margin-bottom: 5px;
+  color: #2c3e50;
+  margin-bottom: 8px;
 }
 
 .header-content p {
-  font-size: 14px;
-  color: #909399;
+  font-size: 16px;
+  color: #606266;
   margin: 0;
 }
 

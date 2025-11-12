@@ -662,148 +662,7 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
         isBlinking: false,
         sessionWarningInterval: null, // Add this line
 
-        events: [
-          {
-            id: 1,
-            title: '주간 팀 미팅',
-            date: '2025-09-20',
-            type: 'meeting',
-            time: '14:00'
-          },
-          {
-            id: 2,
-            title: '회의실 예약',
-            date: '2025-09-22',
-            type: 'reservation',
-            time: '10:00'
-          },
-          {
-            id: 3,
-            title: '연차 휴가',
-            date: '2025-09-25',
-            type: 'vacation',
-            time: '09:00'
-          },
-          {
-            id: 4,
-            title: '프로젝트 마감',
-            date: '2025-09-30',
-            type: 'deadline',
-            time: '18:00'
-          },
-          {
-            id: 5,
-            title: '월간 보고서 회의',
-            date: '2025-09-15',
-            type: 'meeting',
-            time: '15:00'
-          },
-          {
-            id: 6,
-            title: '고객사 미팅',
-            date: '2025-09-18',
-            type: 'meeting',
-            time: '11:00'
-          },
-          {
-            id: 7,
-            title: '법인 차량 예약',
-            date: '2025-09-19',
-            type: 'reservation',
-            time: '09:00'
-          },
-          {
-            id: 8,
-            title: '반차 휴가',
-            date: '2025-09-23',
-            type: 'vacation',
-            time: '14:00'
-          },
-          {
-            id: 9,
-            title: '신규 프로젝트 킥오프',
-            date: '2025-09-24',
-            type: 'meeting',
-            time: '10:00'
-          },
-          {
-            id: 10,
-            title: '대회의실 예약',
-            date: '2025-09-26',
-            type: 'reservation',
-            time: '16:00'
-          },
-          {
-            id: 11,
-            title: '개인 휴가',
-            date: '2025-09-27',
-            type: 'vacation',
-            time: '09:00'
-          },
-          {
-            id: 12,
-            title: '부서 회의',
-            date: '2025-09-28',
-            type: 'meeting',
-            time: '14:30'
-          },
-          {
-            id: 13,
-            title: '프레젠테이션 준비',
-            date: '2025-09-29',
-            type: 'deadline',
-            time: '17:00'
-          },
-          {
-            id: 14,
-            title: '팀 빌딩',
-            date: '2025-09-30',
-            type: 'meeting',
-            time: '13:00'
-          },
-          {
-            id: 15,
-            title: '고객 상담',
-            date: '2025-09-16',
-            type: 'meeting',
-            time: '10:30'
-          },
-          {
-            id: 16,
-            title: '회의실 A 예약',
-            date: '2025-09-17',
-            type: 'reservation',
-            time: '14:00'
-          },
-          {
-            id: 17,
-            title: '개인 휴가',
-            date: '2025-09-21',
-            type: 'vacation',
-            time: '09:00'
-          },
-          {
-            id: 18,
-            title: '프로젝트 발표',
-            date: '2025-09-19',
-            type: 'deadline',
-            time: '16:00'
-          },
-          {
-            id: 19,
-            title: '부서 교육',
-            date: '2025-09-24',
-            type: 'meeting',
-            time: '09:30'
-          },
-          {
-            id: 20,
-            title: '차량 예약',
-            date: '2025-09-25',
-            type: 'reservation',
-            time: '08:00'
-          }
-        ],
+        events: [],
         showEventDialog: false,
         eventForm: {
           title: '',
@@ -1025,18 +884,41 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
         this.sidebarCollapsed = !this.sidebarCollapsed
       },
       getPageTitle() {
+        const nameTitles = {
+          EmployeeDetailView: '직원 상세 정보',
+          EmployeeEdit: '직원 정보 수정',
+          AddEmployee: '직원 추가',
+          AddOrganization: '조직 추가',
+          TitleManagement: '직책 관리',
+          GradeManagement: '직급 관리',
+          RoleList: '역할 목록',
+          CreateRole: '역할 생성',
+          RoleEdit: '역할 수정',
+          MyInfo: '내 정보',
+          MyInfoEdit: '내 정보 수정',
+          NotificationSettings: '알림 설정'
+        }
+
+        if (this.$route.name && nameTitles[this.$route.name]) {
+          return nameTitles[this.$route.name]
+        }
+
+        if (this.$route.path.startsWith('/employee/detail/')) {
+          return '직원 상세 정보'
+        }
+
         const titles = {
           '/': '대시보드',
+          '/search': '통합 검색',
           '/organization': '조직 관리',
           '/employee': '직원 관리',
           '/employee/title': '직책 관리',
           '/employee/grade': '직급 관리',
-          '/employee/role': '역할 목록',
-          '/employee/role/create': '역할 생성',
           '/attendance': '내 근태 현황',
           '/leave-request': '휴가/출장 신청',
           '/shared-calendar': '공유 캘린더',
           '/admin/attendance': '근태 현황',
+          '/admin/policy-management/create' : '새 근태 정책 생성',
           '/admin/leave-management': '관리자 연차 현황',
           '/performance/team-goal': '팀 목표 관리',
           '/performance/my-goal': '내 목표 관리',
@@ -1064,7 +946,9 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
           '/performance/team-goal/create' : '팀 목표 추가',
           '/admin/policy-management' : '근태 정책 관리',
           '/admin/policy-assignment' : '정책 할당',
-          '/admin/work-location-management' : '근무지 관리'
+          '/admin/work-location-management' : '근무지 관리',
+          '/schedule' : '일정',
+          
         }
         return titles[this.$route.path] || 'H.ONE'
       },
@@ -2003,9 +1887,24 @@ import { ArrowLeft, ArrowRight, CirclePlus, Delete, Edit, CircleCheck, Notebook,
 
 /* 캘린더 모달 스타일 */
 .calendar-btn {
-  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #606266;
-  margin-right: 8px;
+  border-radius: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.calendar-btn .el-icon {
+  font-size: 24px;
+}
+
+.calendar-btn:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
 }
 
 .calendar-modal {

@@ -51,7 +51,10 @@
             </div>
             <div class="filter-actions">
               <el-button type="primary" @click="savePayrollData" :loading="saving">
-                <i class="el-icon-check"></i> 저장
+                <i class="el-icon-check"></i> 기본급 저장
+              </el-button>
+              <el-button type="primary" plain @click="saveAllowanceData" :loading="saving">
+                수당 저장
               </el-button>
             </div>
           </div>
@@ -111,6 +114,20 @@
                   size="small"
                   @input="(value) => handleCurrencyInput(row, getItemProperty(item.name), value)"
                   placeholder="0"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="적용일자" width="160" align="center" header-align="center">
+              <template #default="{ row }">
+                <el-date-picker
+                  v-model="row.allowanceEffectiveDate"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  format="YYYY-MM-DD"
+                  placeholder="YYYY-MM-DD"
+                  size="small"
+                  @change="(value) => handleAllowanceDateChange(row, value)"
+                  clearable
                 />
               </template>
             </el-table-column>
@@ -546,7 +563,7 @@ export default {
     // 컬럼 너비 설정
     getColumnWidth() {
       // 모든 항목에 대해 기본 너비 사용
-      return 130
+      return 160
     },
 
     // 합계 계산
@@ -695,14 +712,17 @@ export default {
         
         // 기존 데이터에서 effectiveDate 찾기 (첫 번째 사원의 해당 항목)
         let existingEffectiveDate = null
+        let existingAmount = 0
         if (this.rows.length > 0) {
           const property = this.getItemProperty(item.name)
           const firstRowWithAllowance = this.rows.find(row => {
-            const allowanceData = row[property + 'EffectiveDate']
-            return allowanceData !== undefined && allowanceData !== null
+            const hasAmount = row[property] !== undefined && row[property] !== null
+            const hasDate = row[property + 'EffectiveDate'] !== undefined && row[property + 'EffectiveDate'] !== null
+            return hasAmount || hasDate
           })
           if (firstRowWithAllowance) {
-            existingEffectiveDate = firstRowWithAllowance[property + 'EffectiveDate']
+            existingAmount = Number(firstRowWithAllowance[property]) || 0
+            existingEffectiveDate = firstRowWithAllowance[property + 'EffectiveDate'] || null
           }
         }
         
@@ -717,7 +737,8 @@ export default {
           batchAmount: existingItem?.batchAmount || 0,
           batchAmountDisplay: existingItem?.batchAmountDisplay || '',
           batchEffectiveDate: existingItem?.batchEffectiveDate || existingEffectiveDate || this.getCurrentDate(),
-          originalEffectiveDate: existingEffectiveDate || null
+          originalEffectiveDate: existingEffectiveDate || null,
+          originalAmount: existingAmount
         }
       })
 
@@ -802,7 +823,9 @@ export default {
           this.warning('조회된 급여 데이터가 없습니다.')
         }
       } catch (error) {
-        this.error('급여 데이터 조회 중 오류가 발생했습니다.')
+        console.error('급여 데이터 조회 실패:', error)
+        const errorMessage = error?.response?.data?.message || error?.response?.data?.error
+        this.error(errorMessage || '급여 데이터 조회 중 오류가 발생했습니다.')
       } finally {
         this.loading = false
       }
@@ -833,10 +856,10 @@ export default {
             const property = this.getItemProperty(allowance.allowanceName)
             employee[property] = allowance.amount || 0
             employee[property + 'Display'] = this.formatCurrency(allowance.amount || 0)
+            employee[property + 'OriginalAmount'] = allowance.amount || 0
             // effectiveDate도 저장
-            if (allowance.effectiveDate) {
-              employee[property + 'EffectiveDate'] = allowance.effectiveDate
-            }
+            employee[property + 'EffectiveDate'] = allowance.effectiveDate || null
+            employee[property + 'OriginalEffectiveDate'] = allowance.effectiveDate || null
           })
         }
         
@@ -846,8 +869,13 @@ export default {
           if (!Object.prototype.hasOwnProperty.call(employee, property)) {
             employee[property] = 0
             employee[property + 'Display'] = '0'
+            employee[property + 'OriginalAmount'] = 0
+            employee[property + 'EffectiveDate'] = null
+            employee[property + 'OriginalEffectiveDate'] = null
           }
         })
+
+        employee.allowanceEffectiveDate = null
 
         // 합계 계산
         this.calculateTotals(employee)
@@ -882,7 +910,7 @@ export default {
             memberId: row.memberId,
             payType: row.payType || 'MONTHLY', // 기본값: MONTHLY (월급)
             baseSalary: row.baseSalary || 0,
-            customaryWage: row.customaryWage || 0,
+            customaryWage: row.payTotal || 0,
             effectiveDate: row.effectiveDate || this.getCurrentDate()
           }
         })
@@ -926,6 +954,10 @@ export default {
       row.batchEffectiveDate = value || this.getCurrentDate()
     },
 
+    handleAllowanceDateChange(row, value) {
+      row.allowanceEffectiveDate = value || null
+    },
+
     // 현재 날짜를 YYYY-MM-DD 형식으로 반환
     getCurrentDate() {
       const today = new Date()
@@ -933,6 +965,76 @@ export default {
       const mm = String(today.getMonth() + 1).padStart(2, '0')
       const dd = String(today.getDate()).padStart(2, '0')
       return `${yyyy}-${mm}-${dd}`
+    },
+
+    async saveAllowanceData() {
+      if (this.filteredRows.length === 0) {
+        this.warning('저장할 사원 데이터가 없습니다.')
+        return
+      }
+
+      const authHeaders = getAuthHeadersFromToken()
+      if (!authHeaders || !authHeaders['X-User-MemberPositionId']) {
+        this.error('인증 정보를 찾을 수 없습니다.')
+        return
+      }
+
+      const userHeaders = getUserHeaders()
+      const requestHeaders = { ...authHeaders, ...userHeaders }
+
+      const changedAllowances = []
+
+      this.filteredRows.forEach(row => {
+        this.allowanceItems.forEach(item => {
+          const property = this.getItemProperty(item.name)
+          const amount = Number(row[property]) || 0
+          const effectiveDate = row[property + 'EffectiveDate'] || null
+          const originalAmount = Number(row[property + 'OriginalAmount']) || 0
+          const originalEffectiveDate = row[property + 'OriginalEffectiveDate'] || null
+          const rowDate = row.allowanceEffectiveDate || null
+
+          const hasAmountChanged = amount !== originalAmount
+          const hasDateChanged = rowDate
+            ? (rowDate !== (originalEffectiveDate || ''))
+            : false
+
+          if (hasAmountChanged || hasDateChanged) {
+            changedAllowances.push({
+              memberId: row.memberId,
+              allowanceName: item.name,
+              amount,
+              effectiveDate: rowDate || effectiveDate || this.getCurrentDate()
+            })
+          }
+        })
+      })
+
+      if (changedAllowances.length === 0) {
+        this.info('변경된 수당 항목이 없습니다.')
+        return
+      }
+
+      try {
+        this.saving = true
+        await apiClient.post(
+          `/workforce-service/fixed-allowance/create`,
+          changedAllowances,
+          { headers: requestHeaders }
+        )
+
+        this.success('사원별 수당 정보를 저장했습니다.')
+        await this.fetchPayrollData()
+        this.itemRows = this.generateItemRows()
+        this.filteredRows.forEach(row => {
+          row.allowanceEffectiveDate = null
+        })
+      } catch (error) {
+        console.error('사원별 수당 저장 실패:', error)
+        const errorMessage = error?.response?.data?.message || error?.response?.data?.error
+        this.error(errorMessage || '사원별 수당 정보 저장에 실패했습니다.')
+      } finally {
+        this.saving = false
+      }
     },
 
     // 항목별 일괄 저장
@@ -960,68 +1062,36 @@ export default {
           return
         }
 
+        const userHeaders = getUserHeaders()
+        const requestHeaders = { ...authHeaders, ...userHeaders }
+
         // 변경된 항목만 필터링하여 요청 데이터 생성
         const requestData = []
 
-        // 각 항목별로 변경 확인 (모든 사원에게 동일하게 적용되므로 한 번만 체크)
         itemsWithBatchAmount.forEach(item => {
-          // 기본급은 제외
           if (item.itemName === '기본급') {
             return
           }
 
-          // 해당 항목의 기존 데이터 확인 (첫 번째 사원 기준)
-          const property = this.getItemProperty(item.itemName)
-          let hasChanged = false
-          let existingAmount = 0
-          let existingEffectiveDate = null
+          const newAmount = Number(item.batchAmount) || 0
+          const newEffectiveDate = item.batchEffectiveDate || null
+          const originalAmount = Number(item.originalAmount) || 0
+          const originalEffectiveDate = item.originalEffectiveDate || null
 
-          if (this.rows.length > 0) {
-            const firstRow = this.rows[0]
-            existingAmount = firstRow[property] || 0
-            existingEffectiveDate = firstRow[property + 'EffectiveDate'] || null
-          }
+          const amountChanged = newAmount !== originalAmount
 
-          const newAmount = item.batchAmount
-          const newEffectiveDate = item.batchEffectiveDate || this.getCurrentDate()
-
-          // amount 또는 effectiveDate가 변경되었는지 확인
-          const amountChanged = existingAmount !== newAmount
-          const dateChanged = existingEffectiveDate !== newEffectiveDate
-
-          if (amountChanged || dateChanged) {
-            // 모든 사원에게 적용하므로 항목당 하나만 추가
+          if (amountChanged) {
             requestData.push({
               allowanceName: item.itemName,
-              amount: newAmount, // int 타입으로 전송
-              effectiveDate: newEffectiveDate
+              amount: newAmount,
+              effectiveDate: newEffectiveDate || originalEffectiveDate || this.getCurrentDate()
             })
-            hasChanged = true
-          }
-
-          // 만약 기존 데이터가 없고 새로 추가하는 경우도 포함
-          if (!hasChanged && this.rows.length > 0) {
-            // 모든 사원을 확인하여 하나라도 해당 항목이 없는 경우 추가
-            const hasAnyEmployeeWithThisItem = this.rows.some(row => {
-              const rowProperty = this.getItemProperty(item.itemName)
-              return row[rowProperty] && row[rowProperty] > 0
-            })
-            
-            if (!hasAnyEmployeeWithThisItem && newAmount > 0) {
-              requestData.push({
-                allowanceName: item.itemName,
-                amount: newAmount, // int 타입으로 전송
-                effectiveDate: newEffectiveDate
-              })
-            }
           }
         })
 
-        // 변경된 항목이 없으면 종료
         if (requestData.length === 0) {
           this.info('변경된 항목이 없습니다.')
-          
-          // 일괄 적용 금액 초기화
+
           this.itemRows.forEach(item => {
             item.batchAmount = 0
             item.batchAmountDisplay = ''
@@ -1030,12 +1100,11 @@ export default {
           return
         }
 
-        const userHeaders = getUserHeaders()
         await apiClient.put(
           `/workforce-service/fixed-allowance/update-all`,
           requestData,
           {
-            headers: userHeaders
+            headers: requestHeaders
           }
         )
 
