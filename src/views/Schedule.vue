@@ -538,10 +538,10 @@ export default {
         }
         
         scheduleData.forEach((item, index) => {
-          if (!item.startDate || !item.endDate) return
+          if (!item.startDate) return
           
           const startDateTime = new Date(item.startDate)
-          const endDateTime = new Date(item.endDate)
+          const endDateTime = item.endDate ? new Date(item.endDate) : startDateTime
           
           const startDateKey = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`
           const endDateKey = `${endDateTime.getFullYear()}-${String(endDateTime.getMonth() + 1).padStart(2, '0')}-${String(endDateTime.getDate()).padStart(2, '0')}`

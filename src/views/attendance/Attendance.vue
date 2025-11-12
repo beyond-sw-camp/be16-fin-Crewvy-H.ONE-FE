@@ -760,6 +760,14 @@ export default {
 /* 휴가 관리 탭 스타일 */
 .section-header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-header .el-button {
+  flex-shrink: 0;
 }
 
 .section-header h3 {
